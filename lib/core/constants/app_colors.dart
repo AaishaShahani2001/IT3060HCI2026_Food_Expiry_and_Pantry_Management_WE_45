@@ -9,4 +9,5 @@ abstract final class AppColors {
   static const Color white = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFF5F6B5A);
   static const Color indicatorInactive = Color(0xFFC8E6C9);
+  static const Color unreadBadge = Color(0xFFE53935);
 }
