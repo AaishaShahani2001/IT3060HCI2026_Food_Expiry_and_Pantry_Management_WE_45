@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "704539240164",
+    "project_id": "food-expiry-pantry-management",
+    "storage_bucket": "food-expiry-pantry-management.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:704539240164:android:5530f03bc4a00df2d8aef1",
+        "android_client_info": {
+          "package_name": "com.example.food_expiry_and_pantry_management"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBIVxbPf3vM9QyogubpcW9sfuM-MkZudWU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
