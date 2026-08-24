@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:food_expiry_and_pantry_management/core/constants/app_colors.dart';
+import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
+import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_strings.dart';
+import 'widgets/home_header.dart';
+import 'widgets/summary_card.dart';
+import 'widgets/welcome_section.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -12,39 +17,53 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: const BoxDecoration(
-                    color: AppColors.softGreen,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.kitchen_rounded,
-                    size: 44,
-                    color: AppColors.primaryGreen,
-                  ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const HomeHeader(),
+              const SizedBox(height: 20),
+              const WelcomeSection(),
+              const SizedBox(height: 24),
+              Text(
+                'Overview',
+                style: textTheme.headlineMedium?.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.darkGreen,
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  AppStrings.homeWelcome,
-                  textAlign: TextAlign.center,
-                  style: textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  AppStrings.homePlaceholder,
-                  textAlign: TextAlign.center,
-                  style: textTheme.bodyLarge,
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 12),
+              SummaryCard(
+                title: AppStrings.pantryItems,
+                value: '24 Items',
+                icon: Icons.kitchen_outlined,
+                onTap: () => context.go(AppRoutes.pantry),
+              ),
+              const SizedBox(height: 10),
+              SummaryCard(
+                title: AppStrings.expiringSoon,
+                value: '3 Items',
+                icon: Icons.event_busy_outlined,
+                iconColor: Colors.orange.shade700,
+                onTap: () => context.go(AppRoutes.expiry),
+              ),
+              const SizedBox(height: 10),
+              SummaryCard(
+                title: AppStrings.shoppingList,
+                value: '5 Needed',
+                icon: Icons.shopping_cart_outlined,
+                onTap: () => context.go(AppRoutes.shopping),
+              ),
+              const SizedBox(height: 10),
+              SummaryCard(
+                title: AppStrings.recipeSuggestions,
+                value: '8 Ready',
+                icon: Icons.restaurant_menu_outlined,
+                onTap: () => context.go(AppRoutes.recipes),
+              ),
+            ],
           ),
         ),
       ),
