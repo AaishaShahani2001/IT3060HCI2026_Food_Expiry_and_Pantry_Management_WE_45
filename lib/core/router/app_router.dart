@@ -5,14 +5,15 @@ import '../../features/home/presentation/home_screen.dart';
 import '../../features/home/presentation/widgets/home_shell.dart';
 import '../../features/home/presentation/widgets/section_placeholder.dart';
 import '../../features/pantry/presentation/screens/pantry_screen.dart';
-import '../../features/shopping/presentation/screens/shopping_screen.dart';
 import '../../features/recipes/presentation/screens/recipes_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
+import '../../features/shopping_list/presentation/screens/add_shopping_item_screen.dart';
+import '../../features/shopping_list/presentation/screens/shopping_list_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
-import '../../features/Authentication/screens/login_screen.dart';
-import '../../features/Authentication/screens/signup_screen.dart';
-import '../../features/profile/presentation/screens/profile_screen.dart';
+import '../../features/Authentication/Screens/login_screen.dart';
+import '../../features/Authentication/Screens/signup_screen.dart';
 import '../../features/profile/presentation/screens/change_password_screen.dart';
+import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../constants/app_strings.dart';
 import 'app_routes.dart';
 
@@ -45,6 +46,10 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.changePassword,
       builder: (context, state) => const ChangePasswordScreen(),
     ),
+    GoRoute(
+      path: AppRoutes.addShoppingItem,
+      builder: (context, state) => const AddShoppingItemScreen(),
+    ),
     ShellRoute(
       builder: (context, state, child) => HomeShell(child: child),
       routes: [
@@ -62,7 +67,7 @@ final GoRouter appRouter = GoRouter(
         ),
         GoRoute(
           path: AppRoutes.shopping,
-          builder: (context, state) => const ShoppingScreen(),
+          builder: (context, state) => const ShoppingListScreen(),
         ),
         GoRoute(
           path: AppRoutes.recipes,
