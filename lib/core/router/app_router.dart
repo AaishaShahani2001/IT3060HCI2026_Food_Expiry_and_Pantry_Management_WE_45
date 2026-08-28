@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/Authentication/screens/login_screen.dart';
-import '../../features/Authentication/screens/signup_screen.dart';
+import '../../features/Authentication/Screens/login_screen.dart';
+import '../../features/Authentication/Screens/signup_screen.dart';
 import '../../features/expiry/presentation/screens/expiry_notification_settings_screen.dart';
 import '../../features/expiry/presentation/screens/expiry_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
@@ -16,7 +16,8 @@ import '../../features/recipes/presentation/screens/recipes_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/shared_pantry/presentation/screens/shared_pantry_members_screen.dart';
 import '../../features/shared_pantry/presentation/screens/shared_pantry_screen.dart';
-import '../../features/shopping/presentation/screens/shopping_screen.dart';
+import '../../features/shopping_list/presentation/screens/add_shopping_item_screen.dart';
+import '../../features/shopping_list/presentation/screens/shopping_list_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
 
 import 'app_routes.dart';
@@ -74,6 +75,11 @@ final GoRouter appRouter = GoRouter(
       },
     ),
 
+    GoRoute(
+      path: AppRoutes.addShoppingItem,
+      builder: (context, state) => const AddShoppingItemScreen(),
+    ),
+
     ShellRoute(
       builder: (context, state, child) {
         return HomeShell(child: child);
@@ -108,7 +114,7 @@ final GoRouter appRouter = GoRouter(
 
         GoRoute(
           path: AppRoutes.shopping,
-          builder: (context, state) => const ShoppingScreen(),
+          builder: (context, state) => const ShoppingListScreen(),
         ),
 
         GoRoute(
