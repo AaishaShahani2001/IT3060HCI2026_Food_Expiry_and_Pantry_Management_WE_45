@@ -6,11 +6,13 @@ import 'package:food_expiry_and_pantry_management/features/shopping_list/models/
 class ShoppingItemTile extends StatelessWidget {
   final ShoppingItem item;
   final ValueChanged<bool> onPurchasedChanged;
+  final VoidCallback onDelete;
 
   const ShoppingItemTile({
     super.key,
     required this.item,
     required this.onPurchasedChanged,
+    required this.onDelete,
   });
 
   @override
@@ -25,6 +27,12 @@ class ShoppingItemTile extends StatelessWidget {
         onChanged: (value) => onPurchasedChanged(value ?? false),
         activeColor: AppColors.primaryGreen,
         controlAffinity: ListTileControlAffinity.leading,
+        secondary: IconButton(
+          onPressed: onDelete,
+          icon: const Icon(Icons.delete_outline),
+          color: AppColors.unreadBadge,
+          tooltip: 'Delete ${item.name}',
+        ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
