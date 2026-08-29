@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_colors.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
 import 'package:go_router/go_router.dart';
 
 class AddShoppingItemScreen extends StatefulWidget {
@@ -13,10 +14,24 @@ class AddShoppingItemScreen extends StatefulWidget {
 
 class _AddShoppingItemScreenState extends State<AddShoppingItemScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _itemNameController = TextEditingController();
+  final _quantityController = TextEditingController();
+
+  @override
+  void dispose() {
+    _itemNameController.dispose();
+    _quantityController.dispose();
+    super.dispose();
+  }
 
   void _submitForm() {
     if (_formKey.currentState?.validate() ?? false) {
-      context.pop();
+      final item = ShoppingItem(
+        name: _itemNameController.text.trim(),
+        quantity: int.parse(_quantityController.text.trim()),
+      );
+
+      context.pop(item);
     }
   }
 
@@ -70,6 +85,7 @@ class _AddShoppingItemScreenState extends State<AddShoppingItemScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     TextFormField(
+                      controller: _itemNameController,
                       autofocus: true,
                       textCapitalization: TextCapitalization.sentences,
                       textInputAction: TextInputAction.next,
@@ -85,6 +101,7 @@ class _AddShoppingItemScreenState extends State<AddShoppingItemScreen> {
                     ),
                     const SizedBox(height: 20),
                     TextFormField(
+                      controller: _quantityController,
                       keyboardType: TextInputType.number,
                       textInputAction: TextInputAction.done,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
