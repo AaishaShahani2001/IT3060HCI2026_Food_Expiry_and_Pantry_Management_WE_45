@@ -30,6 +30,10 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     });
   }
 
+  void _deleteItem(int index) {
+    setState(() => _items.removeAt(index));
+  }
+
   Widget _buildAddItemButton() {
     return SizedBox(
       width: double.infinity,
@@ -108,6 +112,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                     item: _items[index],
                     onPurchasedChanged: (isPurchased) =>
                         _updatePurchasedStatus(index, isPurchased),
+                    onDelete: () => _deleteItem(index),
                   );
                 },
               ),
