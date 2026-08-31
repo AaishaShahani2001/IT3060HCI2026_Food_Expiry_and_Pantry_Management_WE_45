@@ -30,6 +30,17 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     });
   }
 
+  Future<void> _editItem(int index) async {
+    final updatedItem = await context.push<ShoppingItem>(
+      AppRoutes.addShoppingItem,
+      extra: _items[index],
+    );
+
+    if (!mounted || updatedItem == null) return;
+
+    setState(() => _items[index] = updatedItem);
+  }
+
   void _deleteItem(int index) {
     setState(() => _items.removeAt(index));
   }
@@ -112,6 +123,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                     item: _items[index],
                     onPurchasedChanged: (isPurchased) =>
                         _updatePurchasedStatus(index, isPurchased),
+                    onEdit: () => _editItem(index),
                     onDelete: () => _deleteItem(index),
                   );
                 },

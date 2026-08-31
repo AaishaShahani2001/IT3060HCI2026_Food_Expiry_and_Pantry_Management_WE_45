@@ -48,6 +48,7 @@ abstract final class AppStrings {
       'Add items you need to buy.';
   static const String addItem = 'Add Item';
   static const String addShoppingItemTitle = 'Add Shopping Item';
+  static const String editShoppingItemTitle = 'Edit Shopping Item';
   static const String itemName = 'Item Name';
   static const String itemNameHint = 'Milk';
   static const String itemNameRequired = 'Please enter an item name.';
@@ -56,6 +57,7 @@ abstract final class AppStrings {
   static const String quantityRequired = 'Please enter a quantity.';
   static const String quantityInvalid = 'Enter a whole number greater than 0.';
   static const String saveItem = 'Save Item';
+  static const String updateItem = 'Update Item';
 
   static const String sectionComingSoon = 'This section will be updated later.';
 }
