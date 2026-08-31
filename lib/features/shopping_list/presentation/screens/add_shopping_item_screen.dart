@@ -6,7 +6,9 @@ import 'package:food_expiry_and_pantry_management/features/shopping_list/models/
 import 'package:go_router/go_router.dart';
 
 class AddShoppingItemScreen extends StatefulWidget {
-  const AddShoppingItemScreen({super.key});
+  final ShoppingItem? initialItem;
+
+  const AddShoppingItemScreen({super.key, this.initialItem});
 
   @override
   State<AddShoppingItemScreen> createState() => _AddShoppingItemScreenState();
@@ -14,8 +16,21 @@ class AddShoppingItemScreen extends StatefulWidget {
 
 class _AddShoppingItemScreenState extends State<AddShoppingItemScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _itemNameController = TextEditingController();
-  final _quantityController = TextEditingController();
+  late final TextEditingController _itemNameController;
+  late final TextEditingController _quantityController;
+
+  bool get _isEditing => widget.initialItem != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _itemNameController = TextEditingController(
+      text: widget.initialItem?.name ?? '',
+    );
+    _quantityController = TextEditingController(
+      text: widget.initialItem?.quantity.toString() ?? '',
+    );
+  }
 
   @override
   void dispose() {
@@ -29,6 +44,7 @@ class _AddShoppingItemScreenState extends State<AddShoppingItemScreen> {
       final item = ShoppingItem(
         name: _itemNameController.text.trim(),
         quantity: int.parse(_quantityController.text.trim()),
+        isPurchased: widget.initialItem?.isPurchased ?? false,
       );
 
       context.pop(item);
@@ -63,7 +79,9 @@ class _AddShoppingItemScreenState extends State<AddShoppingItemScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          AppStrings.addShoppingItemTitle,
+          _isEditing
+              ? AppStrings.editShoppingItemTitle
+              : AppStrings.addShoppingItemTitle,
           style: textTheme.headlineMedium?.copyWith(
             fontSize: 20,
             color: AppColors.darkGreen,
@@ -119,7 +137,11 @@ class _AddShoppingItemScreenState extends State<AddShoppingItemScreen> {
                     const SizedBox(height: 28),
                     FilledButton(
                       onPressed: _submitForm,
-                      child: const Text(AppStrings.saveItem),
+                      child: Text(
+                        _isEditing
+                            ? AppStrings.updateItem
+                            : AppStrings.saveItem,
+                      ),
                     ),
                   ],
                 ),
