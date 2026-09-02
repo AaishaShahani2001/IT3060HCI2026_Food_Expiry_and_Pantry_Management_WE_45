@@ -1,48 +1,47 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_colors.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
 import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/widgets/shopping_item_tile.dart';
 import 'package:go_router/go_router.dart';
 
-class ShoppingListScreen extends StatefulWidget {
+class ShoppingListScreen extends ConsumerStatefulWidget {
   const ShoppingListScreen({super.key});
 
   @override
-  State<ShoppingListScreen> createState() => _ShoppingListScreenState();
+  ConsumerState<ShoppingListScreen> createState() => _ShoppingListScreenState();
 }
 
-class _ShoppingListScreenState extends State<ShoppingListScreen> {
-  final List<ShoppingItem> _items = [];
-
+class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   Future<void> _openAddItemScreen() async {
     final item = await context.push<ShoppingItem>(AppRoutes.addShoppingItem);
 
     if (!mounted || item == null) return;
 
-    setState(() => _items.add(item));
+    ref.read(shoppingListProvider.notifier).addItem(item);
   }
 
   void _updatePurchasedStatus(int index, bool isPurchased) {
-    setState(() {
-      _items[index] = _items[index].copyWith(isPurchased: isPurchased);
-    });
+    ref.read(shoppingListProvider.notifier).togglePurchased(index, isPurchased);
   }
 
   Future<void> _editItem(int index) async {
+    final items = ref.read(shoppingListProvider);
     final updatedItem = await context.push<ShoppingItem>(
       AppRoutes.addShoppingItem,
-      extra: _items[index],
+      extra: items[index],
     );
 
     if (!mounted || updatedItem == null) return;
 
-    setState(() => _items[index] = updatedItem);
+    ref.read(shoppingListProvider.notifier).updateItem(index, updatedItem);
   }
 
   void _deleteItem(int index) {
-    setState(() => _items.removeAt(index));
+    ref.read(shoppingListProvider.notifier).deleteItem(index);
   }
 
   Widget _buildAddItemButton() {
@@ -106,7 +105,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     );
   }
 
-  Widget _buildItemList() {
+  Widget _buildItemList(List<ShoppingItem> items) {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
@@ -115,12 +114,12 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
             Expanded(
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                itemCount: _items.length,
+                itemCount: items.length,
                 separatorBuilder: (context, index) =>
                     const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   return ShoppingItemTile(
-                    item: _items[index],
+                    item: items[index],
                     onPurchasedChanged: (isPurchased) =>
                         _updatePurchasedStatus(index, isPurchased),
                     onEdit: () => _editItem(index),
@@ -142,6 +141,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final items = ref.watch(shoppingListProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -157,7 +157,9 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
         centerTitle: true,
       ),
       body: SafeArea(
-        child: _items.isEmpty ? _buildEmptyState(context) : _buildItemList(),
+        child: items.isEmpty
+            ? _buildEmptyState(context)
+            : _buildItemList(items),
       ),
     );
   }
