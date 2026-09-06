@@ -1,11 +1,14 @@
-import 'dart:async';
+import 'dart:io' show Platform;
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/router/app_router.dart';
+import '../../../firebase_options.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -20,7 +23,9 @@ class _SplashScreenState extends State<SplashScreen>
 
   late final AnimationController _controller;
   late final Animation<double> _fadeAnimation;
-  Timer? _navigationTimer;
+
+  static bool get _isFlutterTest =>
+      !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
 
   @override
   void initState() {
@@ -34,16 +39,37 @@ class _SplashScreenState extends State<SplashScreen>
       curve: Curves.easeInOut,
     );
     _controller.forward();
+    _bootstrap();
+  }
 
-    _navigationTimer = Timer(_navigationDelay, () {
-      if (!mounted) return;
-      context.go(AppRoutes.onboarding);
-    });
+  Future<void> _bootstrap() async {
+    final startedAt = DateTime.now();
+
+    if (!_isFlutterTest) {
+      try {
+        if (Firebase.apps.isEmpty) {
+          await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform,
+          );
+        }
+      } catch (error, stackTrace) {
+        debugPrint('Firebase init failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    }
+
+    final elapsed = DateTime.now().difference(startedAt);
+    final remaining = _navigationDelay - elapsed;
+    if (remaining > Duration.zero) {
+      await Future<void>.delayed(remaining);
+    }
+
+    if (!mounted) return;
+    context.go(AppRoutes.onboarding);
   }
 
   @override
   void dispose() {
-    _navigationTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
