@@ -31,12 +31,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
-  void _goHome() {
-    context.go(AppRoutes.home);
+  // Go to Login after onboarding
+  void _goLogin() {
+    context.go(AppRoutes.login);
   }
 
   void _onNext() {
     final currentIndex = ref.read(onboardingPageIndexProvider);
+
     if (currentIndex < OnboardingData.items.length - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 350),
@@ -48,7 +50,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(onboardingPageIndexProvider);
-    final isLastPage = currentIndex == OnboardingData.items.length - 1;
+    final isLastPage =
+        currentIndex == OnboardingData.items.length - 1;
 
     return Scaffold(
       body: SafeArea(
@@ -63,36 +66,46 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   child: isLastPage
                       ? const SizedBox.shrink()
                       : TextButton(
-                          onPressed: _goHome,
-                          child: const Text(AppStrings.skip),
-                        ),
+                    onPressed: _goLogin,
+                    child: const Text(AppStrings.skip),
+                  ),
                 ),
               ),
+
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
                   itemCount: OnboardingData.items.length,
                   onPageChanged: (index) {
                     ref
-                        .read(onboardingPageIndexProvider.notifier)
+                        .read(
+                      onboardingPageIndexProvider.notifier,
+                    )
                         .setPage(index);
                   },
                   itemBuilder: (context, index) {
-                    return OnboardingPage(item: OnboardingData.items[index]);
+                    return OnboardingPage(
+                      item: OnboardingData.items[index],
+                    );
                   },
                 ),
               ),
+
               PageIndicator(
                 count: OnboardingData.items.length,
                 currentIndex: currentIndex,
               ),
+
               const SizedBox(height: 24),
+
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: isLastPage ? _goHome : _onNext,
+                  onPressed: isLastPage ? _goLogin : _onNext,
                   child: Text(
-                    isLastPage ? AppStrings.getStarted : AppStrings.next,
+                    isLastPage
+                        ? AppStrings.getStarted
+                        : AppStrings.next,
                   ),
                 ),
               ),
