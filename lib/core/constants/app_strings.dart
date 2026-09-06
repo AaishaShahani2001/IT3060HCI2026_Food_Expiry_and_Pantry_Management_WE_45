@@ -55,7 +55,7 @@ abstract final class AppStrings {
   static const String quantity = 'Quantity';
   static const String quantityHint = '1';
   static const String quantityRequired = 'Please enter a quantity.';
-  static const String quantityInvalid = 'Enter a whole number greater than 0.';
+  static const String quantityInvalid = 'Enter a whole number from 1 to 100.';
   static const String saveItem = 'Save Item';
   static const String updateItem = 'Update Item';
 
