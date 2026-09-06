@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_core/firebase_core.dart';
 
 import 'app.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  await Firebase.initializeApp();
+  // Do not await Firebase here — it blocks the first frame and causes
   runApp(const ProviderScope(child: FreshTrackApp()));
 }
