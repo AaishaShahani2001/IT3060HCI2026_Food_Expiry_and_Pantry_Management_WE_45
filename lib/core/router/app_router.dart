@@ -8,6 +8,7 @@ import '../../features/splash/presentation/splash_screen.dart';
 import '../../features/Authentication/screens/login_screen.dart';
 import '../../features/Authentication/screens/signup_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
+import '../../features/profile/presentation/screens/change_password_screen.dart';
 import '../constants/app_strings.dart';
 import 'app_routes.dart';
 
@@ -36,6 +37,11 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.profile,
       builder: (context, state) => const ProfileScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.changePassword,
+      builder: (context, state) =>
+      const ChangePasswordScreen(),
     ),
     ShellRoute(
       builder: (context, state, child) => HomeShell(child: child),
