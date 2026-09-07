@@ -18,14 +18,82 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const HomeHeader(),
+
+              const SizedBox(height: 16),
+
+              // PROFILE BUTTON
+              InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => context.push(AppRoutes.profile),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF4EE),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFFD5E7DC),
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: Colors.white,
+                        child: Icon(
+                          Icons.person_outline_rounded,
+                          color: Color(0xFF2E6B4E),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'My Profile',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1F4D38),
+                              ),
+                            ),
+                            SizedBox(height: 3),
+                            Text(
+                              'Manage your preferences and pantry type',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16,
+                        color: Color(0xFF2E6B4E),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 20),
+
               const WelcomeSection(),
+
               const SizedBox(height: 24),
+
               Text(
                 'Overview',
                 style: textTheme.headlineMedium?.copyWith(
@@ -34,14 +102,18 @@ class HomeScreen extends StatelessWidget {
                   color: AppColors.darkGreen,
                 ),
               ),
+
               const SizedBox(height: 12),
+
               SummaryCard(
                 title: AppStrings.pantryItems,
                 value: '24 Items',
                 icon: Icons.kitchen_outlined,
                 onTap: () => context.go(AppRoutes.pantry),
               ),
+
               const SizedBox(height: 10),
+
               SummaryCard(
                 title: AppStrings.expiringSoon,
                 value: '3 Items',
@@ -49,14 +121,18 @@ class HomeScreen extends StatelessWidget {
                 iconColor: Colors.orange.shade700,
                 onTap: () => context.go(AppRoutes.expiry),
               ),
+
               const SizedBox(height: 10),
+
               SummaryCard(
                 title: AppStrings.shoppingList,
                 value: '5 Needed',
                 icon: Icons.shopping_cart_outlined,
                 onTap: () => context.go(AppRoutes.shopping),
               ),
+
               const SizedBox(height: 10),
+
               SummaryCard(
                 title: AppStrings.recipeSuggestions,
                 value: '8 Ready',

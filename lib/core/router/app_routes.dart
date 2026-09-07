@@ -11,4 +11,7 @@ abstract final class AppRoutes {
   static const String shopping = '/shopping';
   static const String recipes = '/recipes';
   static const String settings = '/settings';
+  static const String profile = '/profile';
+  static const String changePassword =
+      '/change-password';
 }
