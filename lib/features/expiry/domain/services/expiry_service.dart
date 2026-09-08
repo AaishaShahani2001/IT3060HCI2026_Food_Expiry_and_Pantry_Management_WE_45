@@ -16,26 +16,15 @@ class ExpiryService {
   /// - -1 -> expired yesterday
   ///
   /// Returns null when the item has no expiry date.
-  int? daysUntilExpiry(
-    PantryItem item, {
-    DateTime? referenceDate,
-  }) {
+  int? daysUntilExpiry(PantryItem item, {DateTime? referenceDate}) {
     final expiryDate = item.expiryDate;
     if (expiryDate == null) return null;
 
     final reference = referenceDate ?? DateTime.now();
 
-    final today = DateTime(
-      reference.year,
-      reference.month,
-      reference.day,
-    );
+    final today = DateTime(reference.year, reference.month, reference.day);
 
-    final expiry = DateTime(
-      expiryDate.year,
-      expiryDate.month,
-      expiryDate.day,
-    );
+    final expiry = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
 
     return expiry.difference(today).inDays;
   }
@@ -45,14 +34,8 @@ class ExpiryService {
   /// Returns:
   /// - 0 when the item is not overdue
   /// - positive number when the item has expired
-  int daysOverdue(
-    PantryItem item, {
-    DateTime? referenceDate,
-  }) {
-    final days = daysUntilExpiry(
-      item,
-      referenceDate: referenceDate,
-    );
+  int daysOverdue(PantryItem item, {DateTime? referenceDate}) {
+    final days = daysUntilExpiry(item, referenceDate: referenceDate);
 
     if (days == null || days >= 0) {
       return 0;
@@ -69,16 +52,8 @@ class ExpiryService {
     return items
         .where(
           (item) =>
-              daysUntilExpiry(
-                item,
-                referenceDate: referenceDate,
-              ) !=
-              null &&
-              daysUntilExpiry(
-                    item,
-                    referenceDate: referenceDate,
-                  )! <
-                  0,
+              daysUntilExpiry(item, referenceDate: referenceDate) != null &&
+              daysUntilExpiry(item, referenceDate: referenceDate)! < 0,
         )
         .toList();
   }
@@ -92,20 +67,11 @@ class ExpiryService {
     int days = kExpiryExpiringSoonDays,
     DateTime? referenceDate,
   }) {
-    return items
-        .where(
-          (item) {
-            final remaining = daysUntilExpiry(
-              item,
-              referenceDate: referenceDate,
-            );
+    return items.where((item) {
+      final remaining = daysUntilExpiry(item, referenceDate: referenceDate);
 
-            return remaining != null &&
-                remaining >= 0 &&
-                remaining <= days;
-          },
-        )
-        .toList();
+      return remaining != null && remaining >= 0 && remaining <= days;
+    }).toList();
   }
 
   /// Returns items with a valid expiry date that are not expiring soon.
@@ -113,24 +79,15 @@ class ExpiryService {
     Iterable<PantryItem> items, {
     DateTime? referenceDate,
   }) {
-    return items
-        .where(
-          (item) {
-            final remaining = daysUntilExpiry(
-              item,
-              referenceDate: referenceDate,
-            );
+    return items.where((item) {
+      final remaining = daysUntilExpiry(item, referenceDate: referenceDate);
 
-            return remaining != null && remaining > kExpiryExpiringSoonDays;
-          },
-        )
-        .toList();
+      return remaining != null && remaining > kExpiryExpiringSoonDays;
+    }).toList();
   }
 
   /// Returns items that do not have an expiry date.
-  List<PantryItem> itemsWithoutExpiry(
-    Iterable<PantryItem> items,
-  ) {
+  List<PantryItem> itemsWithoutExpiry(Iterable<PantryItem> items) {
     return items.where((item) => item.expiryDate == null).toList();
   }
 
@@ -145,14 +102,8 @@ class ExpiryService {
     DateTime? referenceDate,
   }) {
     return [
-      ...expiredItems(
-        items,
-        referenceDate: referenceDate,
-      ),
-      ...expiringSoonItems(
-        items,
-        referenceDate: referenceDate,
-      ),
+      ...expiredItems(items, referenceDate: referenceDate),
+      ...expiringSoonItems(items, referenceDate: referenceDate),
     ];
   }
 
@@ -169,15 +120,9 @@ class ExpiryService {
     final sorted = List<PantryItem>.from(items);
 
     sorted.sort((a, b) {
-      final aDays = daysUntilExpiry(
-        a,
-        referenceDate: referenceDate,
-      );
+      final aDays = daysUntilExpiry(a, referenceDate: referenceDate);
 
-      final bDays = daysUntilExpiry(
-        b,
-        referenceDate: referenceDate,
-      );
+      final bDays = daysUntilExpiry(b, referenceDate: referenceDate);
 
       // Items without an expiry date go to the end.
       if (aDays == null && bDays == null) return 0;
@@ -191,14 +136,8 @@ class ExpiryService {
   }
 
   /// Returns a human-readable description of the expiry timing.
-  String expiryMessage(
-    PantryItem item, {
-    DateTime? referenceDate,
-  }) {
-    final days = daysUntilExpiry(
-      item,
-      referenceDate: referenceDate,
-    );
+  String expiryMessage(PantryItem item, {DateTime? referenceDate}) {
+    final days = daysUntilExpiry(item, referenceDate: referenceDate);
 
     if (days == null) {
       return 'Expiry date unknown';
@@ -229,14 +168,8 @@ class ExpiryService {
   ///
   /// Priority is based primarily on expiry urgency and secondarily
   /// on whether the item has stock available.
-  String alertPriority(
-    PantryItem item, {
-    DateTime? referenceDate,
-  }) {
-    final days = daysUntilExpiry(
-      item,
-      referenceDate: referenceDate,
-    );
+  String alertPriority(PantryItem item, {DateTime? referenceDate}) {
+    final days = daysUntilExpiry(item, referenceDate: referenceDate);
 
     if (days == null) {
       return 'none';
@@ -260,24 +193,18 @@ class ExpiryService {
   /// Creates a smart alert message for an item when appropriate.
   ///
   /// Returns null when no alert is required.
-  String? smartAlertMessage(
-    PantryItem item, {
-    DateTime? referenceDate,
-  }) {
-    final priority = alertPriority(
-      item,
-      referenceDate: referenceDate,
-    );
+  String? smartAlertMessage(PantryItem item, {DateTime? referenceDate}) {
+    final priority = alertPriority(item, referenceDate: referenceDate);
 
     switch (priority) {
       case 'critical':
         return '${item.name} has expired. Remove it from active stock.';
 
       case 'high':
-        return '${item.name} expires very soon. Consider prioritizing it for sale.';
+        return '${item.name} expires very soon. Consider using it soon.';
 
       case 'medium':
-        return '${item.name} expires within 3 days. Consider using or selling it soon.';
+        return '${item.name} expires within 3 days. Consider using it soon.';
 
       default:
         return null;
@@ -285,32 +212,18 @@ class ExpiryService {
   }
 
   /// Returns summary counts for the expiry dashboard.
-  ({
-    int total,
-    int expired,
-    int expiringSoon,
-    int fresh,
-    int unknown,
-  }) buildSummary(
-    Iterable<PantryItem> items, {
-    DateTime? referenceDate,
-  }) {
+  ({int total, int expired, int expiringSoon, int fresh, int unknown})
+  buildSummary(Iterable<PantryItem> items, {DateTime? referenceDate}) {
     final itemList = List<PantryItem>.from(items);
 
     return (
       total: itemList.length,
-      expired: expiredItems(
-        itemList,
-        referenceDate: referenceDate,
-      ).length,
+      expired: expiredItems(itemList, referenceDate: referenceDate).length,
       expiringSoon: expiringSoonItems(
         itemList,
         referenceDate: referenceDate,
       ).length,
-      fresh: freshItems(
-        itemList,
-        referenceDate: referenceDate,
-      ).length,
+      fresh: freshItems(itemList, referenceDate: referenceDate).length,
       unknown: itemsWithoutExpiry(itemList).length,
     );
   }
