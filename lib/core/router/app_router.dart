@@ -6,6 +6,7 @@ import '../../features/home/presentation/widgets/home_shell.dart';
 import '../../features/home/presentation/widgets/section_placeholder.dart';
 import '../../features/pantry/presentation/screens/pantry_screen.dart';
 import '../../features/shopping/presentation/screens/shopping_screen.dart';
+import '../../features/recipes/presentation/screens/recipes_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
 import '../../features/Authentication/screens/login_screen.dart';
@@ -65,8 +66,7 @@ final GoRouter appRouter = GoRouter(
         ),
         GoRoute(
           path: AppRoutes.recipes,
-          builder: (context, state) =>
-              const SectionPlaceholder(title: AppStrings.navRecipes),
+          builder: (context, state) => const RecipesScreen(),
         ),
         GoRoute(
           path: AppRoutes.settings,
