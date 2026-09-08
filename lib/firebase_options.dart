@@ -10,25 +10,17 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for iOS.',
-        );
+        return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macOS.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for Windows.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for Linux.',
@@ -46,5 +38,42 @@ class DefaultFirebaseOptions {
     messagingSenderId: '704539240164',
     projectId: 'food-expiry-pantry-management',
     storageBucket: 'food-expiry-pantry-management.firebasestorage.app',
+  );
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyARWFoLCcazT9-CSmVfjd8OPMXCDftuImE',
+    appId: '1:704539240164:web:3650b3d3ebf71266d8aef1',
+    messagingSenderId: '704539240164',
+    projectId: 'food-expiry-pantry-management',
+    authDomain: 'food-expiry-pantry-management.firebaseapp.com',
+    storageBucket: 'food-expiry-pantry-management.firebasestorage.app',
+    measurementId: 'G-FE6T6NSQ7E',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyACSeUD6k-xapFdQIQJa0f294UJwpQRIKQ',
+    appId: '1:704539240164:ios:85916a5d460f2983d8aef1',
+    messagingSenderId: '704539240164',
+    projectId: 'food-expiry-pantry-management',
+    storageBucket: 'food-expiry-pantry-management.firebasestorage.app',
+    iosBundleId: 'com.example.foodExpiryAndPantryManagement',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyACSeUD6k-xapFdQIQJa0f294UJwpQRIKQ',
+    appId: '1:704539240164:ios:85916a5d460f2983d8aef1',
+    messagingSenderId: '704539240164',
+    projectId: 'food-expiry-pantry-management',
+    storageBucket: 'food-expiry-pantry-management.firebasestorage.app',
+    iosBundleId: 'com.example.foodExpiryAndPantryManagement',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyARWFoLCcazT9-CSmVfjd8OPMXCDftuImE',
+    appId: '1:704539240164:web:92ea8c9805534c3ad8aef1',
+    messagingSenderId: '704539240164',
+    projectId: 'food-expiry-pantry-management',
+    authDomain: 'food-expiry-pantry-management.firebaseapp.com',
+    storageBucket: 'food-expiry-pantry-management.firebasestorage.app',
+    measurementId: 'G-CWWE50K08D',
   );
 }
