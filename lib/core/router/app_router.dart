@@ -5,6 +5,7 @@ import '../../features/home/presentation/home_screen.dart';
 import '../../features/home/presentation/widgets/home_shell.dart';
 import '../../features/home/presentation/widgets/section_placeholder.dart';
 import '../../features/pantry/presentation/screens/pantry_screen.dart';
+import '../../features/shopping/presentation/screens/shopping_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
 import '../../features/Authentication/screens/login_screen.dart';
@@ -60,8 +61,7 @@ final GoRouter appRouter = GoRouter(
         ),
         GoRoute(
           path: AppRoutes.shopping,
-          builder: (context, state) =>
-              const SectionPlaceholder(title: AppStrings.shoppingList),
+          builder: (context, state) => const ShoppingScreen(),
         ),
         GoRoute(
           path: AppRoutes.recipes,
