@@ -7,6 +7,7 @@ abstract final class AppRoutes {
 
   static const String home = '/home';
   static const String pantry = '/pantry';
+  static const String sharedPantry = '/shared-pantry';
   static const String expiry = '/expiry';
   static const String shopping = '/shopping';
   static const String recipes = '/recipes';
