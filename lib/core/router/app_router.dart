@@ -13,7 +13,8 @@ import '../../features/Authentication/screens/signup_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/change_password_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
-import 'app_routes.dart';
+import '../../features/shared_pantry/presentation/screens/shared_pantry_screen.dart';
+import '../constants/app_strings.dart';
 
 export 'app_routes.dart';
 
@@ -43,6 +44,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.changePassword,
       builder: (context, state) => const ChangePasswordScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.sharedPantry,
+      builder: (context, state) => const SharedPantryScreen(),
     ),
     ShellRoute(
       builder: (context, state, child) => HomeShell(child: child),
