@@ -9,7 +9,6 @@ import '../widgets/pantry_empty_state.dart';
 import '../widgets/pantry_filter_bottom_sheet.dart';
 import '../widgets/pantry_item_card.dart';
 import '../widgets/pantry_location_selector.dart';
-import '../widgets/pantry_summary_card.dart';
 import 'pantry_item_form_screen.dart';
 
 class PantryScreen extends ConsumerStatefulWidget {
@@ -120,7 +119,6 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
     final itemsAsync = ref.watch(pantryItemsProvider);
     final filteredItems = ref.watch(filteredPantryItemsProvider);
     final filters = ref.watch(pantryFilterProvider);
-    final summary = ref.watch(pantrySummaryProvider);
     final locationCounts = ref.watch(pantryLocationCountsProvider);
     final isTablet = MediaQuery.sizeOf(context).width >= 700;
 
@@ -145,12 +143,6 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
               SliverToBoxAdapter(child: _buildHeader(context, filters)),
               if (_isSearchVisible)
                 SliverToBoxAdapter(child: _buildSearchField()),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: _buildSummary(summary),
-                ),
-              ),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -383,28 +375,6 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildSummary(({int total, int lowStock}) summary) {
-    return Row(
-      children: [
-        PantrySummaryCard(
-          label: 'Total items',
-          value: summary.total.toString(),
-          icon: Icons.inventory_2_outlined,
-          color: AppColors.statusFresh,
-          backgroundColor: AppColors.statusFreshBg,
-        ),
-        const SizedBox(width: 12),
-        PantrySummaryCard(
-          label: 'Low stock',
-          value: summary.lowStock.toString(),
-          icon: Icons.warning_amber_rounded,
-          color: AppColors.statusAmber,
-          backgroundColor: AppColors.statusAmberBg,
-        ),
-      ],
     );
   }
 
