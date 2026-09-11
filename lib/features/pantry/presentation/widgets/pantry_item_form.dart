@@ -243,12 +243,21 @@ class _PantryItemFormState extends State<PantryItemForm> {
                     _buildLabel('Unit'),
                     DropdownButtonFormField<PantryUnit>(
                       value: _unit,
-                      decoration: _inputDecoration(prefixIcon: Icons.scale),
+                      isExpanded: true,
+                      decoration: _inputDecoration().copyWith(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 16,
+                        ),
+                      ),
                       items: PantryUnit.values
                           .map(
                             (unit) => DropdownMenuItem(
                               value: unit,
-                              child: Text(unit.label),
+                              child: Text(
+                                unit.label,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           )
                           .toList(),
