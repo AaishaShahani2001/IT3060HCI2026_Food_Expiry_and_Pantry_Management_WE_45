@@ -38,6 +38,54 @@ enum ExpiryStatus {
   }
 
   String get semanticLabel => 'Expiry status: $label';
+
+  String get badgeLabel {
+    switch (this) {
+      case ExpiryStatus.fresh:
+        return 'Fresh';
+      case ExpiryStatus.expiringSoon:
+        return 'Expiring Soon';
+      case ExpiryStatus.expired:
+        return 'Expired';
+      case ExpiryStatus.unknown:
+        return 'Unknown';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case ExpiryStatus.fresh:
+        return Icons.check_circle_outline_rounded;
+      case ExpiryStatus.expiringSoon:
+        return Icons.warning_amber_rounded;
+      case ExpiryStatus.expired:
+        return Icons.error_outline_rounded;
+      case ExpiryStatus.unknown:
+        return Icons.help_outline_rounded;
+    }
+  }
+
+  Color get backgroundColor {
+    switch (this) {
+      case ExpiryStatus.fresh:
+        return AppColors.statusFreshBg;
+      case ExpiryStatus.expiringSoon:
+        return AppColors.statusOrangeBg;
+      case ExpiryStatus.expired:
+        return AppColors.statusRedBg;
+      case ExpiryStatus.unknown:
+        return AppColors.iconBg;
+    }
+  }
+
+  Color get foregroundColor {
+    switch (this) {
+      case ExpiryStatus.unknown:
+        return AppColors.textSecondary;
+      default:
+        return color;
+    }
+  }
 }
 
 abstract final class ExpiryStatusHelper {
