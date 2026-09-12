@@ -142,3 +142,44 @@ class _ExpiryStatusLegendSheet extends StatelessWidget {
     );
   }
 }
+
+/// Status chip that uses colour, icon and text together.
+class ExpiryStatusBadge extends StatelessWidget {
+  const ExpiryStatusBadge({required this.status, super.key});
+
+  final ExpiryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: status.semanticLabel,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: status.backgroundColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: status.foregroundColor.withValues(alpha: 0.22),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(status.icon, size: 16, color: status.foregroundColor),
+            const SizedBox(width: 6),
+            Text(
+              status.badgeLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: status.foregroundColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

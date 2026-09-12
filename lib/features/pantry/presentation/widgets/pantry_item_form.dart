@@ -60,7 +60,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
       text: item != null ? _decimalFieldText(item.quantity) : '',
     );
     _priceController = TextEditingController(
-      text: item != null ? _decimalFieldText(_safePrice(item)) : '',
+      text: item != null ? _decimalFieldText(item.unitPrice) : '',
     );
     _category = item?.category ?? PantryCategory.other;
     _location = item?.location ?? PantryLocation.pantry;
@@ -76,19 +76,21 @@ class _PantryItemFormState extends State<PantryItemForm> {
     super.dispose();
   }
 
-  static double _safePrice(PantryItem item) {
-    try {
-      return item.price;
-    } catch (_) {
-      return 0.0;
-    }
-  }
-
   static String _decimalFieldText(double value) {
     if (value == value.roundToDouble()) {
       return value.toInt().toString();
     }
     return value.toString();
+  }
+
+  static double? _parsePrice(String? raw) {
+    if (raw == null) return null;
+    final cleaned = raw
+        .trim()
+        .replaceAll(',', '')
+        .replaceAll(RegExp(r'[^\d.]'), '');
+    if (cleaned.isEmpty) return null;
+    return double.tryParse(cleaned);
   }
 
   Future<void> _pickExpiryDate() async {
@@ -120,8 +122,13 @@ class _PantryItemFormState extends State<PantryItemForm> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     FocusScope.of(context).unfocus();
 
-    final quantity = double.parse(_quantityController.text.trim());
-    final price = double.parse(_priceController.text.trim());
+    final quantity = double.tryParse(_quantityController.text.trim());
+    final price = _parsePrice(_priceController.text);
+
+    if (quantity == null || quantity <= 0 || price == null || price < 0) {
+      _formKey.currentState?.validate();
+      return;
+    }
 
     await widget.onSubmit(
       PantryItemFormData(
@@ -301,22 +308,12 @@ class _PantryItemFormState extends State<PantryItemForm> {
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
             ],
-            decoration: _inputDecoration(
-              hint: '0.00',
-              prefix: Text(
-                'Rs. ',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.heading,
-                ),
-              ),
-            ),
+            decoration: _inputDecoration(hint: '0.00', prefixText: 'Rs. '),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
                 return 'Price is required.';
               }
-              final parsed = double.tryParse(value.trim());
+              final parsed = _parsePrice(value);
               if (parsed == null) {
                 return 'Enter a valid number.';
               }
@@ -395,6 +392,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
     String? hint,
     IconData? prefixIcon,
     Widget? prefix,
+    String? prefixText,
     Widget? suffixIcon,
   }) {
     return InputDecoration(
@@ -403,6 +401,14 @@ class _PantryItemFormState extends State<PantryItemForm> {
         color: AppColors.textSecondary.withValues(alpha: 0.6),
       ),
       prefix: prefix,
+      prefixText: prefixText,
+      prefixStyle: prefixText != null
+          ? const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.heading,
+            )
+          : null,
       prefixIcon: prefixIcon != null
           ? Icon(prefixIcon, color: AppColors.primaryDark, size: 22)
           : null,

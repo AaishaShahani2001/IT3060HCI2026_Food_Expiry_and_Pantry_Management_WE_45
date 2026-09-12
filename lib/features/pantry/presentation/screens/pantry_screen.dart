@@ -8,7 +8,9 @@ import '../widgets/expiry_status_indicator.dart';
 import '../widgets/pantry_empty_state.dart';
 import '../widgets/pantry_filter_bottom_sheet.dart';
 import '../widgets/pantry_item_card.dart';
+import '../widgets/pantry_item_dialogs.dart';
 import '../widgets/pantry_location_selector.dart';
+import 'pantry_item_details_screen.dart';
 import 'pantry_item_form_screen.dart';
 
 class PantryScreen extends ConsumerStatefulWidget {
@@ -49,43 +51,19 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
     );
   }
 
+  Future<void> _openItemDetails(PantryItem item) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => PantryItemDetailsScreen(item: item)),
+    );
+  }
+
   Future<void> _confirmDelete(PantryItem item) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cream,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Delete item',
-          style: TextStyle(
-            color: AppColors.heading,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to delete "${item.name}" from your pantry?',
-          style: const TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.statusRed,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await confirmDeletePantryItem(
+      context,
+      itemName: item.name,
     );
 
-    if (confirmed == true && mounted) {
+    if (confirmed && mounted) {
       await ref.read(pantryItemsProvider.notifier).deleteItem(item.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -271,6 +249,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
     final notifier = ref.read(pantryItemsProvider.notifier);
     return PantryItemCard(
       item: item,
+      onTap: () => _openItemDetails(item),
       onEdit: () => _openEditItem(item),
       onDelete: () => _confirmDelete(item),
       onIncrement: () => notifier.adjustQuantity(item.id, item.quantityStep),

@@ -187,7 +187,7 @@ class PantryItem {
     this.expiryDate,
     this.createdAt,
     this.updatedAt,
-  }) : _price = price ?? 0.0;
+  }) : price = price ?? 0.0;
 
   final String id;
   final String name;
@@ -195,13 +195,22 @@ class PantryItem {
   final PantryLocation location;
   final double quantity;
   final PantryUnit unit;
-  final double? _price;
+
+  /// Nullable so older in-memory items (hot reload) don't crash when read.
+  final double? price;
   final DateTime? expiryDate;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  /// Missing or legacy values are treated as 0.0 so existing items stay valid.
-  double get price => _price ?? 0.0;
+  double get unitPrice {
+    try {
+      return price ?? 0.0;
+    } catch (_) {
+      return 0.0;
+    }
+  }
+
+  String get priceLabel => 'Rs. ${unitPrice.toStringAsFixed(2)}';
 
   /// Minimum quantity threshold used for low-stock status.
   double get minQuantity {
@@ -278,7 +287,7 @@ class PantryItem {
       location: location ?? this.location,
       quantity: quantity ?? this.quantity,
       unit: unit ?? this.unit,
-      price: price ?? _price ?? 0.0,
+      price: price ?? unitPrice,
       expiryDate: clearExpiryDate ? null : (expiryDate ?? this.expiryDate),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -292,6 +301,7 @@ class PantryItem {
       'location': location.name,
       'quantity': quantity,
       'unit': unit.name,
+      'price': unitPrice,
       'expiryDate': expiryDate?.toIso8601String(),
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
@@ -306,6 +316,7 @@ class PantryItem {
       location: PantryLocation.fromStorage(data['location'] as String? ?? ''),
       quantity: (data['quantity'] as num?)?.toDouble() ?? 0,
       unit: PantryUnit.fromStorage(data['unit'] as String? ?? ''),
+      price: (data['price'] as num?)?.toDouble() ?? 0.0,
       expiryDate: _parseDate(data['expiryDate']),
       createdAt: _parseDate(data['createdAt']),
       updatedAt: _parseDate(data['updatedAt']),
