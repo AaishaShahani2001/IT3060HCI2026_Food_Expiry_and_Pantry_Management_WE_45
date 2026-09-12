@@ -187,6 +187,7 @@ class PantryItem {
     this.expiryDate,
     this.createdAt,
     this.updatedAt,
+    this.firestoreId,
   }) : price = price ?? 0.0;
 
   final String id;
@@ -201,6 +202,14 @@ class PantryItem {
   final DateTime? expiryDate;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+
+  /// Cloud Firestore document ID under users/{uid}/pantryItems/{itemId}.
+  /// Null until the item has been written to Firestore.
+  final String? firestoreId;
+
+  /// True when this item can be updated or deleted in Cloud Firestore.
+  bool get isConnectedToFirestore =>
+      firestoreId != null && firestoreId!.trim().isNotEmpty;
 
   double get unitPrice {
     try {
@@ -279,6 +288,7 @@ class PantryItem {
     bool clearExpiryDate = false,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? firestoreId,
   }) {
     return PantryItem(
       id: id ?? this.id,
@@ -291,6 +301,8 @@ class PantryItem {
       expiryDate: clearExpiryDate ? null : (expiryDate ?? this.expiryDate),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      // Always keep the Firestore document ID unless a new one is provided.
+      firestoreId: firestoreId ?? this.firestoreId,
     );
   }
 
@@ -311,6 +323,10 @@ class PantryItem {
   factory PantryItem.fromMap(String id, Map<String, dynamic> data) {
     return PantryItem(
       id: id,
+      // The Firestore document ID is the map key, not a field on the document.
+      firestoreId: (data['firestoreId'] as String?)?.isNotEmpty == true
+          ? data['firestoreId'] as String
+          : id,
       name: data['name'] as String? ?? '',
       category: PantryCategory.fromStorage(data['category'] as String? ?? ''),
       location: PantryLocation.fromStorage(data['location'] as String? ?? ''),

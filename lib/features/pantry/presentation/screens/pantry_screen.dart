@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../providers/pantry_providers.dart';
 import '../widgets/expiry_status_indicator.dart';
@@ -22,6 +23,7 @@ class PantryScreen extends ConsumerStatefulWidget {
 
 class _PantryScreenState extends ConsumerState<PantryScreen> {
   bool _isSearchVisible = false;
+  bool _isDeleting = false;
   late final TextEditingController _searchController;
   late final FocusNode _searchFocusNode;
 
@@ -58,23 +60,43 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
   }
 
   Future<void> _confirmDelete(PantryItem item) async {
+    if (_isDeleting) return;
+
     final confirmed = await confirmDeletePantryItem(
       context,
       itemName: item.name,
     );
 
-    if (confirmed && mounted) {
-      await ref.read(pantryItemsProvider.notifier).deleteItem(item.id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            content: Text('${item.name} removed from your pantry'),
+    if (!confirmed || !mounted) return;
+
+    setState(() => _isDeleting = true);
+
+    try {
+      await ref.read(pantryItemsProvider.notifier).deleteItem(item);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-        );
+          content: const Text('Item deleted successfully.'),
+        ),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Pantry delete failed: $error');
+      debugPrint('$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.statusRed,
+          content: Text(mapPantryFirestoreError(error)),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
       }
     }
   }
@@ -118,6 +140,13 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
               parent: BouncingScrollPhysics(),
             ),
             slivers: [
+              if (_isDeleting)
+                const SliverToBoxAdapter(
+                  child: LinearProgressIndicator(
+                    minHeight: 2,
+                    color: AppColors.primaryGreen,
+                  ),
+                ),
               SliverToBoxAdapter(child: _buildHeader(context, filters)),
               if (_isSearchVisible)
                 SliverToBoxAdapter(child: _buildSearchField()),

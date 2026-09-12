@@ -6,6 +6,7 @@ import '../../../expiry/domain/services/expiry_service.dart';
 import '../../../expiry/presentation/providers/expiry_provider.dart';
 import '../../../shopping/domain/models/shopping_item.dart';
 import '../../../shopping/presentation/providers/shopping_providers.dart';
+import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../../domain/utils/expiry_status.dart';
 import '../providers/pantry_providers.dart';
@@ -36,6 +37,9 @@ class _PantryItemDetailsScreenState
   /// True after a local delete/consume so we do not pop twice.
   bool _isLeaving = false;
 
+  /// True while a Firestore delete is in progress.
+  bool _isDeleting = false;
+
   /// Prefers the latest provider copy so edits and quantity stay in sync.
   PantryItem? _resolveItem() {
     final items = ref.watch(pantryItemsProvider).asData?.value;
@@ -54,30 +58,53 @@ class _PantryItemDetailsScreenState
     );
   }
 
-  /// App-bar delete: confirm, remove from local pantry, then go back.
+  /// App-bar delete: confirm, delete from Firestore, then leave this screen.
   Future<void> _confirmDelete(PantryItem item) async {
+    if (_isDeleting) return;
+
     final confirmed = await confirmDeletePantryItem(
       context,
       itemName: item.name,
     );
     if (!confirmed || !mounted) return;
 
+    setState(() => _isDeleting = true);
+    // Set before removing from state so a null item does not pop twice.
     _isLeaving = true;
+
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
-    await ref.read(pantryItemsProvider.notifier).deleteItem(item.id);
-
-    messenger.showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        content: Text('${item.name} removed from your pantry'),
-      ),
-    );
-
-    if (mounted) {
-      navigator.pop();
+    try {
+      await ref.read(pantryItemsProvider.notifier).deleteItem(item);
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          content: const Text('Item deleted successfully.'),
+        ),
+      );
+      if (mounted) {
+        navigator.pop();
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Pantry details delete failed: $error');
+      debugPrint('$stackTrace');
+      _isLeaving = false;
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.statusRed,
+          content: Text(mapPantryFirestoreError(error)),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
     }
   }
 
@@ -300,17 +327,29 @@ class _PantryItemDetailsScreenState
         // Edit / Delete remain here so the bottom actions can be shopping/consume.
         actions: [
           IconButton(
-            onPressed: () => _openEdit(item),
+            onPressed: _isDeleting ? null : () => _openEdit(item),
             tooltip: 'Edit ${item.name}',
             icon: const Icon(Icons.edit_outlined),
             color: AppColors.primaryDark,
           ),
-          IconButton(
-            onPressed: () => _confirmDelete(item),
-            tooltip: 'Delete ${item.name}',
-            icon: const Icon(Icons.delete_outline),
-            color: AppColors.statusRed,
-          ),
+          if (_isDeleting)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              onPressed: () => _confirmDelete(item),
+              tooltip: 'Delete ${item.name}',
+              icon: const Icon(Icons.delete_outline),
+              color: AppColors.statusRed,
+            ),
         ],
       ),
       body: SafeArea(

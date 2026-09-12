@@ -1,11 +1,18 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/repositories/mock_pantry_repository.dart';
+import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../../domain/repositories/pantry_repository.dart';
 
 final pantryRepositoryProvider = Provider<PantryRepository>((ref) {
-  return MockPantryRepository();
+  // Local list starts empty. Added items still sync here after Firestore writes.
+  return MockPantryRepository(initialItems: const []);
+});
+
+final pantryFirestoreServiceProvider = Provider<PantryFirestoreService>((ref) {
+  return PantryFirestoreService();
 });
 
 class PantryFilterState {
@@ -87,26 +94,43 @@ final pantryFilterProvider =
 class PantryItemsNotifier extends AsyncNotifier<List<PantryItem>> {
   @override
   Future<List<PantryItem>> build() async {
-    return ref.read(pantryRepositoryProvider).fetchItems();
+    // Pantry starts empty. Do not load sample/mock items.
+    return const [];
   }
 
   Future<void> refreshItems() async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () => ref.read(pantryRepositoryProvider).fetchItems(),
+    // Keep items added this session. Firestore reads are not connected yet.
+    state = AsyncData(
+      List<PantryItem>.from(state.asData?.value ?? const <PantryItem>[]),
     );
   }
 
   Future<void> addItem(PantryItem item) async {
-    final repository = ref.read(pantryRepositoryProvider);
-    final createdItem = await repository.addItem(item);
+    // Persist first so the returned firestoreId is stored in local state.
+    final persistedItem = await ref
+        .read(pantryFirestoreServiceProvider)
+        .addItem(item);
+    final createdItem = await ref
+        .read(pantryRepositoryProvider)
+        .addItem(persistedItem);
     final currentItems = state.asData?.value ?? [];
     state = AsyncData([createdItem, ...currentItems]);
   }
 
   Future<void> updateItem(PantryItem item) async {
-    final repository = ref.read(pantryRepositoryProvider);
-    final updatedItem = await repository.updateItem(item);
+    final connection = _requireFirestoreConnection(item);
+    final firestore = ref.read(pantryFirestoreServiceProvider);
+
+    // Firestore first so a failed write does not change local lists.
+    await firestore.updatePantryItem(
+      userId: connection.userId,
+      itemId: connection.itemId,
+      item: item,
+    );
+
+    final updatedItem = await ref
+        .read(pantryRepositoryProvider)
+        .updateItem(item);
     final currentItems = state.asData?.value ?? [];
     state = AsyncData(
       currentItems
@@ -115,11 +139,41 @@ class PantryItemsNotifier extends AsyncNotifier<List<PantryItem>> {
     );
   }
 
-  Future<void> deleteItem(String id) async {
-    final repository = ref.read(pantryRepositoryProvider);
-    await repository.deleteItem(id);
+  Future<void> deleteItem(PantryItem item) async {
+    final connection = _requireFirestoreConnection(item);
+    final firestore = ref.read(pantryFirestoreServiceProvider);
+
+    // Firestore first so a failed delete keeps the item visible locally.
+    await firestore.deletePantryItem(
+      userId: connection.userId,
+      itemId: connection.itemId,
+    );
+
+    await ref.read(pantryRepositoryProvider).deleteItem(item.id);
     final currentItems = state.asData?.value ?? [];
-    state = AsyncData(currentItems.where((item) => item.id != id).toList());
+    state = AsyncData(
+      currentItems.where((entry) => entry.id != item.id).toList(),
+    );
+  }
+
+  /// Edit/Delete need a signed-in user and a real Firestore document ID.
+  /// Items that exist only in local memory must not be written to Firestore.
+  ({String userId, String itemId}) _requireFirestoreConnection(
+    PantryItem item,
+  ) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw const PantryFirestoreException('Please log in before continuing.');
+    }
+
+    final firestoreId = item.firestoreId;
+    if (firestoreId == null || firestoreId.trim().isEmpty) {
+      throw const PantryFirestoreException(
+        'This item is local-only and is not connected to Firestore yet.',
+      );
+    }
+
+    return (userId: user.uid, itemId: firestoreId);
   }
 
   /// Instantly adjusts quantity via +/- controls without opening the edit form.

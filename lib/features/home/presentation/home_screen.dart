@@ -1,27 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_colors.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
 import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../expiry/presentation/providers/expiry_provider.dart';
+import '../../pantry/presentation/providers/pantry_providers.dart';
 import 'widgets/home_header.dart';
 import 'widgets/summary_card.dart';
 import 'widgets/welcome_section.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
+    final pantrySummary = ref.watch(pantrySummaryProvider);
+    final expirySummary = ref.watch(expirySummaryProvider);
 
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 16,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -39,9 +41,7 @@ class HomeScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: const Color(0xFFEAF4EE),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: const Color(0xFFD5E7DC),
-                    ),
+                    border: Border.all(color: const Color(0xFFD5E7DC)),
                   ),
                   child: const Row(
                     children: [
@@ -56,8 +56,7 @@ class HomeScreen extends StatelessWidget {
                       SizedBox(width: 12),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'My Profile',
@@ -107,7 +106,7 @@ class HomeScreen extends StatelessWidget {
 
               SummaryCard(
                 title: AppStrings.pantryItems,
-                value: '24 Items',
+                value: _itemCountLabel(pantrySummary.total),
                 icon: Icons.kitchen_outlined,
                 onTap: () => context.go(AppRoutes.pantry),
               ),
@@ -116,7 +115,7 @@ class HomeScreen extends StatelessWidget {
 
               SummaryCard(
                 title: AppStrings.expiringSoon,
-                value: '3 Items',
+                value: _itemCountLabel(expirySummary.expiringSoon),
                 icon: Icons.event_busy_outlined,
                 iconColor: Colors.orange.shade700,
                 onTap: () => context.go(AppRoutes.expiry),
@@ -144,5 +143,9 @@ class HomeScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _itemCountLabel(int count) {
+    return count == 1 ? '1 Item' : '$count Items';
   }
 }
