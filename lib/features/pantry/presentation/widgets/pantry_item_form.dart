@@ -11,6 +11,7 @@ class PantryItemFormData {
     required this.location,
     required this.quantity,
     required this.unit,
+    required this.price,
     this.expiryDate,
   });
 
@@ -19,6 +20,7 @@ class PantryItemFormData {
   final PantryLocation location;
   final double quantity;
   final PantryUnit unit;
+  final double price;
   final DateTime? expiryDate;
 }
 
@@ -42,6 +44,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _quantityController;
+  late final TextEditingController _priceController;
 
   late PantryCategory _category;
   late PantryLocation _location;
@@ -54,11 +57,10 @@ class _PantryItemFormState extends State<PantryItemForm> {
     final item = widget.initialItem;
     _nameController = TextEditingController(text: item?.name ?? '');
     _quantityController = TextEditingController(
-      text: item != null
-          ? (item.quantity == item.quantity.roundToDouble()
-                ? item.quantity.toInt().toString()
-                : item.quantity.toString())
-          : '',
+      text: item != null ? _decimalFieldText(item.quantity) : '',
+    );
+    _priceController = TextEditingController(
+      text: item != null ? _decimalFieldText(_safePrice(item)) : '',
     );
     _category = item?.category ?? PantryCategory.other;
     _location = item?.location ?? PantryLocation.pantry;
@@ -70,7 +72,23 @@ class _PantryItemFormState extends State<PantryItemForm> {
   void dispose() {
     _nameController.dispose();
     _quantityController.dispose();
+    _priceController.dispose();
     super.dispose();
+  }
+
+  static double _safePrice(PantryItem item) {
+    try {
+      return item.price;
+    } catch (_) {
+      return 0.0;
+    }
+  }
+
+  static String _decimalFieldText(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+    return value.toString();
   }
 
   Future<void> _pickExpiryDate() async {
@@ -103,6 +121,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
     FocusScope.of(context).unfocus();
 
     final quantity = double.parse(_quantityController.text.trim());
+    final price = double.parse(_priceController.text.trim());
 
     await widget.onSubmit(
       PantryItemFormData(
@@ -111,6 +130,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
         location: _location,
         quantity: quantity,
         unit: _unit,
+        price: price,
         expiryDate: _expiryDate,
       ),
     );
@@ -273,6 +293,40 @@ class _PantryItemFormState extends State<PantryItemForm> {
             ],
           ),
           const SizedBox(height: 16),
+          _buildLabel('Price'),
+          TextFormField(
+            controller: _priceController,
+            enabled: !widget.isSaving,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+            ],
+            decoration: _inputDecoration(
+              hint: '0.00',
+              prefix: Text(
+                'Rs. ',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.heading,
+                ),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Price is required.';
+              }
+              final parsed = double.tryParse(value.trim());
+              if (parsed == null) {
+                return 'Enter a valid number.';
+              }
+              if (parsed < 0) {
+                return 'Price cannot be negative.';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
           _buildLabel('Expiry date (optional)'),
           InkWell(
             onTap: widget.isSaving ? null : _pickExpiryDate,
@@ -340,6 +394,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
   InputDecoration _inputDecoration({
     String? hint,
     IconData? prefixIcon,
+    Widget? prefix,
     Widget? suffixIcon,
   }) {
     return InputDecoration(
@@ -347,6 +402,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
       hintStyle: TextStyle(
         color: AppColors.textSecondary.withValues(alpha: 0.6),
       ),
+      prefix: prefix,
       prefixIcon: prefixIcon != null
           ? Icon(prefixIcon, color: AppColors.primaryDark, size: 22)
           : null,

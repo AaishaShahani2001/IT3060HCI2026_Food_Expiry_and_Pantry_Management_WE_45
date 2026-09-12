@@ -183,10 +183,11 @@ class PantryItem {
     required this.location,
     required this.quantity,
     required this.unit,
+    double? price,
     this.expiryDate,
     this.createdAt,
     this.updatedAt,
-  });
+  }) : _price = price ?? 0.0;
 
   final String id;
   final String name;
@@ -194,9 +195,13 @@ class PantryItem {
   final PantryLocation location;
   final double quantity;
   final PantryUnit unit;
+  final double? _price;
   final DateTime? expiryDate;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+
+  /// Missing or legacy values are treated as 0.0 so existing items stay valid.
+  double get price => _price ?? 0.0;
 
   /// Minimum quantity threshold used for low-stock status.
   double get minQuantity {
@@ -260,6 +265,7 @@ class PantryItem {
     PantryLocation? location,
     double? quantity,
     PantryUnit? unit,
+    double? price,
     DateTime? expiryDate,
     bool clearExpiryDate = false,
     DateTime? createdAt,
@@ -272,6 +278,7 @@ class PantryItem {
       location: location ?? this.location,
       quantity: quantity ?? this.quantity,
       unit: unit ?? this.unit,
+      price: price ?? _price ?? 0.0,
       expiryDate: clearExpiryDate ? null : (expiryDate ?? this.expiryDate),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
