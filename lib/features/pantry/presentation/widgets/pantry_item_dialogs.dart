@@ -12,11 +12,11 @@ Future<bool> confirmDeletePantryItem(
       backgroundColor: AppColors.cream,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text(
-        'Delete item',
+        'Delete item?',
         style: TextStyle(color: AppColors.heading, fontWeight: FontWeight.bold),
       ),
       content: Text(
-        'Are you sure you want to delete $itemName?',
+        'Are you sure you want to delete $itemName? This action cannot be undone.',
         style: const TextStyle(color: AppColors.textSecondary),
       ),
       actions: [

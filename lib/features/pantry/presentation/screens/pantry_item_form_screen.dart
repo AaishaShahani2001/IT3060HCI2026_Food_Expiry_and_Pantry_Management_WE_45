@@ -1,7 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../providers/pantry_providers.dart';
 import '../widgets/pantry_item_form.dart';
@@ -20,6 +22,8 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
   bool _isSaving = false;
 
   Future<void> _handleSubmit(PantryItemFormData data) async {
+    if (_isSaving) return;
+
     setState(() => _isSaving = true);
 
     try {
@@ -38,18 +42,33 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
           ),
         );
       } else {
-        await notifier.updateItem(
-          widget.item!.copyWith(
-            name: data.name,
-            category: data.category,
-            location: data.location,
-            quantity: data.quantity,
-            unit: data.unit,
-            price: data.price,
-            expiryDate: data.expiryDate,
-            clearExpiryDate: data.expiryDate == null,
-          ),
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          throw const PantryFirestoreException(
+            'Please log in before continuing.',
+          );
+        }
+
+        if (!widget.item!.isConnectedToFirestore) {
+          throw const PantryFirestoreException(
+            'This item is local-only and is not connected to Firestore yet.',
+          );
+        }
+
+        // copyWith keeps firestoreId, createdAt, and any fields the form
+        // does not collect (this model has no image or barcode).
+        final updatedItem = widget.item!.copyWith(
+          name: data.name,
+          category: data.category,
+          location: data.location,
+          quantity: data.quantity,
+          unit: data.unit,
+          price: data.price,
+          expiryDate: data.expiryDate,
+          clearExpiryDate: data.expiryDate == null,
         );
+
+        await notifier.updateItem(updatedItem);
       }
 
       if (mounted) {
@@ -63,18 +82,20 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
             content: Text(
               widget.item == null
                   ? '${data.name} added to your pantry'
-                  : '${data.name} updated successfully',
+                  : 'Item updated successfully.',
             ),
           ),
         );
       }
-    } catch (error) {
+    } catch (error, stackTrace) {
+      debugPrint('Pantry item save failed: $error');
+      debugPrint('$stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             behavior: SnackBarBehavior.floating,
             backgroundColor: AppColors.statusRed,
-            content: Text(error.toString()),
+            content: Text(mapPantryFirestoreError(error)),
           ),
         );
       }
