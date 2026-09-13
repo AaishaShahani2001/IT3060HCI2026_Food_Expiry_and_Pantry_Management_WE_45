@@ -9,12 +9,14 @@ class PantryEmptyState extends StatelessWidget {
     required this.type,
     this.onPrimaryAction,
     this.onRetry,
+    this.message,
     super.key,
   });
 
   final PantryEmptyStateType type;
   final VoidCallback? onPrimaryAction;
   final VoidCallback? onRetry;
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +49,7 @@ class PantryEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              config.message,
+              message ?? config.message,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),

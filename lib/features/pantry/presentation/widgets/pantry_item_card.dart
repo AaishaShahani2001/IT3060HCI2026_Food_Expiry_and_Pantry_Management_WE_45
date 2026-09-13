@@ -12,6 +12,7 @@ class PantryItemCard extends StatelessWidget {
     required this.onIncrement,
     required this.onDecrement,
     this.onTap,
+    this.isUpdating = false,
     super.key,
   });
 
@@ -21,10 +22,11 @@ class PantryItemCard extends StatelessWidget {
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
   final VoidCallback? onTap;
+  final bool isUpdating;
 
   @override
   Widget build(BuildContext context) {
-    final canDecrement = item.quantity > 0;
+    final canDecrement = !isUpdating && item.quantity > 0;
 
     return Container(
       decoration: BoxDecoration(
@@ -105,7 +107,28 @@ class PantryItemCard extends StatelessWidget {
                                             ),
                                           ),
                                         ),
-                                        if (item.isLowStock) ...[
+                                        if (item.isOutOfStock) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 7,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.statusRedBg,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: const Text(
+                                              'Out of stock',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.statusRed,
+                                              ),
+                                            ),
+                                          ),
+                                        ] else if (item.isLowStock) ...[
                                           const SizedBox(width: 6),
                                           Container(
                                             padding: const EdgeInsets.symmetric(
@@ -205,6 +228,7 @@ class PantryItemCard extends StatelessWidget {
                         child: _QuantityStepper(
                           quantityLabel: item.quantityLabel,
                           canDecrement: canDecrement,
+                          isUpdating: isUpdating,
                           onIncrement: onIncrement,
                           onDecrement: onDecrement,
                         ),
@@ -225,12 +249,14 @@ class _QuantityStepper extends StatelessWidget {
   const _QuantityStepper({
     required this.quantityLabel,
     required this.canDecrement,
+    required this.isUpdating,
     required this.onIncrement,
     required this.onDecrement,
   });
 
   final String quantityLabel;
   final bool canDecrement;
+  final bool isUpdating;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
 
@@ -262,19 +288,25 @@ class _QuantityStepper extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Center(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    quantityLabel,
-                    maxLines: 1,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.heading,
-                    ),
-                  ),
-                ),
+                child: isUpdating
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          quantityLabel,
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.heading,
+                          ),
+                        ),
+                      ),
               ),
             ),
           ),
@@ -286,7 +318,7 @@ class _QuantityStepper extends StatelessWidget {
           _StepperButton(
             icon: Icons.add,
             tooltip: 'Increase quantity',
-            enabled: true,
+            enabled: !isUpdating,
             foreground: AppColors.primaryDark,
             onPressed: onIncrement,
           ),

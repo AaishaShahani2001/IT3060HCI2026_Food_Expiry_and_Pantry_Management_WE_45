@@ -1,19 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
+import '../providers/pantry_providers.dart';
+
+class MarkConsumedResult {
+  const MarkConsumedResult({required this.consumed, required this.remaining});
+
+  final double consumed;
+  final double remaining;
+}
 
 /// Lets the user choose how much of a pantry item was consumed.
 ///
-/// Returns the consumed quantity, or null if the sheet is cancelled.
-class MarkConsumedBottomSheet extends StatefulWidget {
+/// Writes to Firestore before closing. Returns null if cancelled or failed.
+class MarkConsumedBottomSheet extends ConsumerStatefulWidget {
   const MarkConsumedBottomSheet({required this.item, super.key});
 
   final PantryItem item;
 
-  static Future<double?> show(BuildContext context, PantryItem item) {
-    return showModalBottomSheet<double>(
+  static Future<MarkConsumedResult?> show(
+    BuildContext context,
+    PantryItem item,
+  ) {
+    return showModalBottomSheet<MarkConsumedResult>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.cream,
@@ -25,14 +38,16 @@ class MarkConsumedBottomSheet extends StatefulWidget {
   }
 
   @override
-  State<MarkConsumedBottomSheet> createState() =>
+  ConsumerState<MarkConsumedBottomSheet> createState() =>
       _MarkConsumedBottomSheetState();
 }
 
-class _MarkConsumedBottomSheetState extends State<MarkConsumedBottomSheet> {
+class _MarkConsumedBottomSheetState
+    extends ConsumerState<MarkConsumedBottomSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _consumedController;
   late double _consumed;
+  bool _isSubmitting = false;
 
   PantryItem get _item => widget.item;
 
@@ -43,7 +58,8 @@ class _MarkConsumedBottomSheetState extends State<MarkConsumedBottomSheet> {
     return leftover < 0 ? 0 : double.parse(leftover.toStringAsFixed(2));
   }
 
-  bool get _canConfirm => _consumed > 0 && _consumed <= _available;
+  bool get _canConfirm =>
+      !_isSubmitting && _consumed > 0 && _consumed <= _available;
 
   @override
   void initState() {
@@ -75,10 +91,38 @@ class _MarkConsumedBottomSheetState extends State<MarkConsumedBottomSheet> {
     );
   }
 
-  void _confirm() {
+  Future<void> _confirm() async {
+    if (_isSubmitting) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (!_canConfirm) return;
-    Navigator.of(context).pop(_consumed);
+    if (_consumed <= 0 || _consumed > _available) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final remaining = await ref
+          .read(pantryItemsProvider.notifier)
+          .markConsumed(item: _item, consumedQuantity: _consumed);
+
+      if (!mounted) return;
+      Navigator.of(
+        context,
+      ).pop(MarkConsumedResult(consumed: _consumed, remaining: remaining));
+    } catch (error, stackTrace) {
+      debugPrint('Mark consumed failed: $error');
+      debugPrint('$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.statusRed,
+          content: Text(mapPantryFirestoreError(error)),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -154,7 +198,7 @@ class _MarkConsumedBottomSheetState extends State<MarkConsumedBottomSheet> {
                   _StepperButton(
                     icon: Icons.remove,
                     tooltip: 'Decrease consumed quantity',
-                    enabled: _consumed > 0,
+                    enabled: !_isSubmitting && _consumed > 0,
                     onPressed: () =>
                         _setConsumed(_consumed - _item.quantityStep),
                   ),
@@ -162,6 +206,7 @@ class _MarkConsumedBottomSheetState extends State<MarkConsumedBottomSheet> {
                   Expanded(
                     child: TextFormField(
                       controller: _consumedController,
+                      enabled: !_isSubmitting,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
@@ -210,10 +255,10 @@ class _MarkConsumedBottomSheetState extends State<MarkConsumedBottomSheet> {
                           return 'Enter a valid number.';
                         }
                         if (parsed <= 0) {
-                          return 'Enter an amount greater than 0.';
+                          return 'Enter a quantity greater than 0.';
                         }
                         if (parsed > _available) {
-                          return 'Cannot exceed ${_item.quantityLabel}.';
+                          return 'Only ${_item.quantityValueLabel} ${_item.unit.displayLabel(_available)} are available.';
                         }
                         return null;
                       },
@@ -223,7 +268,7 @@ class _MarkConsumedBottomSheetState extends State<MarkConsumedBottomSheet> {
                   _StepperButton(
                     icon: Icons.add,
                     tooltip: 'Increase consumed quantity',
-                    enabled: _consumed < _available,
+                    enabled: !_isSubmitting && _consumed < _available,
                     onPressed: () =>
                         _setConsumed(_consumed + _item.quantityStep),
                   ),
@@ -245,7 +290,9 @@ class _MarkConsumedBottomSheetState extends State<MarkConsumedBottomSheet> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => Navigator.of(context).pop(),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.textSecondary,
                         minimumSize: const Size.fromHeight(48),
@@ -268,7 +315,16 @@ class _MarkConsumedBottomSheetState extends State<MarkConsumedBottomSheet> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text('Confirm Consumed'),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: AppColors.white,
+                              ),
+                            )
+                          : const Text('Confirm Consumed'),
                     ),
                   ),
                 ],

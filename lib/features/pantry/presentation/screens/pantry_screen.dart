@@ -204,6 +204,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                   hasScrollBody: false,
                   child: PantryEmptyState(
                     type: PantryEmptyStateType.error,
+                    message: mapPantryLoadError(error),
                     onRetry: () {
                       ref.read(pantryItemsProvider.notifier).refreshItems();
                     },
@@ -275,15 +276,38 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
   }
 
   Widget _buildItemCard(PantryItem item) {
-    final notifier = ref.read(pantryItemsProvider.notifier);
+    final busyIds = ref.watch(pantryBusyItemIdsProvider);
+    final isUpdating = busyIds.contains(item.id);
     return PantryItemCard(
       item: item,
+      isUpdating: isUpdating,
       onTap: () => _openItemDetails(item),
       onEdit: () => _openEditItem(item),
       onDelete: () => _confirmDelete(item),
-      onIncrement: () => notifier.adjustQuantity(item.id, item.quantityStep),
-      onDecrement: () => notifier.adjustQuantity(item.id, -item.quantityStep),
+      onIncrement: () => _adjustQuantity(item, item.quantityStep),
+      onDecrement: () => _adjustQuantity(item, -item.quantityStep),
     );
+  }
+
+  Future<void> _adjustQuantity(PantryItem item, double delta) async {
+    if (delta < 0 && item.quantity <= 0) return;
+
+    try {
+      await ref
+          .read(pantryItemsProvider.notifier)
+          .adjustQuantity(item.id, delta);
+    } catch (error, stackTrace) {
+      debugPrint('Pantry quantity change failed: $error');
+      debugPrint('$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.statusRed,
+          content: Text(mapPantryFirestoreError(error)),
+        ),
+      );
+    }
   }
 
   Widget _buildHeader(BuildContext context, PantryFilterState filters) {
