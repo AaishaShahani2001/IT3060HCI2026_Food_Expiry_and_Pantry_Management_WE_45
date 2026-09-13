@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:food_expiry_and_pantry_management/core/constants/app_colors.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
 import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
 import 'package:go_router/go_router.dart';
@@ -46,13 +45,15 @@ class HomeBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentIndex = _calculateSelectedIndex(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    final barColor = colorScheme.surfaceContainerHighest;
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: barColor,
         boxShadow: [
           BoxShadow(
-            color: AppColors.darkGreen.withValues(alpha: 0.08),
+            color: colorScheme.shadow.withValues(alpha: 0.12),
             blurRadius: 12,
             offset: const Offset(0, -2),
           ),
@@ -63,9 +64,9 @@ class HomeBottomNav extends StatelessWidget {
           currentIndex: currentIndex,
           onTap: (index) => _onItemTapped(context, index),
           type: BottomNavigationBarType.fixed,
-          backgroundColor: AppColors.white,
-          selectedItemColor: AppColors.primaryGreen,
-          unselectedItemColor: AppColors.textSecondary,
+          backgroundColor: barColor,
+          selectedItemColor: colorScheme.primary,
+          unselectedItemColor: colorScheme.onSurfaceVariant,
           selectedFontSize: 11,
           unselectedFontSize: 10,
           elevation: 0,
@@ -77,41 +78,41 @@ class HomeBottomNav extends StatelessWidget {
             fontWeight: FontWeight.w500,
             height: 1.4,
           ),
-          items: const [
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home, color: AppColors.primaryGreen),
+              icon: const Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home, color: colorScheme.primary),
               label: AppStrings.navHome,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.kitchen_outlined),
-              activeIcon: Icon(Icons.kitchen, color: AppColors.primaryGreen),
+              icon: const Icon(Icons.kitchen_outlined),
+              activeIcon: Icon(Icons.kitchen, color: colorScheme.primary),
               label: AppStrings.navPantry,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.event_busy_outlined),
-              activeIcon: Icon(Icons.event_busy, color: AppColors.primaryGreen),
+              icon: const Icon(Icons.event_busy_outlined),
+              activeIcon: Icon(Icons.event_busy, color: colorScheme.primary),
               label: AppStrings.navExpiry,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.shopping_cart_outlined),
+              icon: const Icon(Icons.shopping_cart_outlined),
               activeIcon: Icon(
                 Icons.shopping_cart,
-                color: AppColors.primaryGreen,
+                color: colorScheme.primary,
               ),
               label: AppStrings.navShopping,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.restaurant_menu_outlined),
+              icon: const Icon(Icons.restaurant_menu_outlined),
               activeIcon: Icon(
                 Icons.restaurant_menu,
-                color: AppColors.primaryGreen,
+                color: colorScheme.primary,
               ),
               label: AppStrings.navRecipes,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              activeIcon: Icon(Icons.settings, color: AppColors.primaryGreen),
+              icon: const Icon(Icons.settings_outlined),
+              activeIcon: Icon(Icons.settings, color: colorScheme.primary),
               label: AppStrings.navSettings,
             ),
           ],

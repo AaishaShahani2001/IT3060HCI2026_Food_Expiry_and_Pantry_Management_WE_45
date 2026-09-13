@@ -27,6 +27,14 @@ abstract final class AppColors {
   static const Color cardBorder = Color(0xFFE6E0D4);
   static const Color iconBg = Color(0xFFF2ECE1);
   static const Color badgeTextDark = Color(0xFF2D332D);
+
+  // Dark theme surfaces (existing light colours above are unchanged)
+  static const Color darkBackground = Color(0xFF121A16);
+  static const Color darkCard = Color(0xFF1E2A24);
+  static const Color darkBorder = Color(0xFF3A4A40);
+  static const Color darkTextPrimary = Color(0xFFE8EEE9);
+  static const Color darkTextSecondary = Color(0xFFB0BDB4);
+  static const Color darkIconBg = Color(0xFF2A3830);
 }
 
 class FreshPalette {
