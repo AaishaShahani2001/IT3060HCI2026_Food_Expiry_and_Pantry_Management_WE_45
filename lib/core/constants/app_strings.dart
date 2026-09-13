@@ -36,6 +36,16 @@ abstract final class AppStrings {
   static const String navRecipes = 'Recipes';
   static const String navSettings = 'Settings';
 
+  static const String profileTitle = 'Profile';
+  static const String expiryNotificationsTitle = 'Expiry Notifications';
+  static const String expiryNotificationsSubtitle =
+      'Alerts for items that are expiring soon';
+  static const String themePreferences = 'Theme Preferences';
+  static const String themeSystem = 'System';
+  static const String themeLight = 'Light';
+  static const String themeDark = 'Dark';
+  static const String noEmailAvailable = 'No email available';
+
   static const String pantryItems = 'Pantry items';
   static const String expiringSoon = 'Expiring soon';
   static const String shoppingList = 'Shopping list';

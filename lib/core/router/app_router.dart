@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../../features/expiry/presentation/screens/expiry_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/home/presentation/widgets/home_shell.dart';
-import '../../features/home/presentation/widgets/section_placeholder.dart';
 import '../../features/pantry/presentation/screens/pantry_screen.dart';
 import '../../features/shopping/presentation/screens/shopping_screen.dart';
 import '../../features/recipes/presentation/screens/recipes_screen.dart';
@@ -13,7 +12,7 @@ import '../../features/Authentication/screens/login_screen.dart';
 import '../../features/Authentication/screens/signup_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/change_password_screen.dart';
-import '../constants/app_strings.dart';
+import '../../features/settings/presentation/screens/settings_screen.dart';
 import 'app_routes.dart';
 
 export 'app_routes.dart';
@@ -70,8 +69,7 @@ final GoRouter appRouter = GoRouter(
         ),
         GoRoute(
           path: AppRoutes.settings,
-          builder: (context, state) =>
-              const SectionPlaceholder(title: AppStrings.navSettings),
+          builder: (context, state) => const SettingsScreen(),
         ),
       ],
     ),
