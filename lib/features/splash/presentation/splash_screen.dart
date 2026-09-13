@@ -79,12 +79,13 @@ class _SplashScreenState extends State<SplashScreen>
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
+      backgroundColor: FreshPalette.pageBackground,
       body: DecoratedBox(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [AppColors.cream, AppColors.softGreen],
+            colors: [FreshPalette.pageBackground, FreshPalette.highlight],
           ),
         ),
         child: SafeArea(
@@ -99,11 +100,11 @@ class _SplashScreenState extends State<SplashScreen>
                     width: 120,
                     height: 120,
                     decoration: BoxDecoration(
-                      color: AppColors.white,
+                      color: FreshPalette.card,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primaryGreen.withValues(alpha: 0.18),
+                          color: FreshPalette.selected.withValues(alpha: 0.18),
                           blurRadius: 28,
                           offset: const Offset(0, 10),
                         ),
@@ -112,20 +113,24 @@ class _SplashScreenState extends State<SplashScreen>
                     child: const Icon(
                       Icons.kitchen_rounded,
                       size: 58,
-                      color: AppColors.primaryGreen,
+                      color: FreshPalette.selected,
                     ),
                   ),
                   const SizedBox(height: 28),
                   Text(
                     AppStrings.appName,
                     textAlign: TextAlign.center,
-                    style: textTheme.titleLarge,
+                    style: textTheme.titleLarge?.copyWith(
+                      color: FreshPalette.heading,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     AppStrings.tagline,
                     textAlign: TextAlign.center,
-                    style: textTheme.bodyLarge,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: FreshPalette.secondaryText,
+                    ),
                   ),
                   const Spacer(flex: 2),
                   const SizedBox(
@@ -133,7 +138,7 @@ class _SplashScreenState extends State<SplashScreen>
                     height: 28,
                     child: CircularProgressIndicator(
                       strokeWidth: 3,
-                      color: AppColors.primaryGreen,
+                      color: FreshPalette.selected,
                     ),
                   ),
                   const Spacer(flex: 1),

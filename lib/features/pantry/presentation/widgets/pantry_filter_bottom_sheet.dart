@@ -12,7 +12,7 @@ class PantryFilterBottomSheet extends ConsumerWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.cream,
+      backgroundColor: FreshPalette.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -56,6 +56,7 @@ class PantryFilterBottomSheet extends ConsumerWidget {
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: FreshPalette.heading,
                   ),
                 ),
                 TextButton(
@@ -64,6 +65,9 @@ class PantryFilterBottomSheet extends ConsumerWidget {
                           filterNotifier.clearFilters();
                         }
                       : null,
+                  style: TextButton.styleFrom(
+                    foregroundColor: FreshPalette.selected,
+                  ),
                   child: const Text('Clear all'),
                 ),
               ],
@@ -74,7 +78,7 @@ class PantryFilterBottomSheet extends ConsumerWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.heading,
+                color: FreshPalette.heading,
               ),
             ),
             const SizedBox(height: 8),
@@ -86,7 +90,9 @@ class PantryFilterBottomSheet extends ConsumerWidget {
                   label: const Text('All categories'),
                   selected: filters.selectedCategory == null,
                   onSelected: (_) => filterNotifier.setCategory(null),
-                  selectedColor: AppColors.softGreen,
+                  selectedColor: FreshPalette.highlight,
+                  checkmarkColor: FreshPalette.selected,
+                  labelStyle: const TextStyle(color: FreshPalette.heading),
                 ),
                 ...PantryCategory.values.map(
                   (category) => FilterChip(
@@ -94,7 +100,9 @@ class PantryFilterBottomSheet extends ConsumerWidget {
                     label: Text(category.label),
                     selected: filters.selectedCategory == category,
                     onSelected: (_) => filterNotifier.setCategory(category),
-                    selectedColor: AppColors.softGreen,
+                    selectedColor: FreshPalette.highlight,
+                    checkmarkColor: FreshPalette.selected,
+                    labelStyle: const TextStyle(color: FreshPalette.heading),
                   ),
                 ),
               ],
@@ -105,7 +113,7 @@ class PantryFilterBottomSheet extends ConsumerWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.heading,
+                color: FreshPalette.heading,
               ),
             ),
             const SizedBox(height: 8),
@@ -117,7 +125,9 @@ class PantryFilterBottomSheet extends ConsumerWidget {
                   label: const Text('All locations'),
                   selected: filters.selectedLocation == null,
                   onSelected: (_) => filterNotifier.setLocation(null),
-                  selectedColor: AppColors.softGreen,
+                  selectedColor: FreshPalette.highlight,
+                  checkmarkColor: FreshPalette.selected,
+                  labelStyle: const TextStyle(color: FreshPalette.heading),
                 ),
                 ...PantryLocation.values.map(
                   (location) => FilterChip(
@@ -125,7 +135,9 @@ class PantryFilterBottomSheet extends ConsumerWidget {
                     label: Text(location.label),
                     selected: filters.selectedLocation == location,
                     onSelected: (_) => filterNotifier.setLocation(location),
-                    selectedColor: AppColors.softGreen,
+                    selectedColor: FreshPalette.highlight,
+                    checkmarkColor: FreshPalette.selected,
+                    labelStyle: const TextStyle(color: FreshPalette.heading),
                   ),
                 ),
               ],
@@ -136,7 +148,7 @@ class PantryFilterBottomSheet extends ConsumerWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.heading,
+                color: FreshPalette.heading,
               ),
             ),
             const SizedBox(height: 8),
@@ -147,7 +159,9 @@ class PantryFilterBottomSheet extends ConsumerWidget {
                   label: Text(level.label),
                   selected: filters.stockLevel == level,
                   onSelected: (_) => filterNotifier.setStockLevel(level),
-                  selectedColor: AppColors.softGreen,
+                  selectedColor: FreshPalette.highlight,
+                  checkmarkColor: FreshPalette.selected,
+                  labelStyle: const TextStyle(color: FreshPalette.heading),
                   showCheckmark: false,
                 ),
               ),
@@ -155,6 +169,10 @@ class PantryFilterBottomSheet extends ConsumerWidget {
             const SizedBox(height: 12),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(),
+              style: FilledButton.styleFrom(
+                backgroundColor: FreshPalette.primaryButton,
+                foregroundColor: Colors.white,
+              ),
               child: const Text('Apply filters'),
             ),
           ],

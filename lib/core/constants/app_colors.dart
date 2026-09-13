@@ -28,3 +28,15 @@ abstract final class AppColors {
   static const Color iconBg = Color(0xFFF2ECE1);
   static const Color badgeTextDark = Color(0xFF2D332D);
 }
+
+class FreshPalette {
+  FreshPalette._();
+
+  static const Color primaryButton = Color(0xFF174A3A);
+  static const Color selected = Color(0xFF2E6B4E);
+  static const Color highlight = Color(0xFFB8D98A);
+  static const Color card = Color(0xFFFFFFFF);
+  static const Color pageBackground = Color(0xFFF5F7F2);
+  static const Color heading = Color(0xFF17201B);
+  static const Color secondaryText = Color(0xFF6B7280);
+}

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
 import '../../data/onboarding_data.dart';
@@ -50,10 +51,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(onboardingPageIndexProvider);
-    final isLastPage =
-        currentIndex == OnboardingData.items.length - 1;
+    final isLastPage = currentIndex == OnboardingData.items.length - 1;
 
     return Scaffold(
+      backgroundColor: FreshPalette.pageBackground,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
@@ -66,9 +67,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   child: isLastPage
                       ? const SizedBox.shrink()
                       : TextButton(
-                    onPressed: _goLogin,
-                    child: const Text(AppStrings.skip),
-                  ),
+                          onPressed: _goLogin,
+                          style: TextButton.styleFrom(
+                            foregroundColor: FreshPalette.selected,
+                          ),
+                          child: const Text(AppStrings.skip),
+                        ),
                 ),
               ),
 
@@ -78,15 +82,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   itemCount: OnboardingData.items.length,
                   onPageChanged: (index) {
                     ref
-                        .read(
-                      onboardingPageIndexProvider.notifier,
-                    )
+                        .read(onboardingPageIndexProvider.notifier)
                         .setPage(index);
                   },
                   itemBuilder: (context, index) {
-                    return OnboardingPage(
-                      item: OnboardingData.items[index],
-                    );
+                    return OnboardingPage(item: OnboardingData.items[index]);
                   },
                 ),
               ),
@@ -102,10 +102,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: isLastPage ? _goLogin : _onNext,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: FreshPalette.primaryButton,
+                    foregroundColor: Colors.white,
+                  ),
                   child: Text(
-                    isLastPage
-                        ? AppStrings.getStarted
-                        : AppStrings.next,
+                    isLastPage ? AppStrings.getStarted : AppStrings.next,
                   ),
                 ),
               ),

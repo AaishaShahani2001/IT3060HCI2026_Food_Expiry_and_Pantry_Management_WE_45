@@ -123,16 +123,17 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
     final isTablet = MediaQuery.sizeOf(context).width >= 700;
 
     return Scaffold(
+      backgroundColor: FreshPalette.pageBackground,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openAddItem,
-        backgroundColor: AppColors.primaryGreen,
-        foregroundColor: AppColors.white,
+        backgroundColor: FreshPalette.primaryButton,
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('Add Item'),
       ),
       body: SafeArea(
         child: RefreshIndicator(
-          color: AppColors.primaryGreen,
+          color: FreshPalette.selected,
           onRefresh: () =>
               ref.read(pantryItemsProvider.notifier).refreshItems(),
           child: CustomScrollView(
@@ -144,7 +145,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                 const SliverToBoxAdapter(
                   child: LinearProgressIndicator(
                     minHeight: 2,
-                    color: AppColors.primaryGreen,
+                    color: FreshPalette.selected,
                   ),
                 ),
               SliverToBoxAdapter(child: _buildHeader(context, filters)),
@@ -175,7 +176,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
+                            color: FreshPalette.secondaryText,
                           ),
                         ),
                       ),
@@ -189,6 +190,9 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                                 .read(pantryFilterProvider.notifier)
                                 .clearFilters();
                           },
+                          style: TextButton.styleFrom(
+                            foregroundColor: FreshPalette.selected,
+                          ),
                           child: const Text('Clear filters'),
                         ),
                     ],
@@ -325,13 +329,15 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.heading,
+                    color: FreshPalette.heading,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Manage and organize your food items',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: FreshPalette.secondaryText,
+                  ),
                 ),
               ],
             ),
@@ -342,8 +348,8 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
             icon: Icon(
               _isSearchVisible ? Icons.search_off_outlined : Icons.search,
               color: _isSearchVisible || filters.searchQuery.isNotEmpty
-                  ? AppColors.primaryDark
-                  : AppColors.heading,
+                  ? FreshPalette.selected
+                  : FreshPalette.heading,
             ),
           ),
           IconButton(
@@ -373,7 +379,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
         },
         decoration: InputDecoration(
           hintText: 'Search by item name...',
-          prefixIcon: const Icon(Icons.search, color: AppColors.primaryDark),
+          prefixIcon: const Icon(Icons.search, color: FreshPalette.selected),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   onPressed: () {
@@ -385,7 +391,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                 )
               : null,
           filled: true,
-          fillColor: AppColors.white,
+          fillColor: FreshPalette.card,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 14,
@@ -401,7 +407,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: const BorderSide(
-              color: AppColors.primaryGreen,
+              color: FreshPalette.selected,
               width: 1.8,
             ),
           ),
