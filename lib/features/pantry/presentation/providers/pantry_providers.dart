@@ -1,19 +1,31 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/repositories/mock_pantry_repository.dart';
 import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
-import '../../domain/repositories/pantry_repository.dart';
-
-final pantryRepositoryProvider = Provider<PantryRepository>((ref) {
-  // Local list starts empty. Added items still sync here after Firestore writes.
-  return MockPantryRepository(initialItems: const []);
-});
 
 final pantryFirestoreServiceProvider = Provider<PantryFirestoreService>((ref) {
   return PantryFirestoreService();
 });
+
+/// Item IDs with a quantity or Mark Consumed write in progress.
+class PantryBusyItemIdsNotifier extends Notifier<Set<String>> {
+  @override
+  Set<String> build() => const {};
+
+  void start(String id) => state = {...state, id};
+
+  void stop(String id) {
+    state = {...state}..remove(id);
+  }
+}
+
+final pantryBusyItemIdsProvider =
+    NotifierProvider<PantryBusyItemIdsNotifier, Set<String>>(
+      PantryBusyItemIdsNotifier.new,
+    );
 
 class PantryFilterState {
   const PantryFilterState({
@@ -91,79 +103,51 @@ final pantryFilterProvider =
       PantryFilterNotifier.new,
     );
 
-class PantryItemsNotifier extends AsyncNotifier<List<PantryItem>> {
+class PantryItemsNotifier extends StreamNotifier<List<PantryItem>> {
   @override
-  Future<List<PantryItem>> build() async {
-    // Pantry starts empty. Do not load sample/mock items.
-    return const [];
+  Stream<List<PantryItem>> build() {
+    final service = ref.watch(pantryFirestoreServiceProvider);
+    return _watchPantryForSignedInUser(service);
   }
 
   Future<void> refreshItems() async {
-    // Keep items added this session. Firestore reads are not connected yet.
-    state = AsyncData(
-      List<PantryItem>.from(state.asData?.value ?? const <PantryItem>[]),
-    );
+    ref.invalidateSelf();
   }
 
   Future<void> addItem(PantryItem item) async {
-    // Persist first so the returned firestoreId is stored in local state.
-    final persistedItem = await ref
-        .read(pantryFirestoreServiceProvider)
-        .addItem(item);
-    final createdItem = await ref
-        .read(pantryRepositoryProvider)
-        .addItem(persistedItem);
-    final currentItems = state.asData?.value ?? [];
-    state = AsyncData([createdItem, ...currentItems]);
+    await ref.read(pantryFirestoreServiceProvider).addItem(item);
   }
 
   Future<void> updateItem(PantryItem item) async {
     final connection = _requireFirestoreConnection(item);
-    final firestore = ref.read(pantryFirestoreServiceProvider);
-
-    // Firestore first so a failed write does not change local lists.
-    await firestore.updatePantryItem(
-      userId: connection.userId,
-      itemId: connection.itemId,
-      item: item,
-    );
-
-    final updatedItem = await ref
-        .read(pantryRepositoryProvider)
-        .updateItem(item);
-    final currentItems = state.asData?.value ?? [];
-    state = AsyncData(
-      currentItems
-          .map((entry) => entry.id == updatedItem.id ? updatedItem : entry)
-          .toList(),
-    );
+    await ref
+        .read(pantryFirestoreServiceProvider)
+        .updatePantryItem(
+          userId: connection.userId,
+          itemId: connection.itemId,
+          item: item,
+        );
   }
 
   Future<void> deleteItem(PantryItem item) async {
     final connection = _requireFirestoreConnection(item);
-    final firestore = ref.read(pantryFirestoreServiceProvider);
-
-    // Firestore first so a failed delete keeps the item visible locally.
-    await firestore.deletePantryItem(
-      userId: connection.userId,
-      itemId: connection.itemId,
-    );
-
-    await ref.read(pantryRepositoryProvider).deleteItem(item.id);
-    final currentItems = state.asData?.value ?? [];
-    state = AsyncData(
-      currentItems.where((entry) => entry.id != item.id).toList(),
-    );
+    await ref
+        .read(pantryFirestoreServiceProvider)
+        .deletePantryItem(userId: connection.userId, itemId: connection.itemId);
   }
 
-  /// Edit/Delete need a signed-in user and a real Firestore document ID.
-  /// Items that exist only in local memory must not be written to Firestore.
+  /// Edit/Delete/quantity need a signed-in user and a real Firestore document ID.
   ({String userId, String itemId}) _requireFirestoreConnection(
-    PantryItem item,
-  ) {
+    PantryItem item, {
+    bool forQuantityUpdate = false,
+  }) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      throw const PantryFirestoreException('Please log in before continuing.');
+      throw PantryFirestoreException(
+        forQuantityUpdate
+            ? 'Please log in before updating an item.'
+            : 'Please log in before continuing.',
+      );
     }
 
     final firestoreId = item.firestoreId;
@@ -176,7 +160,7 @@ class PantryItemsNotifier extends AsyncNotifier<List<PantryItem>> {
     return (userId: user.uid, itemId: firestoreId);
   }
 
-  /// Instantly adjusts quantity via +/- controls without opening the edit form.
+  /// +/- controls. Firestore write first; the stream updates the UI.
   Future<void> adjustQuantity(String id, double delta) async {
     final currentItems = state.asData?.value;
     if (currentItems == null) return;
@@ -185,36 +169,134 @@ class PantryItemsNotifier extends AsyncNotifier<List<PantryItem>> {
     if (index == -1) return;
 
     final current = currentItems[index];
-    final nextQuantity = (current.quantity + delta).clamp(0.0, double.infinity);
-    if (nextQuantity == current.quantity) return;
+    if (delta < 0 && current.quantity <= 0) return;
 
-    final updatedItem = current.withAdjustedQuantity(delta);
+    final busy = ref.read(pantryBusyItemIdsProvider);
+    if (busy.contains(id)) return;
 
-    // Optimistic UI update for immediate feedback.
-    final optimistic = [...currentItems];
-    optimistic[index] = updatedItem;
-    state = AsyncData(optimistic);
+    final connection = _requireFirestoreConnection(
+      current,
+      forQuantityUpdate: true,
+    );
+    final busyNotifier = ref.read(pantryBusyItemIdsProvider.notifier);
+    busyNotifier.start(id);
 
     try {
-      final saved = await ref
-          .read(pantryRepositoryProvider)
-          .updateItem(updatedItem);
-      final latest = state.asData?.value ?? optimistic;
-      state = AsyncData(
-        latest.map((entry) => entry.id == saved.id ? saved : entry).toList(),
+      await ref
+          .read(pantryFirestoreServiceProvider)
+          .changeItemQuantity(
+            userId: connection.userId,
+            itemId: connection.itemId,
+            change: delta,
+          );
+    } finally {
+      busyNotifier.stop(id);
+    }
+  }
+
+  /// Mark Consumed write. Returns the remaining quantity from Firestore.
+  Future<double> markConsumed({
+    required PantryItem item,
+    required double consumedQuantity,
+  }) async {
+    if (consumedQuantity <= 0) {
+      throw const PantryFirestoreException('Enter a quantity greater than 0.');
+    }
+
+    final currentItems = state.asData?.value;
+    PantryItem current = item;
+    if (currentItems != null) {
+      for (final entry in currentItems) {
+        if (entry.id == item.id ||
+            (item.firestoreId != null &&
+                entry.firestoreId == item.firestoreId)) {
+          current = entry;
+          break;
+        }
+      }
+    }
+
+    final busy = ref.read(pantryBusyItemIdsProvider);
+    if (busy.contains(current.id)) {
+      throw const PantryFirestoreException(
+        'Something went wrong. Please try again.',
       );
-    } catch (_) {
-      // Roll back if persistence fails.
-      state = AsyncData(currentItems);
-      rethrow;
+    }
+
+    final connection = _requireFirestoreConnection(
+      current,
+      forQuantityUpdate: true,
+    );
+    final busyNotifier = ref.read(pantryBusyItemIdsProvider.notifier);
+    busyNotifier.start(current.id);
+
+    try {
+      return await ref
+          .read(pantryFirestoreServiceProvider)
+          .markItemConsumed(
+            userId: connection.userId,
+            itemId: connection.itemId,
+            consumedQuantity: consumedQuantity,
+          );
+    } finally {
+      busyNotifier.stop(current.id);
     }
   }
 }
 
 final pantryItemsProvider =
-    AsyncNotifierProvider<PantryItemsNotifier, List<PantryItem>>(
+    StreamNotifierProvider<PantryItemsNotifier, List<PantryItem>>(
       PantryItemsNotifier.new,
     );
+
+/// Switches the pantry stream when the signed-in user changes.
+Stream<List<PantryItem>> _watchPantryForSignedInUser(
+  PantryFirestoreService service,
+) {
+  late final StreamController<List<PantryItem>> controller;
+  StreamSubscription<User?>? authSub;
+  StreamSubscription<List<PantryItem>>? pantrySub;
+
+  controller = StreamController<List<PantryItem>>(
+    onListen: () {
+      authSub = FirebaseAuth.instance.authStateChanges().listen(
+        (user) async {
+          await pantrySub?.cancel();
+          pantrySub = null;
+          if (user == null) {
+            if (!controller.isClosed) {
+              controller.add(const <PantryItem>[]);
+            }
+            return;
+          }
+          pantrySub = service
+              .watchPantryItems(userId: user.uid)
+              .listen(
+                (items) {
+                  if (!controller.isClosed) controller.add(items);
+                },
+                onError: (Object error, StackTrace stackTrace) {
+                  if (!controller.isClosed) {
+                    controller.addError(error, stackTrace);
+                  }
+                },
+              );
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!controller.isClosed) {
+            controller.addError(error, stackTrace);
+          }
+        },
+      );
+    },
+    onCancel: () async {
+      await pantrySub?.cancel();
+      await authSub?.cancel();
+    },
+  );
+
+  return controller.stream;
+}
 
 final filteredPantryItemsProvider = Provider<List<PantryItem>>((ref) {
   final itemsAsync = ref.watch(pantryItemsProvider);

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../utils/expiry_status.dart';
@@ -30,10 +31,14 @@ enum PantryLocation {
   }
 
   static PantryLocation fromStorage(String value) {
-    return PantryLocation.values.firstWhere(
-      (location) => location.name == value,
-      orElse: () => PantryLocation.pantry,
-    );
+    final normalized = value.trim().toLowerCase();
+    for (final location in PantryLocation.values) {
+      if (location.name == normalized ||
+          location.label.toLowerCase() == normalized) {
+        return location;
+      }
+    }
+    return PantryLocation.pantry;
   }
 }
 
@@ -95,10 +100,14 @@ enum PantryCategory {
   }
 
   static PantryCategory fromStorage(String value) {
-    return PantryCategory.values.firstWhere(
-      (category) => category.name == value,
-      orElse: () => PantryCategory.other,
-    );
+    final normalized = value.trim().toLowerCase();
+    for (final category in PantryCategory.values) {
+      if (category.name == normalized ||
+          category.label.toLowerCase() == normalized) {
+        return category;
+      }
+    }
+    return PantryCategory.other;
   }
 }
 
@@ -151,10 +160,13 @@ enum PantryUnit {
   }
 
   static PantryUnit fromStorage(String value) {
-    return PantryUnit.values.firstWhere(
-      (unit) => unit.name == value,
-      orElse: () => PantryUnit.items,
-    );
+    final normalized = value.trim().toLowerCase();
+    for (final unit in PantryUnit.values) {
+      if (unit.name == normalized || unit.label.toLowerCase() == normalized) {
+        return unit;
+      }
+    }
+    return PantryUnit.items;
   }
 }
 
@@ -233,6 +245,9 @@ class PantryItem {
   }
 
   bool get isLowStock => quantity <= minQuantity;
+
+  /// True when nothing remains. The item is kept; it is not auto-deleted.
+  bool get isOutOfStock => quantity <= 0;
 
   /// Step size for quick +/- quantity controls.
   double get quantityStep {
@@ -321,26 +336,44 @@ class PantryItem {
   }
 
   factory PantryItem.fromMap(String id, Map<String, dynamic> data) {
+    final firestoreId = _stringField(data['firestoreId']);
     return PantryItem(
       id: id,
-      // The Firestore document ID is the map key, not a field on the document.
-      firestoreId: (data['firestoreId'] as String?)?.isNotEmpty == true
-          ? data['firestoreId'] as String
-          : id,
-      name: data['name'] as String? ?? '',
-      category: PantryCategory.fromStorage(data['category'] as String? ?? ''),
-      location: PantryLocation.fromStorage(data['location'] as String? ?? ''),
-      quantity: (data['quantity'] as num?)?.toDouble() ?? 0,
-      unit: PantryUnit.fromStorage(data['unit'] as String? ?? ''),
-      price: (data['price'] as num?)?.toDouble() ?? 0.0,
+      firestoreId: firestoreId.isNotEmpty ? firestoreId : id,
+      name: _stringField(data['name']),
+      category: PantryCategory.fromStorage(_stringField(data['category'])),
+      location: PantryLocation.fromStorage(_stringField(data['location'])),
+      quantity: _numField(data['quantity']),
+      unit: PantryUnit.fromStorage(_stringField(data['unit'])),
+      price: _numField(data['price']),
       expiryDate: _parseDate(data['expiryDate']),
       createdAt: _parseDate(data['createdAt']),
       updatedAt: _parseDate(data['updatedAt']),
     );
   }
 
+  /// Converts a Firestore pantry document. [documentId] is stored as id and firestoreId.
+  factory PantryItem.fromFirestore(
+    String documentId,
+    Map<String, dynamic> data,
+  ) {
+    return PantryItem.fromMap(documentId, data);
+  }
+
+  static String _stringField(dynamic value) {
+    if (value is String) return value;
+    return '';
+  }
+
+  static double _numField(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0;
+    return 0;
+  }
+
   static DateTime? _parseDate(dynamic value) {
     if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
     if (value is DateTime) return value;
     if (value is String && value.isNotEmpty) {
       return DateTime.tryParse(value);

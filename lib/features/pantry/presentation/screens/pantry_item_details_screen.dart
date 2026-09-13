@@ -45,7 +45,13 @@ class _PantryItemDetailsScreenState
     final items = ref.watch(pantryItemsProvider).asData?.value;
     if (items == null) return widget.item;
 
+    final firestoreId = widget.item.firestoreId;
     for (final item in items) {
+      if (firestoreId != null &&
+          firestoreId.isNotEmpty &&
+          item.firestoreId == firestoreId) {
+        return item;
+      }
       if (item.id == widget.item.id) return item;
     }
     return null;
@@ -172,7 +178,7 @@ class _PantryItemDetailsScreenState
     }
   }
 
-  /// Opens a sheet to choose how much was consumed, then updates local quantity.
+  /// Opens a sheet to choose how much was consumed, then writes to Firestore.
   Future<void> _markConsumed(PantryItem item) async {
     if (item.quantity <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -187,66 +193,53 @@ class _PantryItemDetailsScreenState
       return;
     }
 
-    final consumed = await MarkConsumedBottomSheet.show(context, item);
-    if (consumed == null || consumed <= 0 || !mounted) return;
+    final result = await MarkConsumedBottomSheet.show(context, item);
+    if (result == null || !mounted) return;
 
-    try {
-      await ref
-          .read(pantryItemsProvider.notifier)
-          .adjustQuantity(item.id, -consumed);
-
-      if (!mounted) return;
-      final remaining = (item.quantity - consumed).clamp(0.0, double.infinity);
-      final remainingLabel =
-          '${remaining == remaining.roundToDouble() ? remaining.toInt() : remaining} ${item.unit.displayLabel(remaining)}';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          content: Text(
-            remaining <= 0
-                ? 'Consumed all ${item.quantityLabel}'
-                : 'Consumed ${_formatConsumed(consumed, item)}. $remainingLabel remaining',
-          ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        content: Text(
+          result.remaining <= 0
+              ? 'All ${item.name} consumed. Item is now out of stock.'
+              : 'Consumed ${_formatConsumed(result.consumed, item)}. ${_formatQuantityValue(result.remaining)} remaining.',
         ),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.statusRed,
-          content: Text(error.toString()),
-        ),
-      );
-    }
+      ),
+    );
   }
 
   String _formatConsumed(double consumed, PantryItem item) {
-    final amount = consumed == consumed.roundToDouble()
-        ? consumed.toInt().toString()
-        : consumed.toString();
-    return '$amount ${item.unit.displayLabel(consumed)}';
+    return '${_formatQuantityValue(consumed)} ${item.unit.displayLabel(consumed)}';
   }
 
-  /// Quantity stepper handler; never lets the local quantity go below zero.
+  String _formatQuantityValue(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+    return value
+        .toStringAsFixed(2)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
+  }
+
+  /// Quantity stepper; Firestore first, then Riverpod. Never goes below zero.
   Future<void> _adjustQuantity(PantryItem item, double delta) async {
-    final nextQuantity = item.quantity + delta;
-    if (nextQuantity < 0) return;
+    if (delta < 0 && item.quantity <= 0) return;
 
     try {
       await ref
           .read(pantryItemsProvider.notifier)
           .adjustQuantity(item.id, delta);
-    } catch (error) {
+    } catch (error, stackTrace) {
+      debugPrint('Pantry details quantity change failed: $error');
+      debugPrint('$stackTrace');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
           backgroundColor: AppColors.statusRed,
-          content: Text(error.toString()),
+          content: Text(mapPantryFirestoreError(error)),
         ),
       );
     }
@@ -314,7 +307,8 @@ class _PantryItemDetailsScreenState
 
     final expiryService = ref.watch(expiryServiceProvider);
     final isWide = MediaQuery.sizeOf(context).width >= 700;
-    final canDecrement = item.quantity > 0;
+    final isUpdating = ref.watch(pantryBusyItemIdsProvider).contains(item.id);
+    final canDecrement = !isUpdating && item.quantity > 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -388,9 +382,12 @@ class _PantryItemDetailsScreenState
                   _QuantityCard(
                     item: item,
                     canDecrement: canDecrement,
+                    isUpdating: isUpdating,
                     onDecrement: () =>
                         _adjustQuantity(item, -item.quantityStep),
-                    onIncrement: () => _adjustQuantity(item, item.quantityStep),
+                    onIncrement: isUpdating
+                        ? null
+                        : () => _adjustQuantity(item, item.quantityStep),
                   ),
                   const SizedBox(height: 24),
                   // Bottom actions: restock via shopping list, or mark as used.
@@ -401,7 +398,7 @@ class _PantryItemDetailsScreenState
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
-                    onPressed: item.quantity <= 0
+                    onPressed: item.quantity <= 0 || isUpdating
                         ? null
                         : () => _markConsumed(item),
                     style: OutlinedButton.styleFrom(
@@ -413,7 +410,9 @@ class _PantryItemDetailsScreenState
                       ),
                     ),
                     icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Mark consumed'),
+                    label: Text(
+                      item.isOutOfStock ? 'Out of stock' : 'Mark consumed',
+                    ),
                   ),
                 ],
               ),
@@ -661,14 +660,16 @@ class _QuantityCard extends StatelessWidget {
   const _QuantityCard({
     required this.item,
     required this.canDecrement,
+    required this.isUpdating,
     required this.onDecrement,
     required this.onIncrement,
   });
 
   final PantryItem item;
   final bool canDecrement;
+  final bool isUpdating;
   final VoidCallback onDecrement;
-  final VoidCallback onIncrement;
+  final VoidCallback? onIncrement;
 
   @override
   Widget build(BuildContext context) {
@@ -686,10 +687,12 @@ class _QuantityCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            item.quantityLabel,
-            style: const TextStyle(
+            item.isOutOfStock ? 'Out of stock' : item.quantityLabel,
+            style: TextStyle(
               fontSize: 14,
-              color: AppColors.textSecondary,
+              color: item.isOutOfStock
+                  ? AppColors.statusRed
+                  : AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 14),
@@ -719,18 +722,26 @@ class _QuantityCard extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Center(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          item.quantityLabel,
-                          maxLines: 1,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.heading,
-                          ),
-                        ),
-                      ),
+                      child: isUpdating
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                item.quantityLabel,
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.heading,
+                                ),
+                              ),
+                            ),
                     ),
                   ),
                 ),
@@ -742,9 +753,9 @@ class _QuantityCard extends StatelessWidget {
                 _QuantityButton(
                   icon: Icons.add,
                   tooltip: 'Increase quantity',
-                  enabled: true,
+                  enabled: onIncrement != null && !isUpdating,
                   foreground: AppColors.primaryDark,
-                  onPressed: onIncrement,
+                  onPressed: onIncrement ?? () {},
                 ),
               ],
             ),

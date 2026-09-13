@@ -1,8 +1,7 @@
 import '../../domain/models/pantry_item.dart';
 import '../../domain/repositories/pantry_repository.dart';
 
-/// In-memory pantry store used until Firestore reads are connected.
-/// Starts empty so the UI never shows sample items.
+/// Optional in-memory pantry store used by unit tests.
 class MockPantryRepository implements PantryRepository {
   MockPantryRepository({List<PantryItem>? initialItems})
     : _items = List<PantryItem>.from(initialItems ?? const []);
