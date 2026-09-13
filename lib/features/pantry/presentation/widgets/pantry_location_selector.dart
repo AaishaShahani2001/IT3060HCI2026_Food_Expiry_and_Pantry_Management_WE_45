@@ -123,10 +123,10 @@ class _LocationChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = isSelected ? AppColors.white : AppColors.heading;
+    final foreground = isSelected ? Colors.white : FreshPalette.heading;
     final muted = isSelected
-        ? AppColors.white.withValues(alpha: 0.9)
-        : AppColors.textSecondary;
+        ? Colors.white.withValues(alpha: 0.9)
+        : FreshPalette.secondaryText;
 
     return Material(
       color: Colors.transparent,
@@ -139,16 +139,16 @@ class _LocationChip extends StatelessWidget {
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primaryGreen : AppColors.white,
+            color: isSelected ? FreshPalette.selected : FreshPalette.card,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: isSelected ? AppColors.primaryGreen : AppColors.cardBorder,
+              color: isSelected ? FreshPalette.selected : AppColors.cardBorder,
               width: 1,
             ),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: AppColors.primaryGreen.withValues(alpha: 0.28),
+                      color: FreshPalette.selected.withValues(alpha: 0.28),
                       blurRadius: 10,
                       offset: const Offset(0, 3),
                     ),

@@ -29,7 +29,7 @@ class MarkConsumedBottomSheet extends ConsumerStatefulWidget {
     return showModalBottomSheet<MarkConsumedResult>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.cream,
+      backgroundColor: FreshPalette.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -161,7 +161,7 @@ class _MarkConsumedBottomSheetState
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.heading,
+                  color: FreshPalette.heading,
                 ),
               ),
               const SizedBox(height: 6),
@@ -172,7 +172,7 @@ class _MarkConsumedBottomSheetState
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.heading,
+                  color: FreshPalette.heading,
                 ),
               ),
               const SizedBox(height: 16),
@@ -180,7 +180,7 @@ class _MarkConsumedBottomSheetState
                 'Available: ${_item.quantityLabel}',
                 style: const TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecondary,
+                  color: FreshPalette.secondaryText,
                 ),
               ),
               const SizedBox(height: 16),
@@ -189,7 +189,7 @@ class _MarkConsumedBottomSheetState
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.heading,
+                  color: FreshPalette.heading,
                 ),
               ),
               const SizedBox(height: 8),
@@ -220,7 +220,7 @@ class _MarkConsumedBottomSheetState
                         hintText: '0',
                         suffixText: unit,
                         filled: true,
-                        fillColor: AppColors.white,
+                        fillColor: FreshPalette.card,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 14,
@@ -240,7 +240,7 @@ class _MarkConsumedBottomSheetState
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: const BorderSide(
-                            color: AppColors.primaryGreen,
+                            color: FreshPalette.selected,
                             width: 1.8,
                           ),
                         ),
@@ -282,7 +282,7 @@ class _MarkConsumedBottomSheetState
                   fontWeight: FontWeight.w700,
                   color: _consumed > _available
                       ? AppColors.statusRed
-                      : AppColors.heading,
+                      : FreshPalette.heading,
                 ),
               ),
               const SizedBox(height: 20),
@@ -294,7 +294,7 @@ class _MarkConsumedBottomSheetState
                           ? null
                           : () => Navigator.of(context).pop(),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.textSecondary,
+                        foregroundColor: FreshPalette.secondaryText,
                         minimumSize: const Size.fromHeight(48),
                         side: const BorderSide(color: AppColors.cardBorder),
                         shape: RoundedRectangleBorder(
@@ -310,6 +310,8 @@ class _MarkConsumedBottomSheetState
                     child: FilledButton(
                       onPressed: _canConfirm ? _confirm : null,
                       style: FilledButton.styleFrom(
+                        backgroundColor: FreshPalette.primaryButton,
+                        foregroundColor: Colors.white,
                         minimumSize: const Size.fromHeight(48),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -321,7 +323,7 @@ class _MarkConsumedBottomSheetState
                               height: 22,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.5,
-                                color: AppColors.white,
+                                color: Colors.white,
                               ),
                             )
                           : const Text('Confirm Consumed'),
@@ -365,7 +367,7 @@ class _StepperButton extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: AppColors.white,
+        color: FreshPalette.card,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
           side: const BorderSide(color: AppColors.cardBorder),
@@ -380,8 +382,8 @@ class _StepperButton extends StatelessWidget {
               icon,
               size: 20,
               color: enabled
-                  ? AppColors.primaryDark
-                  : AppColors.textSecondary.withValues(alpha: 0.35),
+                  ? FreshPalette.selected
+                  : FreshPalette.secondaryText.withValues(alpha: 0.35),
             ),
           ),
         ),

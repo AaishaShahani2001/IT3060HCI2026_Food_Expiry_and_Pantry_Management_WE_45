@@ -44,26 +44,38 @@ class PantryEmptyState extends StatelessWidget {
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppColors.heading,
+                color: FreshPalette.heading,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               message ?? config.message,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: FreshPalette.secondaryText,
+              ),
             ),
             if (config.primaryLabel != null && onPrimaryAction != null) ...[
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: onPrimaryAction,
-                style: FilledButton.styleFrom(minimumSize: const Size(220, 48)),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(220, 48),
+                  backgroundColor: FreshPalette.primaryButton,
+                  foregroundColor: Colors.white,
+                ),
                 child: Text(config.primaryLabel!),
               ),
             ],
             if (config.showRetry && onRetry != null) ...[
               const SizedBox(height: 12),
-              TextButton(onPressed: onRetry, child: const Text('Try again')),
+              TextButton(
+                onPressed: onRetry,
+                style: TextButton.styleFrom(
+                  foregroundColor: FreshPalette.selected,
+                ),
+                child: const Text('Try again'),
+              ),
             ],
           ],
         ),
@@ -76,8 +88,8 @@ class PantryEmptyState extends StatelessWidget {
       case PantryEmptyStateType.noItems:
         return const _EmptyStateConfig(
           icon: Icons.kitchen_outlined,
-          iconColor: AppColors.primaryDark,
-          backgroundColor: AppColors.softGreen,
+          iconColor: FreshPalette.selected,
+          backgroundColor: FreshPalette.highlight,
           title: 'Your pantry is empty',
           message:
               'Start by adding your first food item to keep track of what you have at home.',
@@ -138,12 +150,12 @@ class PantryLoadingState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: AppColors.primaryGreen),
+            CircularProgressIndicator(color: FreshPalette.selected),
             SizedBox(height: 16),
             Text(
               'Loading your pantry...',
               style: TextStyle(
-                color: AppColors.textSecondary,
+                color: FreshPalette.secondaryText,
                 fontWeight: FontWeight.w500,
               ),
             ),

@@ -9,19 +9,25 @@ Future<bool> confirmDeletePantryItem(
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      backgroundColor: AppColors.cream,
+      backgroundColor: FreshPalette.card,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text(
         'Delete item?',
-        style: TextStyle(color: AppColors.heading, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          color: FreshPalette.heading,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       content: Text(
         'Are you sure you want to delete $itemName? This action cannot be undone.',
-        style: const TextStyle(color: AppColors.textSecondary),
+        style: const TextStyle(color: FreshPalette.secondaryText),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
+          style: TextButton.styleFrom(
+            foregroundColor: FreshPalette.secondaryText,
+          ),
           child: const Text('Cancel'),
         ),
         FilledButton(

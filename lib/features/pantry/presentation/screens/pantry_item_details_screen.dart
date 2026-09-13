@@ -311,7 +311,11 @@ class _PantryItemDetailsScreenState
     final canDecrement = !isUpdating && item.quantity > 0;
 
     return Scaffold(
+      backgroundColor: FreshPalette.pageBackground,
       appBar: AppBar(
+        backgroundColor: FreshPalette.pageBackground,
+        foregroundColor: FreshPalette.heading,
+        surfaceTintColor: FreshPalette.pageBackground,
         title: const Text('Item Details'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -324,7 +328,7 @@ class _PantryItemDetailsScreenState
             onPressed: _isDeleting ? null : () => _openEdit(item),
             tooltip: 'Edit ${item.name}',
             icon: const Icon(Icons.edit_outlined),
-            color: AppColors.primaryDark,
+            color: FreshPalette.selected,
           ),
           if (_isDeleting)
             const Padding(
@@ -333,7 +337,10 @@ class _PantryItemDetailsScreenState
                 child: SizedBox(
                   width: 22,
                   height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: FreshPalette.selected,
+                  ),
                 ),
               ),
             )
@@ -393,6 +400,10 @@ class _PantryItemDetailsScreenState
                   // Bottom actions: restock via shopping list, or mark as used.
                   FilledButton.icon(
                     onPressed: () => _addToShoppingList(item),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: FreshPalette.primaryButton,
+                      foregroundColor: Colors.white,
+                    ),
                     icon: const Icon(Icons.add_shopping_cart_outlined),
                     label: const Text('Add shopping list'),
                   ),
@@ -402,9 +413,9 @@ class _PantryItemDetailsScreenState
                         ? null
                         : () => _markConsumed(item),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primaryDark,
+                      foregroundColor: FreshPalette.selected,
                       minimumSize: const Size.fromHeight(52),
-                      side: const BorderSide(color: AppColors.primaryGreen),
+                      side: const BorderSide(color: FreshPalette.selected),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -440,13 +451,13 @@ class _HeaderCard extends StatelessWidget {
             width: 84,
             height: 84,
             decoration: BoxDecoration(
-              color: AppColors.iconBg,
+              color: FreshPalette.highlight,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(
               item.category.icon,
               size: 40,
-              color: AppColors.primaryDark,
+              color: FreshPalette.selected,
             ),
           ),
           const SizedBox(width: 16),
@@ -462,7 +473,7 @@ class _HeaderCard extends StatelessWidget {
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     height: 1.25,
-                    color: AppColors.heading,
+                    color: FreshPalette.heading,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -471,7 +482,7 @@ class _HeaderCard extends StatelessWidget {
                     Icon(
                       item.category.icon,
                       size: 16,
-                      color: AppColors.textSecondary,
+                      color: FreshPalette.secondaryText,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -481,7 +492,7 @@ class _HeaderCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 14,
-                          color: AppColors.textSecondary,
+                          color: FreshPalette.secondaryText,
                         ),
                       ),
                     ),
@@ -609,7 +620,7 @@ class _ExpiryCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.heading,
+                    color: FreshPalette.heading,
                   ),
                 ),
               ),
@@ -682,7 +693,7 @@ class _QuantityCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: AppColors.heading,
+              color: FreshPalette.heading,
             ),
           ),
           const SizedBox(height: 6),
@@ -692,14 +703,14 @@ class _QuantityCard extends StatelessWidget {
               fontSize: 14,
               color: item.isOutOfStock
                   ? AppColors.statusRed
-                  : AppColors.textSecondary,
+                  : FreshPalette.secondaryText,
             ),
           ),
           const SizedBox(height: 14),
           Container(
             height: 48,
             decoration: BoxDecoration(
-              color: AppColors.softGreen.withValues(alpha: 0.55),
+              color: FreshPalette.highlight.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppColors.cardBorder),
             ),
@@ -710,7 +721,7 @@ class _QuantityCard extends StatelessWidget {
                   icon: Icons.remove,
                   tooltip: 'Decrease quantity',
                   enabled: canDecrement,
-                  foreground: AppColors.badgeTextDark,
+                  foreground: FreshPalette.heading,
                   onPressed: onDecrement,
                 ),
                 Container(
@@ -728,6 +739,7 @@ class _QuantityCard extends StatelessWidget {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.5,
+                                color: FreshPalette.selected,
                               ),
                             )
                           : FittedBox(
@@ -738,7 +750,7 @@ class _QuantityCard extends StatelessWidget {
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.heading,
+                                  color: FreshPalette.heading,
                                 ),
                               ),
                             ),
@@ -754,7 +766,7 @@ class _QuantityCard extends StatelessWidget {
                   icon: Icons.add,
                   tooltip: 'Increase quantity',
                   enabled: onIncrement != null && !isUpdating,
-                  foreground: AppColors.primaryDark,
+                  foreground: FreshPalette.selected,
                   onPressed: onIncrement ?? () {},
                 ),
               ],
@@ -797,7 +809,7 @@ class _QuantityButton extends StatelessWidget {
               size: 20,
               color: enabled
                   ? foreground
-                  : AppColors.textSecondary.withValues(alpha: 0.35),
+                  : FreshPalette.secondaryText.withValues(alpha: 0.35),
             ),
           ),
         ),
@@ -825,7 +837,7 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 18, color: AppColors.primaryDark),
+          Icon(icon, size: 18, color: FreshPalette.selected),
           const SizedBox(width: 10),
           Expanded(
             flex: 5,
@@ -836,7 +848,7 @@ class _InfoRow extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary,
+                color: FreshPalette.secondaryText,
               ),
             ),
           ),
@@ -852,7 +864,7 @@ class _InfoRow extends StatelessWidget {
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 height: 1.25,
-                color: AppColors.heading,
+                color: FreshPalette.heading,
               ),
             ),
           ),
@@ -874,7 +886,7 @@ class _DetailsCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: FreshPalette.card,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.cardBorder),
         boxShadow: [

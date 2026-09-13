@@ -23,7 +23,7 @@ class ExpiryStatusIndicator extends StatelessWidget {
       decoration: BoxDecoration(
         color: status.color,
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 1.5),
+        border: Border.all(color: FreshPalette.card, width: 1.5),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
@@ -63,7 +63,7 @@ class ExpiryStatusLegendButton extends StatelessWidget {
       onPressed: () => show(context),
       tooltip: 'Expiry indicators',
       icon: const Icon(Icons.info_outline_rounded, size: 20),
-      color: AppColors.textSecondary,
+      color: FreshPalette.secondaryText,
       visualDensity: VisualDensity.compact,
       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
       padding: EdgeInsets.zero,
@@ -89,7 +89,7 @@ class _ExpiryStatusLegendSheet extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
           decoration: BoxDecoration(
-            color: AppColors.white,
+            color: FreshPalette.card,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: AppColors.cardBorder),
             boxShadow: [
@@ -109,7 +109,7 @@ class _ExpiryStatusLegendSheet extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.heading,
+                  color: FreshPalette.heading,
                 ),
               ),
               const SizedBox(height: 14),
@@ -128,7 +128,7 @@ class _ExpiryStatusLegendSheet extends StatelessWidget {
                         status.label,
                         style: const TextStyle(
                           fontSize: 14,
-                          color: AppColors.textSecondary,
+                          color: FreshPalette.secondaryText,
                         ),
                       ),
                     ],

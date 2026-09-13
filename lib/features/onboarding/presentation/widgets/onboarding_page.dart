@@ -30,11 +30,11 @@ class OnboardingPage extends StatelessWidget {
                         width: iconSize,
                         height: iconSize,
                         decoration: BoxDecoration(
-                          color: AppColors.softGreen,
+                          color: FreshPalette.highlight,
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primaryGreen.withValues(
+                              color: FreshPalette.selected.withValues(
                                 alpha: 0.12,
                               ),
                               blurRadius: 24,
@@ -45,20 +45,24 @@ class OnboardingPage extends StatelessWidget {
                         child: Icon(
                           item.icon,
                           size: iconSize * 0.46,
-                          color: AppColors.primaryGreen,
+                          color: FreshPalette.selected,
                         ),
                       ),
                       const SizedBox(height: 32),
                       Text(
                         item.title,
                         textAlign: TextAlign.center,
-                        style: textTheme.headlineMedium,
+                        style: textTheme.headlineMedium?.copyWith(
+                          color: FreshPalette.heading,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         item.description,
                         textAlign: TextAlign.center,
-                        style: textTheme.bodyLarge,
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: FreshPalette.secondaryText,
+                        ),
                       ),
                     ],
                   ),

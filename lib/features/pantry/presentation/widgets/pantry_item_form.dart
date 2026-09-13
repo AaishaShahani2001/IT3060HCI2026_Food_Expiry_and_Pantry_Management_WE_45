@@ -106,7 +106,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
           data: Theme.of(context).copyWith(
             colorScheme: Theme.of(
               context,
-            ).colorScheme.copyWith(primary: AppColors.primaryGreen),
+            ).colorScheme.copyWith(primary: FreshPalette.selected),
           ),
           child: child!,
         );
@@ -347,8 +347,8 @@ class _PantryItemFormState extends State<PantryItemForm> {
                     : 'No expiry date set',
                 style: TextStyle(
                   color: _expiryDate != null
-                      ? AppColors.heading
-                      : AppColors.textSecondary.withValues(alpha: 0.7),
+                      ? FreshPalette.heading
+                      : FreshPalette.secondaryText.withValues(alpha: 0.7),
                 ),
               ),
             ),
@@ -356,13 +356,17 @@ class _PantryItemFormState extends State<PantryItemForm> {
           const SizedBox(height: 24),
           FilledButton(
             onPressed: widget.isSaving ? null : _handleSubmit,
+            style: FilledButton.styleFrom(
+              backgroundColor: FreshPalette.primaryButton,
+              foregroundColor: Colors.white,
+            ),
             child: widget.isSaving
                 ? const SizedBox(
                     width: 22,
                     height: 22,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      color: AppColors.white,
+                      color: Colors.white,
                     ),
                   )
                 : Text(
@@ -382,7 +386,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
         style: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: AppColors.heading,
+          color: FreshPalette.heading,
         ),
       ),
     );
@@ -398,7 +402,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(
-        color: AppColors.textSecondary.withValues(alpha: 0.6),
+        color: FreshPalette.secondaryText.withValues(alpha: 0.6),
       ),
       prefix: prefix,
       prefixText: prefixText,
@@ -406,15 +410,15 @@ class _PantryItemFormState extends State<PantryItemForm> {
           ? const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: AppColors.heading,
+              color: FreshPalette.heading,
             )
           : null,
       prefixIcon: prefixIcon != null
-          ? Icon(prefixIcon, color: AppColors.primaryDark, size: 22)
+          ? Icon(prefixIcon, color: FreshPalette.selected, size: 22)
           : null,
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: AppColors.white,
+      fillColor: FreshPalette.card,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -426,7 +430,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.primaryGreen, width: 1.8),
+        borderSide: const BorderSide(color: FreshPalette.selected, width: 1.8),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
