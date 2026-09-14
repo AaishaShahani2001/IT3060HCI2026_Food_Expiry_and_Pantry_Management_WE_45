@@ -443,8 +443,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           key: _formKey,
           child: Column(
             crossAxisAlignment:
-            CrossAxisAlignment
-                .stretch,
+            CrossAxisAlignment.stretch,
             children: [
 
               // ==================================================
@@ -503,8 +502,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
 
                     Expanded(
-                      child:
-                      Column(
+                      child: Column(
                         crossAxisAlignment:
                         CrossAxisAlignment
                             .start,
@@ -516,15 +514,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ? 'PantryPal User'
                                 : _nameController
                                 .text,
-                            maxLines:
-                            1,
+                            maxLines: 1,
                             overflow:
                             TextOverflow
                                 .ellipsis,
                             style:
                             const TextStyle(
-                              fontSize:
-                              18,
+                              fontSize: 18,
                               fontWeight:
                               FontWeight
                                   .w700,
@@ -540,15 +536,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Text(
                             user?.email ??
                                 _email,
-                            maxLines:
-                            1,
+                            maxLines: 1,
                             overflow:
                             TextOverflow
                                 .ellipsis,
                             style:
                             const TextStyle(
-                              fontSize:
-                              13,
+                              fontSize: 13,
                               color:
                               textGrey,
                             ),
@@ -1106,18 +1100,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color:
                       primaryGreen,
                     ),
+
                     const SizedBox(
                       width: 12,
                     ),
+
                     const Expanded(
                       child: Text(
                         'Your profile preferences will be used later to provide more relevant pantry and recipe suggestions.',
                         style:
                         TextStyle(
-                          fontSize:
-                          13,
-                          height:
-                          1.45,
+                          fontSize: 13,
+                          height: 1.45,
                           color:
                           darkGreen,
                         ),
@@ -1147,6 +1141,135 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(
                 height: 14,
+              ),
+
+              // ==================================================
+              // SHARED PANTRY
+              // ==================================================
+
+              InkWell(
+                borderRadius:
+                BorderRadius.circular(
+                  14,
+                ),
+                onTap: _isSaving
+                    ? null
+                    : () => context.push(
+                  AppRoutes
+                      .sharedPantry,
+                ),
+                child: Container(
+                  padding:
+                  const EdgeInsets.all(
+                    16,
+                  ),
+                  decoration:
+                  BoxDecoration(
+                    color:
+                    Colors.white,
+                    borderRadius:
+                    BorderRadius
+                        .circular(
+                      14,
+                    ),
+                    border:
+                    Border.all(
+                      color:
+                      const Color(
+                        0xFFE3E9E6,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration:
+                        BoxDecoration(
+                          color:
+                          const Color(
+                            0xFFEAF4EE,
+                          ),
+                          borderRadius:
+                          BorderRadius
+                              .circular(
+                            12,
+                          ),
+                        ),
+                        child:
+                        const Icon(
+                          Icons
+                              .people_alt_outlined,
+                          color:
+                          Color(
+                            0xFF2E6B4E,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(
+                        width: 12,
+                      ),
+
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                          CrossAxisAlignment
+                              .start,
+                          children: [
+                            Text(
+                              'Shared Pantry',
+                              style:
+                              TextStyle(
+                                fontSize:
+                                14,
+                                fontWeight:
+                                FontWeight
+                                    .w700,
+                                color:
+                                Color(
+                                  0xFF1F2933,
+                                ),
+                              ),
+                            ),
+
+                            SizedBox(
+                              height: 3,
+                            ),
+
+                            Text(
+                              'Manage your shared pantry and members.',
+                              style:
+                              TextStyle(
+                                fontSize:
+                                12,
+                                color:
+                                Color(
+                                  0xFF6B7280,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const Icon(
+                        Icons
+                            .arrow_forward_ios_rounded,
+                        size: 16,
+                        color:
+                        Color(
+                          0xFF2E6B4E,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(
+                height: 12,
               ),
 
               // ==================================================
@@ -1219,8 +1342,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
 
                       const Expanded(
-                        child:
-                        Column(
+                        child: Column(
                           crossAxisAlignment:
                           CrossAxisAlignment
                               .start,
@@ -1240,9 +1362,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                               ),
                             ),
+
                             SizedBox(
                               height: 3,
                             ),
+
                             Text(
                               'Update your account password.',
                               style:
@@ -1344,8 +1468,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
 
                       const Expanded(
-                        child:
-                        Column(
+                        child: Column(
                           crossAxisAlignment:
                           CrossAxisAlignment
                               .start,
@@ -1365,9 +1488,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                               ),
                             ),
+
                             SizedBox(
                               height: 3,
                             ),
+
                             Text(
                               'Sign out of your PantryPal account.',
                               style:
@@ -1419,7 +1544,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return InkWell(
       borderRadius:
-      BorderRadius.circular(14),
+      BorderRadius.circular(
+        14,
+      ),
       onTap: _isSaving
           ? null
           : () {
@@ -1433,7 +1560,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           milliseconds: 180,
         ),
         padding:
-        const EdgeInsets.all(14),
+        const EdgeInsets.all(
+          14,
+        ),
         decoration:
         BoxDecoration(
           color: selected
@@ -1442,7 +1571,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           )
               : Colors.white,
           borderRadius:
-          BorderRadius.circular(14),
+          BorderRadius.circular(
+            14,
+          ),
           border: Border.all(
             color: selected
                 ? primaryGreen
@@ -1489,8 +1620,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Expanded(
               child: Column(
                 crossAxisAlignment:
-                CrossAxisAlignment
-                    .start,
+                CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
@@ -1499,20 +1629,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       fontSize: 14,
                       fontWeight:
                       FontWeight.w700,
-                      color: Color(
+                      color:
+                      Color(
                         0xFF1F2933,
                       ),
                     ),
                   ),
+
                   const SizedBox(
                     height: 3,
                   ),
+
                   Text(
                     subtitle,
                     style:
                     const TextStyle(
                       fontSize: 12,
-                      color: Color(
+                      color:
+                      Color(
                         0xFF6B7280,
                       ),
                     ),
@@ -1557,7 +1691,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }) {
     return Container(
       padding:
-      const EdgeInsets.all(16),
+      const EdgeInsets.all(
+        16,
+      ),
       decoration:
       BoxDecoration(
         color: Colors.white,
