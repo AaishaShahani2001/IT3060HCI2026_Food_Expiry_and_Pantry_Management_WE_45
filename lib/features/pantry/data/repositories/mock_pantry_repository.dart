@@ -1,5 +1,6 @@
 import '../../domain/models/pantry_item.dart';
 import '../../domain/repositories/pantry_repository.dart';
+import '../../domain/utils/pantry_duplicate_lookup.dart';
 
 /// Optional in-memory pantry store used by unit tests.
 class MockPantryRepository implements PantryRepository {
@@ -44,5 +45,14 @@ class MockPantryRepository implements PantryRepository {
   Future<void> deleteItem(String id) async {
     await Future<void>.delayed(const Duration(milliseconds: 250));
     _items.removeWhere((item) => item.id == id);
+  }
+
+  @override
+  PantryItem? findDuplicateByName(String name, {String? excludeItemId}) {
+    return lookupDuplicatePantryItemByName(
+      _items,
+      name,
+      excludeItemId: excludeItemId,
+    );
   }
 }

@@ -8,13 +8,11 @@ abstract final class AppRoutes {
   static const String home = '/home';
   static const String pantry = '/pantry';
   static const String sharedPantry = '/shared-pantry';
-  static const String sharedPantryMembers =
-      '/shared-pantry-members';
+  static const String sharedPantryMembers = '/shared-pantry-members';
   static const String expiry = '/expiry';
   static const String shopping = '/shopping';
   static const String recipes = '/recipes';
   static const String settings = '/settings';
   static const String profile = '/profile';
-  static const String changePassword =
-      '/change-password';
+  static const String changePassword = '/change-password';
 }

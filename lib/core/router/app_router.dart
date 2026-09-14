@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
 
 import '../../features/expiry/presentation/screens/expiry_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
@@ -54,23 +55,13 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.sharedPantryMembers,
       builder: (context, state) {
-        final pantryId =
-        state.uri.queryParameters['pantryId'];
+        final pantryId = state.uri.queryParameters['pantryId'];
 
-        if (pantryId == null ||
-            pantryId.isEmpty) {
-          return const Scaffold(
-            body: Center(
-              child: Text(
-                'Pantry not found.',
-              ),
-            ),
-          );
+        if (pantryId == null || pantryId.isEmpty) {
+          return const Scaffold(body: Center(child: Text('Pantry not found.')));
         }
 
-        return SharedPantryMembersScreen(
-          pantryId: pantryId,
-        );
+        return SharedPantryMembersScreen(pantryId: pantryId);
       },
     ),
     ShellRoute(

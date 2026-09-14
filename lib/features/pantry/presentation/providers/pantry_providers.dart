@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
+import '../../domain/utils/pantry_duplicate_lookup.dart';
 
 final pantryFirestoreServiceProvider = Provider<PantryFirestoreService>((ref) {
   return PantryFirestoreService();
@@ -116,6 +117,20 @@ class PantryItemsNotifier extends StreamNotifier<List<PantryItem>> {
 
   Future<void> addItem(PantryItem item) async {
     await ref.read(pantryFirestoreServiceProvider).addItem(item);
+  }
+
+  /// Returns the first current pantry item whose name matches [name]
+  /// (trimmed, case-insensitive). Pass [excludeItemId] when editing so the
+  /// item being saved is not treated as its own duplicate.
+  ///
+  /// Uses the in-memory Firestore stream so this can later be replaced with
+  /// a Firestore query.
+  PantryItem? findDuplicateByName(String name, {String? excludeItemId}) {
+    return lookupDuplicatePantryItemByName(
+      state.asData?.value ?? const <PantryItem>[],
+      name,
+      excludeItemId: excludeItemId,
+    );
   }
 
   Future<void> updateItem(PantryItem item) async {

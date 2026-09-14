@@ -6,6 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../providers/pantry_providers.dart';
+import '../widgets/duplicate_item_dialog.dart';
 import '../widgets/pantry_item_form.dart';
 
 class PantryItemFormScreen extends ConsumerStatefulWidget {
@@ -24,52 +25,39 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
   Future<void> _handleSubmit(PantryItemFormData data) async {
     if (_isSaving) return;
 
+    FocusScope.of(context).unfocus();
     setState(() => _isSaving = true);
 
     try {
-      final notifier = ref.read(pantryItemsProvider.notifier);
-      if (widget.item == null) {
-        await notifier.addItem(
-          PantryItem(
-            id: '',
-            name: data.name,
-            category: data.category,
-            location: data.location,
-            quantity: data.quantity,
-            unit: data.unit,
-            price: data.price,
-            expiryDate: data.expiryDate,
-          ),
-        );
-      } else {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) {
-          throw const PantryFirestoreException(
-            'Please log in before continuing.',
-          );
-        }
+      final duplicate = ref
+          .read(pantryItemsProvider.notifier)
+          .findDuplicateByName(data.name, excludeItemId: widget.item?.id);
 
-        if (!widget.item!.isConnectedToFirestore) {
-          throw const PantryFirestoreException(
-            'This item is local-only and is not connected to Firestore yet.',
-          );
-        }
+      if (duplicate != null) {
+        if (!mounted) return;
 
-        // copyWith keeps firestoreId, createdAt, and any fields the form
-        // does not collect (this model has no image or barcode).
-        final updatedItem = widget.item!.copyWith(
-          name: data.name,
-          category: data.category,
-          location: data.location,
-          quantity: data.quantity,
-          unit: data.unit,
-          price: data.price,
-          expiryDate: data.expiryDate,
-          clearExpiryDate: data.expiryDate == null,
+        final action = await showDuplicateItemDialog(
+          context: context,
+          existingItem: duplicate,
         );
 
-        await notifier.updateItem(updatedItem);
+        if (!mounted) return;
+
+        if (action == DuplicateItemAction.updateExisting) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => PantryItemFormScreen(item: duplicate),
+            ),
+          );
+          return;
+        }
+
+        if (action != DuplicateItemAction.addAnyway) {
+          return;
+        }
       }
+
+      await _persistItem(data);
 
       if (mounted) {
         Navigator.of(context).pop(true);
@@ -104,6 +92,51 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  Future<void> _persistItem(PantryItemFormData data) async {
+    final notifier = ref.read(pantryItemsProvider.notifier);
+    if (widget.item == null) {
+      await notifier.addItem(
+        PantryItem(
+          id: '',
+          name: data.name,
+          category: data.category,
+          location: data.location,
+          quantity: data.quantity,
+          unit: data.unit,
+          price: data.price,
+          expiryDate: data.expiryDate,
+        ),
+      );
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw const PantryFirestoreException('Please log in before continuing.');
+    }
+
+    if (!widget.item!.isConnectedToFirestore) {
+      throw const PantryFirestoreException(
+        'This item is local-only and is not connected to Firestore yet.',
+      );
+    }
+
+    // copyWith keeps firestoreId, createdAt, and any fields the form
+    // does not collect (this model has no image or barcode).
+    final updatedItem = widget.item!.copyWith(
+      name: data.name,
+      category: data.category,
+      location: data.location,
+      quantity: data.quantity,
+      unit: data.unit,
+      price: data.price,
+      expiryDate: data.expiryDate,
+      clearExpiryDate: data.expiryDate == null,
+    );
+
+    await notifier.updateItem(updatedItem);
   }
 
   @override

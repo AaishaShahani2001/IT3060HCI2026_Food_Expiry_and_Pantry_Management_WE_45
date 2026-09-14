@@ -4,6 +4,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/pantry_item.dart';
 import 'expiry_status_indicator.dart';
 
+enum _PantryItemCardAction { edit, delete }
+
 class PantryItemCard extends StatelessWidget {
   const PantryItemCard({
     required this.item,
@@ -172,30 +174,61 @@ class PantryItemCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      onPressed: onEdit,
-                      tooltip: 'Edit ${item.name}',
-                      icon: const Icon(Icons.edit_outlined, size: 20),
-                      color: FreshPalette.selected,
-                      visualDensity: VisualDensity.compact,
-                      constraints: const BoxConstraints(
-                        minWidth: 40,
-                        minHeight: 40,
+                PopupMenuButton<_PantryItemCardAction>(
+                  tooltip: 'More options for ${item.name}',
+                  icon: const Icon(
+                    Icons.more_vert,
+                    size: 22,
+                    color: FreshPalette.heading,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
+                  color: FreshPalette.card,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: AppColors.cardBorder),
+                  ),
+                  onSelected: (action) {
+                    switch (action) {
+                      case _PantryItemCardAction.edit:
+                        onEdit();
+                      case _PantryItemCardAction.delete:
+                        onDelete();
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: _PantryItemCardAction.edit,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.edit_outlined,
+                            size: 20,
+                            color: FreshPalette.selected,
+                          ),
+                          SizedBox(width: 12),
+                          Text('Edit'),
+                        ],
                       ),
                     ),
-                    IconButton(
-                      onPressed: onDelete,
-                      tooltip: 'Delete ${item.name}',
-                      icon: const Icon(Icons.delete_outline, size: 20),
-                      color: AppColors.statusRed,
-                      visualDensity: VisualDensity.compact,
-                      constraints: const BoxConstraints(
-                        minWidth: 40,
-                        minHeight: 40,
+                    PopupMenuItem(
+                      value: _PantryItemCardAction.delete,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outline,
+                            size: 20,
+                            color: AppColors.statusRed,
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            'Delete',
+                            style: TextStyle(color: AppColors.statusRed),
+                          ),
+                        ],
                       ),
                     ),
                   ],
