@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/pantry_item.dart';
 import 'expiry_status_indicator.dart';
-
-enum _PantryItemCardAction { edit, delete }
+import 'pantry_item_actions_sheet.dart';
 
 class PantryItemCard extends StatelessWidget {
   const PantryItemCard({
     required this.item,
     required this.onEdit,
+    required this.onUsedUp,
     required this.onDelete,
     required this.onIncrement,
     required this.onDecrement,
@@ -20,6 +20,7 @@ class PantryItemCard extends StatelessWidget {
 
   final PantryItem item;
   final VoidCallback onEdit;
+  final VoidCallback onUsedUp;
   final VoidCallback onDelete;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
@@ -28,7 +29,7 @@ class PantryItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canDecrement = !isUpdating && item.quantity > 0;
+    final canDecrement = !isUpdating;
 
     return Container(
       decoration: BoxDecoration(
@@ -174,65 +175,47 @@ class PantryItemCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                PopupMenuButton<_PantryItemCardAction>(
-                  tooltip: 'More options for ${item.name}',
-                  icon: const Icon(
-                    Icons.more_vert,
-                    size: 22,
-                    color: FreshPalette.heading,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 40,
-                    minHeight: 40,
-                  ),
-                  color: FreshPalette.card,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: const BorderSide(color: AppColors.cardBorder),
-                  ),
-                  onSelected: (action) {
-                    switch (action) {
-                      case _PantryItemCardAction.edit:
-                        onEdit();
-                      case _PantryItemCardAction.delete:
-                        onDelete();
-                    }
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: _PantryItemCardAction.edit,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.edit_outlined,
-                            size: 20,
-                            color: FreshPalette.selected,
-                          ),
-                          SizedBox(width: 12),
-                          Text('Edit'),
-                        ],
+                if (isUpdating)
+                  const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: FreshPalette.selected,
                       ),
                     ),
-                    PopupMenuItem(
-                      value: _PantryItemCardAction.delete,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.delete_outline,
-                            size: 20,
-                            color: AppColors.statusRed,
-                          ),
-                          SizedBox(width: 12),
-                          Text(
-                            'Delete',
-                            style: TextStyle(color: AppColors.statusRed),
-                          ),
-                        ],
+                  )
+                else
+                  Semantics(
+                    button: true,
+                    label: 'More actions for ${item.name}',
+                    child: IconButton(
+                      tooltip: 'More actions for ${item.name}',
+                      onPressed: () async {
+                        final action = await showPantryItemActionsSheet(
+                          context: context,
+                          item: item,
+                        );
+                        if (action == null) return;
+                        switch (action) {
+                          case PantryItemSheetAction.edit:
+                            onEdit();
+                          case PantryItemSheetAction.usedUp:
+                            onUsedUp();
+                          case PantryItemSheetAction.delete:
+                            onDelete();
+                        }
+                      },
+                      icon: const Icon(Icons.more_vert_rounded, size: 22),
+                      color: FreshPalette.heading,
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
                       ),
                     ),
-                  ],
-                ),
+                  ),
               ],
             ),
             const SizedBox(height: 14),

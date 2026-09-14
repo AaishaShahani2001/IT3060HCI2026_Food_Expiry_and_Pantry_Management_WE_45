@@ -17,7 +17,7 @@ import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/shared_pantry/presentation/screens/shared_pantry_screen.dart';
 import '../../features/shared_pantry/presentation/screens/shared_pantry_members_screen.dart';
 import 'package:flutter/material.dart';
-import '../constants/app_strings.dart';
+// import '../constants/app_strings.dart';
 
 export 'app_routes.dart';
 
