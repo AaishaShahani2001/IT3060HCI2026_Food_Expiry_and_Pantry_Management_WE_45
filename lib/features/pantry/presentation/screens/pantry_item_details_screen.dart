@@ -6,14 +6,13 @@ import '../../../expiry/domain/services/expiry_service.dart';
 import '../../../expiry/presentation/providers/expiry_provider.dart';
 import '../../../shopping/domain/models/shopping_item.dart';
 import '../../../shopping/presentation/providers/shopping_providers.dart';
-import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../../domain/utils/expiry_status.dart';
 import '../providers/pantry_providers.dart';
+import '../utils/pantry_item_actions.dart';
 import '../widgets/expiry_status_indicator.dart';
 import '../widgets/mark_consumed_bottom_sheet.dart';
-import '../widgets/pantry_item_dialogs.dart';
-import 'pantry_item_form_screen.dart';
+import '../widgets/pantry_item_actions_sheet.dart';
 
 /// Local pantry item details screen.
 ///
@@ -37,81 +36,81 @@ class _PantryItemDetailsScreenState
   /// True after a local delete/consume so we do not pop twice.
   bool _isLeaving = false;
 
-  /// True while a Firestore delete is in progress.
-  bool _isDeleting = false;
-
   /// Prefers the latest provider copy so edits and quantity stay in sync.
   PantryItem? _resolveItem() {
     final items = ref.watch(pantryItemsProvider).asData?.value;
-    if (items == null) return widget.item;
-
-    final firestoreId = widget.item.firestoreId;
-    for (final item in items) {
-      if (firestoreId != null &&
-          firestoreId.isNotEmpty &&
-          item.firestoreId == firestoreId) {
-        return item;
+    final pending = ref.watch(pantryPendingQuantitiesProvider);
+    PantryItem? found = widget.item;
+    if (items != null) {
+      found = null;
+      final firestoreId = widget.item.firestoreId;
+      for (final item in items) {
+        if (firestoreId != null &&
+            firestoreId.isNotEmpty &&
+            item.firestoreId == firestoreId) {
+          found = item;
+          break;
+        }
+        if (item.id == widget.item.id) {
+          found = item;
+          break;
+        }
       }
-      if (item.id == widget.item.id) return item;
     }
-    return null;
+    if (found == null) return null;
+    final overlay = pending[found.id];
+    if (overlay != null) return found.copyWith(quantity: overlay);
+    return found;
   }
 
-  /// Opens the existing Edit Item form with the current local values.
-  Future<void> _openEdit(PantryItem item) async {
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => PantryItemFormScreen(item: item)),
+  Future<void> _openEdit(PantryItem item) {
+    return openPantryItemEditor(context, item);
+  }
+
+  Future<void> _openActions(PantryItem item) async {
+    if (ref.read(pantryBusyItemIdsProvider).contains(item.id)) return;
+    final action = await showPantryItemActionsSheet(
+      context: context,
+      item: item,
+    );
+    if (action == null || !mounted) return;
+    switch (action) {
+      case PantryItemSheetAction.edit:
+        await _openEdit(item);
+      case PantryItemSheetAction.usedUp:
+        await _markUsedUp(item);
+      case PantryItemSheetAction.delete:
+        await _confirmDelete(item);
+    }
+  }
+
+  Future<void> _markUsedUp(PantryItem item) {
+    final items = ref.read(pantryItemsProvider).asData?.value ?? const [];
+    final index = items.indexWhere((entry) => entry.id == item.id);
+    return handlePantryUsedUp(
+      context: context,
+      ref: ref,
+      item: item,
+      originalIndex: index < 0 ? 0 : index,
+      onRemoved: () {
+        _isLeaving = true;
+        if (mounted) Navigator.of(context).pop();
+      },
     );
   }
 
   /// App-bar delete: confirm, delete from Firestore, then leave this screen.
   Future<void> _confirmDelete(PantryItem item) async {
-    if (_isDeleting) return;
-
-    final confirmed = await confirmDeletePantryItem(
-      context,
-      itemName: item.name,
+    if (ref.read(pantryBusyItemIdsProvider).contains(item.id)) return;
+    await handlePantryPermanentDelete(
+      context: context,
+      ref: ref,
+      item: item,
+      onRemoved: () {
+        _isLeaving = true;
+        if (mounted) Navigator.of(context).pop();
+      },
     );
-    if (!confirmed || !mounted) return;
-
-    setState(() => _isDeleting = true);
-    // Set before removing from state so a null item does not pop twice.
-    _isLeaving = true;
-
-    final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
-
-    try {
-      await ref.read(pantryItemsProvider.notifier).deleteItem(item);
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          content: const Text('Item deleted successfully.'),
-        ),
-      );
-      if (mounted) {
-        navigator.pop();
-      }
-    } catch (error, stackTrace) {
-      debugPrint('Pantry details delete failed: $error');
-      debugPrint('$stackTrace');
-      _isLeaving = false;
-      if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.statusRed,
-          content: Text(mapPantryFirestoreError(error)),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isDeleting = false);
-      }
-    }
   }
 
   /// Copies this pantry item into the local shopping list if it is not there.
@@ -223,26 +222,14 @@ class _PantryItemDetailsScreenState
         .replaceFirst(RegExp(r'\.$'), '');
   }
 
-  /// Quantity stepper; Firestore first, then Riverpod. Never goes below zero.
-  Future<void> _adjustQuantity(PantryItem item, double delta) async {
-    if (delta < 0 && item.quantity <= 0) return;
-
-    try {
-      await ref
-          .read(pantryItemsProvider.notifier)
-          .adjustQuantity(item.id, delta);
-    } catch (error, stackTrace) {
-      debugPrint('Pantry details quantity change failed: $error');
-      debugPrint('$stackTrace');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.statusRed,
-          content: Text(mapPantryFirestoreError(error)),
-        ),
-      );
-    }
+  /// Quantity stepper with optimistic UI, debounce, and Undo.
+  Future<void> _adjustQuantity(PantryItem item, double delta) {
+    return handlePantryQuantityDelta(
+      context: context,
+      ref: ref,
+      item: item,
+      delta: delta,
+    );
   }
 
   /// Builds the expiry help line from existing expiry-service day counts.
@@ -308,7 +295,7 @@ class _PantryItemDetailsScreenState
     final expiryService = ref.watch(expiryServiceProvider);
     final isWide = MediaQuery.sizeOf(context).width >= 700;
     final isUpdating = ref.watch(pantryBusyItemIdsProvider).contains(item.id);
-    final canDecrement = !isUpdating && item.quantity > 0;
+    final canDecrement = !isUpdating;
 
     return Scaffold(
       backgroundColor: FreshPalette.pageBackground,
@@ -324,13 +311,7 @@ class _PantryItemDetailsScreenState
         ),
         // Edit / Delete remain here so the bottom actions can be shopping/consume.
         actions: [
-          IconButton(
-            onPressed: _isDeleting ? null : () => _openEdit(item),
-            tooltip: 'Edit ${item.name}',
-            icon: const Icon(Icons.edit_outlined),
-            color: FreshPalette.selected,
-          ),
-          if (_isDeleting)
+          if (ref.watch(pantryBusyItemIdsProvider).contains(item.id))
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Center(
@@ -345,11 +326,15 @@ class _PantryItemDetailsScreenState
               ),
             )
           else
-            IconButton(
-              onPressed: () => _confirmDelete(item),
-              tooltip: 'Delete ${item.name}',
-              icon: const Icon(Icons.delete_outline),
-              color: AppColors.statusRed,
+            Semantics(
+              button: true,
+              label: 'More actions for ${item.name}',
+              child: IconButton(
+                onPressed: () => _openActions(item),
+                tooltip: 'More actions for ${item.name}',
+                icon: const Icon(Icons.more_vert_rounded),
+                color: FreshPalette.heading,
+              ),
             ),
         ],
       ),

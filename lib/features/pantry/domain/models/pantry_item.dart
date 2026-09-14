@@ -335,6 +335,30 @@ class PantryItem {
     };
   }
 
+  /// Firestore document fields for create and Used Up restore.
+  ///
+  /// Enums are stored as names. Dates use [Timestamp]. [createdAt] is kept
+  /// when [preserveCreatedAt] is true so Undo recreates the same document.
+  Map<String, dynamic> toFirestore({
+    required String userId,
+    bool preserveCreatedAt = false,
+  }) {
+    return {
+      'name': name,
+      'category': category.name,
+      'location': location.name,
+      'quantity': quantity,
+      'unit': unit.name,
+      'price': unitPrice,
+      'expiryDate': expiryDate == null ? null : Timestamp.fromDate(expiryDate!),
+      'userId': userId,
+      'createdAt': preserveCreatedAt && createdAt != null
+          ? Timestamp.fromDate(createdAt!)
+          : FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+  }
+
   factory PantryItem.fromMap(String id, Map<String, dynamic> data) {
     final firestoreId = _stringField(data['firestoreId']);
     return PantryItem(

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../domain/models/pantry_item.dart';
+import '../../domain/models/removed_pantry_item.dart';
 
 /// User-facing Firestore error. [toString] is the friendly message only.
 class PantryFirestoreException implements Exception {
@@ -55,10 +56,17 @@ String mapPantryLoadError(Object error) {
   return 'Something went wrong while loading your Pantry.';
 }
 
+const String kPantrySignInRequiredMessage =
+    'Please sign in again to manage your pantry.';
+
 String _friendlyFirebaseMessage(String code) {
   switch (code) {
+    case 'unauthenticated':
+      return kPantrySignInRequiredMessage;
     case 'permission-denied':
       return 'You do not have permission to modify this item.';
+    case 'not-found':
+      return 'This item no longer exists.';
     case 'unavailable':
     case 'deadline-exceeded':
     case 'network-request-failed':
@@ -156,24 +164,11 @@ class PantryFirestoreService {
   Future<PantryItem> addItem(PantryItem item) async {
     final user = _auth.currentUser;
     if (user == null) {
-      throw const PantryFirestoreException('Please log in before continuing.');
+      throw const PantryFirestoreException(kPantrySignInRequiredMessage);
     }
 
     final now = DateTime.now();
-    final itemData = <String, dynamic>{
-      'name': item.name,
-      'category': item.category.name,
-      'location': item.location.name,
-      'quantity': item.quantity,
-      'unit': item.unit.name,
-      'price': item.unitPrice,
-      'expiryDate': item.expiryDate == null
-          ? null
-          : Timestamp.fromDate(item.expiryDate!),
-      'userId': user.uid,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
+    final itemData = item.toFirestore(userId: user.uid);
 
     try {
       // Let Firestore generate the document ID. Never use the item name.
@@ -188,6 +183,74 @@ class PantryFirestoreService {
     } on FirebaseException catch (error) {
       debugPrint('Pantry Firestore add failed: ${error.code} ${error.message}');
       throw PantryFirestoreException(_friendlyFirebaseMessage(error.code));
+    }
+  }
+
+  /// Removes [item] because it was consumed. The Firestore document is deleted
+  /// using its current ID so Undo can recreate the same document.
+  Future<RemovedPantryItem> markAsUsedUp({
+    required String userId,
+    required PantryItem item,
+    required int originalIndex,
+  }) async {
+    final itemId = item.firestoreId ?? item.id;
+    if (itemId.trim().isEmpty) {
+      throw const PantryFirestoreException(
+        'This item is local-only and is not connected to Firestore yet.',
+      );
+    }
+
+    await deletePantryItem(userId: userId, itemId: itemId);
+    return RemovedPantryItem(item: item, originalIndex: originalIndex);
+  }
+
+  /// Recreates a Used Up item with [RemovedPantryItem.documentId]. Uses set(),
+  /// never add(), so the original document ID is preserved.
+  Future<void> restoreUsedUpItem({
+    required String userId,
+    required RemovedPantryItem removedItem,
+  }) async {
+    final itemId = removedItem.documentId;
+    if (itemId.trim().isEmpty) {
+      throw PantryFirestoreException(
+        'Unable to restore ${removedItem.name}. Please try again.',
+      );
+    }
+
+    try {
+      await _itemDoc(userId: userId, itemId: itemId).set(
+        removedItem.item.toFirestore(userId: userId, preserveCreatedAt: true),
+      );
+    } on FirebaseException catch (error) {
+      debugPrint(
+        'Pantry Used Up restore failed: ${error.code} ${error.message}',
+      );
+      throw PantryFirestoreException(_friendlyFirebaseMessage(error.code));
+    }
+  }
+
+  /// Writes an absolute quantity. Never stores a negative value.
+  Future<void> updateQuantity({
+    required String userId,
+    required String itemId,
+    required double quantity,
+  }) async {
+    if (quantity < 0) {
+      throw const PantryFirestoreException('Quantity cannot be negative.');
+    }
+
+    try {
+      await _itemDoc(userId: userId, itemId: itemId).update({
+        'quantity': double.parse(quantity.toStringAsFixed(2)),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (error) {
+      debugPrint(
+        'Pantry quantity update failed: ${error.code} ${error.message}',
+      );
+      throw PantryFirestoreException(
+        _friendlyQuantityFirebaseMessage(error.code),
+      );
     }
   }
 

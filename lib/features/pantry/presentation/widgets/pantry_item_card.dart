@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/pantry_item.dart';
 import 'expiry_status_indicator.dart';
+import 'pantry_item_actions_sheet.dart';
 
 class PantryItemCard extends StatelessWidget {
   const PantryItemCard({
     required this.item,
     required this.onEdit,
+    required this.onUsedUp,
     required this.onDelete,
     required this.onIncrement,
     required this.onDecrement,
@@ -18,6 +20,7 @@ class PantryItemCard extends StatelessWidget {
 
   final PantryItem item;
   final VoidCallback onEdit;
+  final VoidCallback onUsedUp;
   final VoidCallback onDelete;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
@@ -26,7 +29,7 @@ class PantryItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canDecrement = !isUpdating && item.quantity > 0;
+    final canDecrement = !isUpdating;
 
     return Container(
       decoration: BoxDecoration(
@@ -172,34 +175,47 @@ class PantryItemCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      onPressed: onEdit,
-                      tooltip: 'Edit ${item.name}',
-                      icon: const Icon(Icons.edit_outlined, size: 20),
-                      color: FreshPalette.selected,
-                      visualDensity: VisualDensity.compact,
-                      constraints: const BoxConstraints(
-                        minWidth: 40,
-                        minHeight: 40,
+                if (isUpdating)
+                  const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: FreshPalette.selected,
                       ),
                     ),
-                    IconButton(
-                      onPressed: onDelete,
-                      tooltip: 'Delete ${item.name}',
-                      icon: const Icon(Icons.delete_outline, size: 20),
-                      color: AppColors.statusRed,
-                      visualDensity: VisualDensity.compact,
+                  )
+                else
+                  Semantics(
+                    button: true,
+                    label: 'More actions for ${item.name}',
+                    child: IconButton(
+                      tooltip: 'More actions for ${item.name}',
+                      onPressed: () async {
+                        final action = await showPantryItemActionsSheet(
+                          context: context,
+                          item: item,
+                        );
+                        if (action == null) return;
+                        switch (action) {
+                          case PantryItemSheetAction.edit:
+                            onEdit();
+                          case PantryItemSheetAction.usedUp:
+                            onUsedUp();
+                          case PantryItemSheetAction.delete:
+                            onDelete();
+                        }
+                      },
+                      icon: const Icon(Icons.more_vert_rounded, size: 22),
+                      color: FreshPalette.heading,
                       constraints: const BoxConstraints(
-                        minWidth: 40,
-                        minHeight: 40,
+                        minWidth: 48,
+                        minHeight: 48,
                       ),
                     ),
-                  ],
-                ),
+                  ),
               ],
             ),
             const SizedBox(height: 14),

@@ -5,11 +5,11 @@ import '../../../../core/constants/app_colors.dart';
 import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../providers/pantry_providers.dart';
+import '../utils/pantry_item_actions.dart';
 import '../widgets/expiry_status_indicator.dart';
 import '../widgets/pantry_empty_state.dart';
 import '../widgets/pantry_filter_bottom_sheet.dart';
 import '../widgets/pantry_item_card.dart';
-import '../widgets/pantry_item_dialogs.dart';
 import '../widgets/pantry_location_selector.dart';
 import 'pantry_item_details_screen.dart';
 import 'pantry_item_form_screen.dart';
@@ -23,7 +23,6 @@ class PantryScreen extends ConsumerStatefulWidget {
 
 class _PantryScreenState extends ConsumerState<PantryScreen> {
   bool _isSearchVisible = false;
-  bool _isDeleting = false;
   late final TextEditingController _searchController;
   late final FocusNode _searchFocusNode;
 
@@ -47,10 +46,8 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
     );
   }
 
-  Future<void> _openEditItem(PantryItem item) async {
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => PantryItemFormScreen(item: item)),
-    );
+  Future<void> _openEditItem(PantryItem item) {
+    return openPantryItemEditor(context, item);
   }
 
   Future<void> _openItemDetails(PantryItem item) async {
@@ -59,46 +56,17 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
     );
   }
 
-  Future<void> _confirmDelete(PantryItem item) async {
-    if (_isDeleting) return;
+  Future<void> _confirmDelete(PantryItem item) {
+    return handlePantryPermanentDelete(context: context, ref: ref, item: item);
+  }
 
-    final confirmed = await confirmDeletePantryItem(
-      context,
-      itemName: item.name,
+  Future<void> _markUsedUp(PantryItem item, int originalIndex) {
+    return handlePantryUsedUp(
+      context: context,
+      ref: ref,
+      item: item,
+      originalIndex: originalIndex,
     );
-
-    if (!confirmed || !mounted) return;
-
-    setState(() => _isDeleting = true);
-
-    try {
-      await ref.read(pantryItemsProvider.notifier).deleteItem(item);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          content: const Text('Item deleted successfully.'),
-        ),
-      );
-    } catch (error, stackTrace) {
-      debugPrint('Pantry delete failed: $error');
-      debugPrint('$stackTrace');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.statusRed,
-          content: Text(mapPantryFirestoreError(error)),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isDeleting = false);
-      }
-    }
   }
 
   void _toggleSearch() {
@@ -141,13 +109,6 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
               parent: BouncingScrollPhysics(),
             ),
             slivers: [
-              if (_isDeleting)
-                const SliverToBoxAdapter(
-                  child: LinearProgressIndicator(
-                    minHeight: 2,
-                    color: FreshPalette.selected,
-                  ),
-                ),
               SliverToBoxAdapter(child: _buildHeader(context, filters)),
               if (_isSearchVisible)
                 SliverToBoxAdapter(child: _buildSearchField()),
@@ -253,8 +214,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                               mainAxisExtent: 168,
                             ),
                         delegate: SliverChildBuilderDelegate((context, index) {
-                          final item = filteredItems[index];
-                          return _buildItemCard(item);
+                          return _buildItemCard(filteredItems[index], index);
                         }, childCount: filteredItems.length),
                       ),
                     );
@@ -266,7 +226,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                       itemCount: filteredItems.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
-                        return _buildItemCard(filteredItems[index]);
+                        return _buildItemCard(filteredItems[index], index);
                       },
                     ),
                   );
@@ -279,7 +239,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
     );
   }
 
-  Widget _buildItemCard(PantryItem item) {
+  Widget _buildItemCard(PantryItem item, int originalIndex) {
     final busyIds = ref.watch(pantryBusyItemIdsProvider);
     final isUpdating = busyIds.contains(item.id);
     return PantryItemCard(
@@ -287,31 +247,20 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
       isUpdating: isUpdating,
       onTap: () => _openItemDetails(item),
       onEdit: () => _openEditItem(item),
+      onUsedUp: () => _markUsedUp(item, originalIndex),
       onDelete: () => _confirmDelete(item),
       onIncrement: () => _adjustQuantity(item, item.quantityStep),
       onDecrement: () => _adjustQuantity(item, -item.quantityStep),
     );
   }
 
-  Future<void> _adjustQuantity(PantryItem item, double delta) async {
-    if (delta < 0 && item.quantity <= 0) return;
-
-    try {
-      await ref
-          .read(pantryItemsProvider.notifier)
-          .adjustQuantity(item.id, delta);
-    } catch (error, stackTrace) {
-      debugPrint('Pantry quantity change failed: $error');
-      debugPrint('$stackTrace');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.statusRed,
-          content: Text(mapPantryFirestoreError(error)),
-        ),
-      );
-    }
+  Future<void> _adjustQuantity(PantryItem item, double delta) {
+    return handlePantryQuantityDelta(
+      context: context,
+      ref: ref,
+      item: item,
+      delta: delta,
+    );
   }
 
   Widget _buildHeader(BuildContext context, PantryFilterState filters) {
