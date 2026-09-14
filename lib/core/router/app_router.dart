@@ -14,6 +14,8 @@ import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/change_password_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/shared_pantry/presentation/screens/shared_pantry_screen.dart';
+import '../../features/shared_pantry/presentation/screens/shared_pantry_members_screen.dart';
+import 'package:flutter/material.dart';
 import '../constants/app_strings.dart';
 
 export 'app_routes.dart';
@@ -48,6 +50,28 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.sharedPantry,
       builder: (context, state) => const SharedPantryScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.sharedPantryMembers,
+      builder: (context, state) {
+        final pantryId =
+        state.uri.queryParameters['pantryId'];
+
+        if (pantryId == null ||
+            pantryId.isEmpty) {
+          return const Scaffold(
+            body: Center(
+              child: Text(
+                'Pantry not found.',
+              ),
+            ),
+          );
+        }
+
+        return SharedPantryMembersScreen(
+          pantryId: pantryId,
+        );
+      },
     ),
     ShellRoute(
       builder: (context, state, child) => HomeShell(child: child),

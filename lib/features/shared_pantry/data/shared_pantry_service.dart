@@ -20,7 +20,6 @@ class SharedPantryService {
           (_) => characters[random.nextInt(characters.length)],
     ).join();
   }
-
   Future<String> createPantry({
     required String pantryName,
   }) async {
@@ -36,11 +35,28 @@ class SharedPantryService {
       throw Exception('Please enter a pantry name.');
     }
 
-    final pantryRef = _firestore.collection('pantries').doc();
+    // Check whether the user already belongs to a pantry.
+    final existingMemberships = await _firestore
+        .collectionGroup('members')
+        .where('uid', isEqualTo: user.uid)
+        .limit(1)
+        .get();
+
+    if (existingMemberships.docs.isNotEmpty) {
+      throw Exception(
+        'You are already a member of a pantry. '
+            'Leave your current pantry before creating a new one.',
+      );
+    }
+
+    final pantryRef =
+    _firestore.collection('pantries').doc();
+
     final inviteCode = _generateInviteCode();
 
     final batch = _firestore.batch();
 
+    // Create the pantry.
     batch.set(pantryRef, {
       'name': name,
       'type': 'shared',
@@ -49,6 +65,7 @@ class SharedPantryService {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
+    // Add creator as owner.
     batch.set(
       pantryRef.collection('members').doc(user.uid),
       {
@@ -60,6 +77,7 @@ class SharedPantryService {
       },
     );
 
+    // Link the user to this pantry.
     batch.set(
       _firestore.collection('users').doc(user.uid),
       {
@@ -107,10 +125,18 @@ class SharedPantryService {
         .collection('members')
         .doc(user.uid);
 
-    final existingMember = await memberRef.get();
+    // Check whether the user already belongs to any pantry.
+    final existingMemberships = await _firestore
+        .collectionGroup('members')
+        .where('uid', isEqualTo: user.uid)
+        .limit(1)
+        .get();
 
-    if (existingMember.exists) {
-      throw Exception('You are already a member of this pantry.');
+    if (existingMemberships.docs.isNotEmpty) {
+      throw Exception(
+        'You are already a member of a pantry. '
+            'Leave your current pantry before joining another one.',
+      );
     }
 
     final batch = _firestore.batch();
