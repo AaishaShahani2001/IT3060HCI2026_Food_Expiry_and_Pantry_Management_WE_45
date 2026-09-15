@@ -1,10 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/providers/current_user_provider.dart';
 import '../../../../core/providers/theme_mode_provider.dart';
+import '../../../../core/router/app_routes.dart';
 import '../widgets/settings_nav_card.dart';
 import '../widgets/theme_option_button.dart';
 
@@ -23,10 +25,12 @@ class SettingsScreen extends ConsumerWidget {
       loading: () => AppStrings.userFallback,
       error: (_, _) => AppStrings.userFallback,
     );
+
     final email = FirebaseAuth.instance.currentUser?.email;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
+
       appBar: AppBar(
         title: Text(
           AppStrings.navSettings,
@@ -40,13 +44,15 @@ class SettingsScreen extends ConsumerWidget {
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // UI-only placeholder. Profile editing/navigation belongs
-            // to another team member and is not wired from Settings.
+            // ==================================================
+            // PROFILE
+            // ==================================================
             SettingsNavCard(
               icon: Icons.person_outline_rounded,
               title: AppStrings.profileTitle,
@@ -55,15 +61,29 @@ class SettingsScreen extends ConsumerWidget {
                   ? AppStrings.noEmailAvailable
                   : email,
             ),
+
             const SizedBox(height: 12),
-            // UI-only placeholder. Expiry notification settings belong
-            // to another team member and are not wired from Settings.
-            const SettingsNavCard(
-              icon: Icons.notifications_outlined,
-              title: AppStrings.expiryNotificationsTitle,
-              detail: AppStrings.expiryNotificationsSubtitle,
+
+            // ==================================================
+            // EXPIRY NOTIFICATIONS
+            // ==================================================
+            InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                context.push(AppRoutes.expiryNotifications);
+              },
+              child: const SettingsNavCard(
+                icon: Icons.notifications_outlined,
+                title: AppStrings.expiryNotificationsTitle,
+                detail: AppStrings.expiryNotificationsSubtitle,
+              ),
             ),
+
             const SizedBox(height: 28),
+
+            // ==================================================
+            // THEME PREFERENCES
+            // ==================================================
             Text(
               AppStrings.themePreferences,
               style: textTheme.headlineMedium?.copyWith(
@@ -71,39 +91,54 @@ class SettingsScreen extends ConsumerWidget {
                 color: colorScheme.onSurface,
               ),
             ),
+
             const SizedBox(height: 12),
+
             Row(
               children: [
+                // System
                 Expanded(
                   child: ThemeOptionButton(
                     label: AppStrings.themeSystem,
                     icon: Icons.brightness_auto_outlined,
                     selected: themeMode == ThemeMode.system,
-                    onPressed: () => ref
-                        .read(themeModeProvider.notifier)
-                        .setThemeMode(ThemeMode.system),
+                    onPressed: () {
+                      ref
+                          .read(themeModeProvider.notifier)
+                          .setThemeMode(ThemeMode.system);
+                    },
                   ),
                 ),
+
                 const SizedBox(width: 10),
+
+                // Light
                 Expanded(
                   child: ThemeOptionButton(
                     label: AppStrings.themeLight,
                     icon: Icons.light_mode_outlined,
                     selected: themeMode == ThemeMode.light,
-                    onPressed: () => ref
-                        .read(themeModeProvider.notifier)
-                        .setThemeMode(ThemeMode.light),
+                    onPressed: () {
+                      ref
+                          .read(themeModeProvider.notifier)
+                          .setThemeMode(ThemeMode.light);
+                    },
                   ),
                 ),
+
                 const SizedBox(width: 10),
+
+                // Dark
                 Expanded(
                   child: ThemeOptionButton(
                     label: AppStrings.themeDark,
                     icon: Icons.dark_mode_outlined,
                     selected: themeMode == ThemeMode.dark,
-                    onPressed: () => ref
-                        .read(themeModeProvider.notifier)
-                        .setThemeMode(ThemeMode.dark),
+                    onPressed: () {
+                      ref
+                          .read(themeModeProvider.notifier)
+                          .setThemeMode(ThemeMode.dark);
+                    },
                   ),
                 ),
               ],
