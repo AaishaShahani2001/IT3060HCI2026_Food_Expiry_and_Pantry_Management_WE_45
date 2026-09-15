@@ -103,11 +103,9 @@ class _PantryItemFormState extends State<PantryItemForm> {
       helpText: 'Select expiry date',
       builder: (context, child) {
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(
-              context,
-            ).colorScheme.copyWith(primary: FreshPalette.selected),
-          ),
+          data: Theme.of(
+            context,
+          ).copyWith(colorScheme: Theme.of(context).colorScheme),
           child: child!,
         );
       },
@@ -173,6 +171,9 @@ class _PantryItemFormState extends State<PantryItemForm> {
           _buildLabel('Category'),
           DropdownButtonFormField<PantryCategory>(
             value: _category,
+            dropdownColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
             decoration: _inputDecoration(prefixIcon: Icons.category_outlined),
             items: PantryCategory.values
                 .map(
@@ -198,6 +199,9 @@ class _PantryItemFormState extends State<PantryItemForm> {
           _buildLabel('Location'),
           DropdownButtonFormField<PantryLocation>(
             value: _location,
+            dropdownColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
             decoration: _inputDecoration(prefixIcon: Icons.place_outlined),
             items: PantryLocation.values
                 .map(
@@ -271,6 +275,9 @@ class _PantryItemFormState extends State<PantryItemForm> {
                     DropdownButtonFormField<PantryUnit>(
                       value: _unit,
                       isExpanded: true,
+                      dropdownColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                       decoration: _inputDecoration().copyWith(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -347,8 +354,10 @@ class _PantryItemFormState extends State<PantryItemForm> {
                     : 'No expiry date set',
                 style: TextStyle(
                   color: _expiryDate != null
-                      ? FreshPalette.heading
-                      : FreshPalette.secondaryText.withValues(alpha: 0.7),
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Theme.of(
+                          context,
+                        ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                 ),
               ),
             ),
@@ -357,16 +366,16 @@ class _PantryItemFormState extends State<PantryItemForm> {
           FilledButton(
             onPressed: widget.isSaving ? null : _handleSubmit,
             style: FilledButton.styleFrom(
-              backgroundColor: FreshPalette.primaryButton,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             child: widget.isSaving
-                ? const SizedBox(
+                ? SizedBox(
                     width: 22,
                     height: 22,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onPrimary,
                     ),
                   )
                 : Text(
@@ -383,10 +392,10 @@ class _PantryItemFormState extends State<PantryItemForm> {
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: FreshPalette.heading,
+          color: Theme.of(context).colorScheme.onSurface,
         ),
       ),
     );
@@ -399,38 +408,39 @@ class _PantryItemFormState extends State<PantryItemForm> {
     String? prefixText,
     Widget? suffixIcon,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(
-        color: FreshPalette.secondaryText.withValues(alpha: 0.6),
+        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
       ),
       prefix: prefix,
       prefixText: prefixText,
       prefixStyle: prefixText != null
-          ? const TextStyle(
+          ? TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: FreshPalette.heading,
+              color: colorScheme.onSurface,
             )
           : null,
       prefixIcon: prefixIcon != null
-          ? Icon(prefixIcon, color: FreshPalette.selected, size: 22)
+          ? Icon(prefixIcon, color: colorScheme.primary, size: 22)
           : null,
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: FreshPalette.card,
+      fillColor: colorScheme.surfaceContainerHighest,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.cardBorder),
+        borderSide: BorderSide(color: colorScheme.outline),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.cardBorder),
+        borderSide: BorderSide(color: colorScheme.outline),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: FreshPalette.selected, width: 1.8),
+        borderSide: BorderSide(color: colorScheme.primary, width: 1.8),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),

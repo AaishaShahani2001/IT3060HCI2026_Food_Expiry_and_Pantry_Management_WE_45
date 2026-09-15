@@ -9,6 +9,12 @@ import '../screens/pantry_item_form_screen.dart';
 import '../widgets/pantry_item_dialogs.dart';
 import 'pantry_snackbar.dart';
 
+Future<void> openPantryAddItem(BuildContext context) {
+  return Navigator.of(
+    context,
+  ).push<bool>(MaterialPageRoute(builder: (_) => const PantryItemFormScreen()));
+}
+
 Future<void> openPantryItemEditor(BuildContext context, PantryItem item) {
   return Navigator.of(context).push<bool>(
     MaterialPageRoute(builder: (_) => PantryItemFormScreen(item: item)),

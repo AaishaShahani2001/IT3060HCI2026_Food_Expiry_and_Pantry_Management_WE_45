@@ -8,6 +8,7 @@ import '../../features/expiry/presentation/screens/expiry_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/home/presentation/widgets/home_shell.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
+import '../../features/pantry/presentation/screens/pantry_items_screen.dart';
 import '../../features/pantry/presentation/screens/pantry_screen.dart';
 import '../../features/profile/presentation/screens/change_password_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
@@ -86,6 +87,13 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: AppRoutes.pantry,
           builder: (context, state) => const PantryScreen(),
+          routes: [
+            GoRoute(
+              // Child path is 'items', not '/items', so the location is /pantry/items.
+              path: 'items',
+              builder: (context, state) => const PantryItemsScreen(),
+            ),
+          ],
         ),
 
         GoRoute(

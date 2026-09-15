@@ -9,6 +9,7 @@ abstract final class AppRoutes {
   // Main navigation
   static const String home = '/home';
   static const String pantry = '/pantry';
+  static const String pantryItems = '/pantry/items';
   static const String expiry = '/expiry';
   static const String expiryNotifications = '/expiry/notifications';
   static const String shopping = '/shopping';

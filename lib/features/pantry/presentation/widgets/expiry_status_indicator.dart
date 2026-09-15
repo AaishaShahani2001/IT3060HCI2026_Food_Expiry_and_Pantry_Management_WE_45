@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../domain/utils/expiry_status.dart';
 
 class ExpiryStatusIndicator extends StatelessWidget {
@@ -17,16 +16,21 @@ class ExpiryStatusIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final indicator = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: status.color,
+        color: status.colorFor(colorScheme),
         shape: BoxShape.circle,
-        border: Border.all(color: FreshPalette.card, width: 1.5),
+        border: Border.all(
+          color: colorScheme.surfaceContainerHighest,
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
+            color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.18),
             blurRadius: 2,
             offset: const Offset(0, 1),
           ),
@@ -59,11 +63,12 @@ class ExpiryStatusLegendButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return IconButton(
       onPressed: () => show(context),
       tooltip: 'Expiry indicators',
       icon: const Icon(Icons.info_outline_rounded, size: 20),
-      color: FreshPalette.secondaryText,
+      color: colorScheme.onSurfaceVariant,
       visualDensity: VisualDensity.compact,
       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
       padding: EdgeInsets.zero,
@@ -83,18 +88,20 @@ class _ExpiryStatusLegendSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
           decoration: BoxDecoration(
-            color: FreshPalette.card,
+            color: colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.cardBorder),
+            border: Border.all(color: colorScheme.outline),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
+                color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.08),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
@@ -109,7 +116,7 @@ class _ExpiryStatusLegendSheet extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: FreshPalette.heading,
+                  color: colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 14),
@@ -126,9 +133,9 @@ class _ExpiryStatusLegendSheet extends StatelessWidget {
                       const SizedBox(width: 12),
                       Text(
                         status.label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          color: FreshPalette.secondaryText,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -151,21 +158,21 @@ class ExpiryStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final foreground = status.foregroundColorFor(colorScheme);
     return Semantics(
       label: status.semanticLabel,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: status.backgroundColor,
+          color: status.backgroundColorFor(colorScheme),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: status.foregroundColor.withValues(alpha: 0.22),
-          ),
+          border: Border.all(color: foreground.withValues(alpha: 0.22)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(status.icon, size: 16, color: status.foregroundColor),
+            Icon(status.icon, size: 16, color: foreground),
             const SizedBox(width: 6),
             Text(
               status.badgeLabel,
@@ -174,7 +181,7 @@ class ExpiryStatusBadge extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: status.foregroundColor,
+                color: foreground,
               ),
             ),
           ],

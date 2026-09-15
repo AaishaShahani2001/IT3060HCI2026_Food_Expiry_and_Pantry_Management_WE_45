@@ -13,7 +13,7 @@ Future<PantryItemSheetAction?> showPantryItemActionsSheet({
   return showModalBottomSheet<PantryItemSheetAction>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: FreshPalette.card,
+    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
@@ -30,7 +30,7 @@ Future<PantryItemSheetAction?> showPantryItemActionsSheet({
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppColors.cardBorder,
+                      color: Theme.of(context).colorScheme.outline,
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -44,17 +44,17 @@ Future<PantryItemSheetAction?> showPantryItemActionsSheet({
                       item.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: FreshPalette.heading,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ),
                 ),
                 _ActionTile(
                   icon: Icons.edit_outlined,
-                  iconColor: FreshPalette.selected,
+                  iconColor: Theme.of(context).colorScheme.primary,
                   title: 'Edit Item',
                   subtitle: 'Update item information',
                   onTap: () =>
@@ -62,7 +62,7 @@ Future<PantryItemSheetAction?> showPantryItemActionsSheet({
                 ),
                 _ActionTile(
                   icon: Icons.check_circle_outline,
-                  iconColor: AppColors.primaryGreen,
+                  iconColor: Theme.of(context).colorScheme.primary,
                   title: 'Used Up',
                   subtitle: 'Remove because this item was consumed',
                   onTap: () =>
@@ -113,12 +113,12 @@ class _ActionTile extends StatelessWidget {
         title,
         style: TextStyle(
           fontWeight: FontWeight.w600,
-          color: titleColor ?? FreshPalette.heading,
+          color: titleColor ?? Theme.of(context).colorScheme.onSurface,
         ),
       ),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(color: FreshPalette.secondaryText),
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
       onTap: onTap,
     );
