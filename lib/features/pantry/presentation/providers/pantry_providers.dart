@@ -8,6 +8,7 @@ import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../../domain/models/removed_pantry_item.dart';
 import '../../domain/utils/pantry_duplicate_lookup.dart';
+import '../../domain/utils/pantry_list_query.dart';
 
 const Duration _quantityDebounce = Duration(milliseconds: 550);
 
@@ -75,6 +76,7 @@ class PantryFilterState {
     this.selectedLocation,
     this.selectedCategory,
     this.stockLevel = StockLevelFilter.all,
+    this.sortOption = PantrySortOption.recentlyAdded,
   });
 
   final String searchQuery;
@@ -82,17 +84,34 @@ class PantryFilterState {
   final PantryCategory? selectedCategory;
   final StockLevelFilter stockLevel;
 
+  /// Sort is UI preference, not a matching filter. Clearing filters keeps it.
+  final PantrySortOption sortOption;
+
   bool get hasActiveFilters =>
       searchQuery.isNotEmpty ||
       selectedLocation != null ||
       selectedCategory != null ||
       stockLevel != StockLevelFilter.all;
 
+  bool get hasCustomSort => sortOption != PantrySortOption.recentlyAdded;
+
+  int get activeFilterCount {
+    var count = 0;
+    if (searchQuery.trim().isNotEmpty) count++;
+    if (selectedLocation != null) count++;
+    if (selectedCategory != null) count++;
+    if (stockLevel != StockLevelFilter.all) count++;
+    return count;
+  }
+
+  bool get hasMultipleActiveFilters => activeFilterCount >= 2;
+
   PantryFilterState copyWith({
     String? searchQuery,
     PantryLocation? selectedLocation,
     PantryCategory? selectedCategory,
     StockLevelFilter? stockLevel,
+    PantrySortOption? sortOption,
     bool clearLocation = false,
     bool clearCategory = false,
   }) {
@@ -105,6 +124,7 @@ class PantryFilterState {
           ? null
           : (selectedCategory ?? this.selectedCategory),
       stockLevel: stockLevel ?? this.stockLevel,
+      sortOption: sortOption ?? this.sortOption,
     );
   }
 }
@@ -135,14 +155,38 @@ class PantryFilterNotifier extends Notifier<PantryFilterState> {
     state = state.copyWith(stockLevel: stockLevel);
   }
 
+  void setSortOption(PantrySortOption sortOption) {
+    state = state.copyWith(sortOption: sortOption);
+  }
+
   void clearFilters() {
-    state = const PantryFilterState();
+    // Keep the selected sort so returning from View All and clearing chips
+    // does not silently reset recently-added vs name ordering.
+    state = PantryFilterState(sortOption: state.sortOption);
   }
 }
 
 final pantryFilterProvider =
     NotifierProvider<PantryFilterNotifier, PantryFilterState>(
       PantryFilterNotifier.new,
+    );
+
+/// Card vs list layout for All Pantry Items.
+///
+/// UI-only. Not autoDispose so the selection survives opening View All,
+/// item details, and returning to the Pantry dashboard in the same session.
+enum PantryViewMode { cards, list }
+
+class PantryViewModeNotifier extends Notifier<PantryViewMode> {
+  @override
+  PantryViewMode build() => PantryViewMode.cards;
+
+  void setMode(PantryViewMode mode) => state = mode;
+}
+
+final pantryViewModeProvider =
+    NotifierProvider<PantryViewModeNotifier, PantryViewMode>(
+      PantryViewModeNotifier.new,
     );
 
 class PantryItemsNotifier extends StreamNotifier<List<PantryItem>> {
@@ -545,12 +589,21 @@ class _QuantityEditSession {
   void Function(PantryQuantityWriteResult result)? onFlushed;
 }
 
+/// Live pantry collection at `users/{uid}/pantryItems`.
+///
+/// One stream is shared by the dashboard and All Pantry Items. The five-item
+/// preview is derived in memory from [filteredPantryItemsProvider]; this
+/// notifier is not limited to five documents.
 final pantryItemsProvider =
     StreamNotifierProvider<PantryItemsNotifier, List<PantryItem>>(
       PantryItemsNotifier.new,
     );
 
 /// Switches the pantry stream when the signed-in user changes.
+///
+/// Both Pantry screens watch [pantryItemsProvider]; this is the single
+/// users/{uid}/pantryItems listener. The dashboard preview is derived in
+/// memory and does not open a second Firestore query.
 Stream<List<PantryItem>> _watchPantryForSignedInUser(
   PantryFirestoreService service,
 ) {
@@ -599,16 +652,36 @@ Stream<List<PantryItem>> _watchPantryForSignedInUser(
   return controller.stream;
 }
 
+/// Filtered and sorted items derived from the existing Firestore stream.
+///
+/// Shared by the dashboard preview and the All Pantry Items screen so both
+/// stay in sync without a second listener or a local copy of the collection.
 final filteredPantryItemsProvider = Provider<List<PantryItem>>((ref) {
   final itemsAsync = ref.watch(pantryItemsProvider);
   final filters = ref.watch(pantryFilterProvider);
   final pending = ref.watch(pantryPendingQuantitiesProvider);
 
   return itemsAsync.maybeWhen(
-    data: (items) =>
-        _applyFilters(_withPendingQuantities(items, pending), filters),
+    data: (items) {
+      final visible = _withPendingQuantities(items, pending);
+      final filtered = PantryListQuery.applyFilters(
+        items: visible,
+        searchQuery: filters.searchQuery,
+        location: filters.selectedLocation,
+        category: filters.selectedCategory,
+        stockLevel: filters.stockLevel,
+      );
+      // Sort once here so item widgets do not re-sort on every build.
+      return PantryListQuery.sortItems(filtered, filters.sortOption);
+    },
     orElse: () => const [],
   );
+});
+
+/// At most five matching items for the dashboard. The source list is unchanged.
+final pantryPreviewItemsProvider = Provider<List<PantryItem>>((ref) {
+  final filteredAndSortedItems = ref.watch(filteredPantryItemsProvider);
+  return PantryListQuery.preview(filteredAndSortedItems);
 });
 
 final pantrySummaryProvider = Provider<({int total, int lowStock})>((ref) {
@@ -660,31 +733,4 @@ List<PantryItem> _withPendingQuantities(
           ? item.copyWith(quantity: pending[item.id]!)
           : item,
   ];
-}
-
-List<PantryItem> _applyFilters(
-  List<PantryItem> items,
-  PantryFilterState filters,
-) {
-  return items.where((item) {
-    final matchesSearch =
-        filters.searchQuery.isEmpty ||
-        item.name.toLowerCase().contains(filters.searchQuery.toLowerCase());
-
-    final matchesLocation =
-        filters.selectedLocation == null ||
-        item.location == filters.selectedLocation;
-
-    final matchesCategory =
-        filters.selectedCategory == null ||
-        item.category == filters.selectedCategory;
-
-    final matchesStock = switch (filters.stockLevel) {
-      StockLevelFilter.all => true,
-      StockLevelFilter.inStock => !item.isLowStock,
-      StockLevelFilter.lowStock => item.isLowStock,
-    };
-
-    return matchesSearch && matchesLocation && matchesCategory && matchesStock;
-  }).toList();
 }

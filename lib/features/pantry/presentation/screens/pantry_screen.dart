@@ -9,10 +9,9 @@ import '../utils/pantry_item_actions.dart';
 import '../widgets/expiry_status_indicator.dart';
 import '../widgets/pantry_empty_state.dart';
 import '../widgets/pantry_filter_bottom_sheet.dart';
-import '../widgets/pantry_item_card.dart';
+import '../widgets/pantry_items_sliver.dart';
 import '../widgets/pantry_location_selector.dart';
-import 'pantry_item_details_screen.dart';
-import 'pantry_item_form_screen.dart';
+import '../widgets/pantry_recent_items_header.dart';
 
 class PantryScreen extends ConsumerStatefulWidget {
   const PantryScreen({super.key});
@@ -23,14 +22,15 @@ class PantryScreen extends ConsumerStatefulWidget {
 
 class _PantryScreenState extends ConsumerState<PantryScreen> {
   bool _isSearchVisible = false;
-  late final TextEditingController _searchController;
-  late final FocusNode _searchFocusNode;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController();
-    _searchFocusNode = FocusNode();
+    final initialQuery = ref.read(pantryFilterProvider).searchQuery;
+    _searchController.text = initialQuery;
+    _isSearchVisible = initialQuery.isNotEmpty;
   }
 
   @override
@@ -40,33 +40,17 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
     super.dispose();
   }
 
-  Future<void> _openAddItem() async {
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const PantryItemFormScreen()),
-    );
-  }
-
-  Future<void> _openEditItem(PantryItem item) {
-    return openPantryItemEditor(context, item);
-  }
-
-  Future<void> _openItemDetails(PantryItem item) async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => PantryItemDetailsScreen(item: item)),
-    );
-  }
-
-  Future<void> _confirmDelete(PantryItem item) {
-    return handlePantryPermanentDelete(context: context, ref: ref, item: item);
-  }
-
-  Future<void> _markUsedUp(PantryItem item, int originalIndex) {
-    return handlePantryUsedUp(
-      context: context,
-      ref: ref,
-      item: item,
-      originalIndex: originalIndex,
-    );
+  void _syncSearchController(String query) {
+    if (_searchController.text != query) {
+      _searchController.value = TextEditingValue(
+        text: query,
+        selection: TextSelection.collapsed(offset: query.length),
+      );
+    }
+    final shouldShow = query.isNotEmpty;
+    if (shouldShow != _isSearchVisible && query.isNotEmpty) {
+      setState(() => _isSearchVisible = true);
+    }
   }
 
   void _toggleSearch() {
@@ -86,22 +70,31 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
   Widget build(BuildContext context) {
     final itemsAsync = ref.watch(pantryItemsProvider);
     final filteredItems = ref.watch(filteredPantryItemsProvider);
+    final previewItems = ref.watch(pantryPreviewItemsProvider);
     final filters = ref.watch(pantryFilterProvider);
     final locationCounts = ref.watch(pantryLocationCountsProvider);
-    final isTablet = MediaQuery.sizeOf(context).width >= 700;
+
+    ref.listen<String>(
+      pantryFilterProvider.select((state) => state.searchQuery),
+      (previous, next) {
+        _syncSearchController(next);
+      },
+    );
+
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: FreshPalette.pageBackground,
+      backgroundColor: colorScheme.surface,
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAddItem,
-        backgroundColor: FreshPalette.primaryButton,
-        foregroundColor: Colors.white,
+        onPressed: () => openPantryAddItem(context),
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
         icon: const Icon(Icons.add),
         label: const Text('Add Item'),
       ),
       body: SafeArea(
         child: RefreshIndicator(
-          color: FreshPalette.selected,
+          color: colorScheme.primary,
           onRefresh: () =>
               ref.read(pantryItemsProvider.notifier).refreshItems(),
           child: CustomScrollView(
@@ -134,10 +127,10 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                       Expanded(
                         child: Text(
                           _resultsLabel(itemsAsync, filteredItems, filters),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: FreshPalette.secondaryText,
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -152,7 +145,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                                 .clearFilters();
                           },
                           style: TextButton.styleFrom(
-                            foregroundColor: FreshPalette.selected,
+                            foregroundColor: colorScheme.primary,
                           ),
                           child: const Text('Clear filters'),
                         ),
@@ -160,78 +153,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                   ),
                 ),
               ),
-              itemsAsync.when(
-                loading: () => const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: PantryLoadingState(),
-                ),
-                error: (error, _) => SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: PantryEmptyState(
-                    type: PantryEmptyStateType.error,
-                    message: mapPantryLoadError(error),
-                    onRetry: () {
-                      ref.read(pantryItemsProvider.notifier).refreshItems();
-                    },
-                  ),
-                ),
-                data: (items) {
-                  if (items.isEmpty) {
-                    return SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: PantryEmptyState(
-                        type: PantryEmptyStateType.noItems,
-                        onPrimaryAction: _openAddItem,
-                      ),
-                    );
-                  }
-
-                  if (filteredItems.isEmpty) {
-                    return SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: PantryEmptyState(
-                        type: PantryEmptyStateType.noResults,
-                        onPrimaryAction: () {
-                          _searchController.clear();
-                          setState(() => _isSearchVisible = false);
-                          ref
-                              .read(pantryFilterProvider.notifier)
-                              .clearFilters();
-                        },
-                      ),
-                    );
-                  }
-
-                  if (isTablet) {
-                    return SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-                      sliver: SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 12,
-                              crossAxisSpacing: 12,
-                              mainAxisExtent: 168,
-                            ),
-                        delegate: SliverChildBuilderDelegate((context, index) {
-                          return _buildItemCard(filteredItems[index], index);
-                        }, childCount: filteredItems.length),
-                      ),
-                    );
-                  }
-
-                  return SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-                    sliver: SliverList.separated(
-                      itemCount: filteredItems.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        return _buildItemCard(filteredItems[index], index);
-                      },
-                    ),
-                  );
-                },
-              ),
+              ..._previewSlivers(itemsAsync, filteredItems, previewItems),
             ],
           ),
         ),
@@ -239,31 +161,76 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
     );
   }
 
-  Widget _buildItemCard(PantryItem item, int originalIndex) {
-    final busyIds = ref.watch(pantryBusyItemIdsProvider);
-    final isUpdating = busyIds.contains(item.id);
-    return PantryItemCard(
-      item: item,
-      isUpdating: isUpdating,
-      onTap: () => _openItemDetails(item),
-      onEdit: () => _openEditItem(item),
-      onUsedUp: () => _markUsedUp(item, originalIndex),
-      onDelete: () => _confirmDelete(item),
-      onIncrement: () => _adjustQuantity(item, item.quantityStep),
-      onDecrement: () => _adjustQuantity(item, -item.quantityStep),
-    );
-  }
+  List<Widget> _previewSlivers(
+    AsyncValue<List<PantryItem>> itemsAsync,
+    List<PantryItem> filteredItems,
+    List<PantryItem> previewItems,
+  ) {
+    return itemsAsync.when(
+      loading: () => const [
+        SliverFillRemaining(hasScrollBody: false, child: PantryLoadingState()),
+      ],
+      error: (error, _) => [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: PantryEmptyState(
+            type: PantryEmptyStateType.error,
+            message: mapPantryLoadError(error),
+            onRetry: () {
+              ref.read(pantryItemsProvider.notifier).refreshItems();
+            },
+          ),
+        ),
+      ],
+      data: (items) {
+        if (items.isEmpty) {
+          return [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: PantryEmptyState(
+                type: PantryEmptyStateType.noItems,
+                onPrimaryAction: () => openPantryAddItem(context),
+              ),
+            ),
+          ];
+        }
 
-  Future<void> _adjustQuantity(PantryItem item, double delta) {
-    return handlePantryQuantityDelta(
-      context: context,
-      ref: ref,
-      item: item,
-      delta: delta,
+        if (filteredItems.isEmpty) {
+          return [
+            const SliverToBoxAdapter(
+              child: PantryRecentItemsHeader(matchingCount: 0),
+            ),
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: PantryEmptyState(
+                type: PantryEmptyStateType.noResults,
+                onPrimaryAction: () {
+                  _searchController.clear();
+                  setState(() => _isSearchVisible = false);
+                  ref.read(pantryFilterProvider.notifier).clearFilters();
+                },
+              ),
+            ),
+          ];
+        }
+
+        return [
+          SliverToBoxAdapter(
+            child: PantryRecentItemsHeader(matchingCount: filteredItems.length),
+          ),
+          PantryItemsSliver(
+            // Derive a five-item dashboard preview without modifying the
+            // complete Firestore-backed list used by View All.
+            items: previewItems,
+            viewMode: PantryViewMode.cards,
+          ),
+        ];
+      },
     );
   }
 
   Widget _buildHeader(BuildContext context, PantryFilterState filters) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
       child: Row(
@@ -278,14 +245,14 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: FreshPalette.heading,
+                    color: colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Manage and organize your food items',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: FreshPalette.secondaryText,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -297,8 +264,8 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
             icon: Icon(
               _isSearchVisible ? Icons.search_off_outlined : Icons.search,
               color: _isSearchVisible || filters.searchQuery.isNotEmpty
-                  ? FreshPalette.selected
-                  : FreshPalette.heading,
+                  ? colorScheme.primary
+                  : colorScheme.onSurface,
             ),
           ),
           IconButton(
@@ -317,6 +284,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
   }
 
   Widget _buildSearchField() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: TextField(
@@ -328,7 +296,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
         },
         decoration: InputDecoration(
           hintText: 'Search by item name...',
-          prefixIcon: const Icon(Icons.search, color: FreshPalette.selected),
+          prefixIcon: Icon(Icons.search, color: colorScheme.primary),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   onPressed: () {
@@ -340,25 +308,22 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                 )
               : null,
           filled: true,
-          fillColor: FreshPalette.card,
+          fillColor: colorScheme.surfaceContainerHighest,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 14,
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: AppColors.cardBorder),
+            borderSide: BorderSide(color: colorScheme.outline),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: AppColors.cardBorder),
+            borderSide: BorderSide(color: colorScheme.outline),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: FreshPalette.selected,
-              width: 1.8,
-            ),
+            borderSide: BorderSide(color: colorScheme.primary, width: 1.8),
           ),
         ),
       ),

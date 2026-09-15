@@ -292,17 +292,18 @@ class _PantryItemDetailsScreenState
       return const Scaffold(body: SizedBox.shrink());
     }
 
+    final colorScheme = Theme.of(context).colorScheme;
     final expiryService = ref.watch(expiryServiceProvider);
     final isWide = MediaQuery.sizeOf(context).width >= 700;
     final isUpdating = ref.watch(pantryBusyItemIdsProvider).contains(item.id);
     final canDecrement = !isUpdating;
 
     return Scaffold(
-      backgroundColor: FreshPalette.pageBackground,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: FreshPalette.pageBackground,
-        foregroundColor: FreshPalette.heading,
-        surfaceTintColor: FreshPalette.pageBackground,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        surfaceTintColor: colorScheme.surface,
         title: const Text('Item Details'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -312,15 +313,15 @@ class _PantryItemDetailsScreenState
         // Edit / Delete remain here so the bottom actions can be shopping/consume.
         actions: [
           if (ref.watch(pantryBusyItemIdsProvider).contains(item.id))
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Center(
                 child: SizedBox(
                   width: 22,
                   height: 22,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.5,
-                    color: FreshPalette.selected,
+                    color: colorScheme.primary,
                   ),
                 ),
               ),
@@ -333,7 +334,7 @@ class _PantryItemDetailsScreenState
                 onPressed: () => _openActions(item),
                 tooltip: 'More actions for ${item.name}',
                 icon: const Icon(Icons.more_vert_rounded),
-                color: FreshPalette.heading,
+                color: colorScheme.onSurface,
               ),
             ),
         ],
@@ -386,8 +387,8 @@ class _PantryItemDetailsScreenState
                   FilledButton.icon(
                     onPressed: () => _addToShoppingList(item),
                     style: FilledButton.styleFrom(
-                      backgroundColor: FreshPalette.primaryButton,
-                      foregroundColor: Colors.white,
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
                     ),
                     icon: const Icon(Icons.add_shopping_cart_outlined),
                     label: const Text('Add shopping list'),
@@ -398,9 +399,9 @@ class _PantryItemDetailsScreenState
                         ? null
                         : () => _markConsumed(item),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: FreshPalette.selected,
+                      foregroundColor: colorScheme.primary,
                       minimumSize: const Size.fromHeight(52),
-                      side: const BorderSide(color: FreshPalette.selected),
+                      side: BorderSide(color: colorScheme.primary),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -428,6 +429,7 @@ class _HeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return _DetailsCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -436,13 +438,13 @@ class _HeaderCard extends StatelessWidget {
             width: 84,
             height: 84,
             decoration: BoxDecoration(
-              color: FreshPalette.highlight,
+              color: colorScheme.secondaryContainer,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(
               item.category.icon,
               size: 40,
-              color: FreshPalette.selected,
+              color: colorScheme.primary,
             ),
           ),
           const SizedBox(width: 16),
@@ -454,11 +456,11 @@ class _HeaderCard extends StatelessWidget {
                   item.name,
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     height: 1.25,
-                    color: FreshPalette.heading,
+                    color: colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -467,7 +469,7 @@ class _HeaderCard extends StatelessWidget {
                     Icon(
                       item.category.icon,
                       size: 16,
-                      color: FreshPalette.secondaryText,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -475,9 +477,9 @@ class _HeaderCard extends StatelessWidget {
                         item.category.label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          color: FreshPalette.secondaryText,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -587,6 +589,7 @@ class _ExpiryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = item.expiryStatus;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return _DetailsCard(
       child: Column(
@@ -596,16 +599,16 @@ class _ExpiryCard extends StatelessWidget {
             children: [
               Icon(
                 Icons.event_available_outlined,
-                color: status.foregroundColor,
+                color: status.foregroundColorFor(colorScheme),
               ),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Expiry information',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: FreshPalette.heading,
+                    color: colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -623,13 +626,17 @@ class _ExpiryCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
-              color: status.backgroundColor,
+              color: status.backgroundColorFor(colorScheme),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(status.icon, size: 20, color: status.foregroundColor),
+                Icon(
+                  status.icon,
+                  size: 20,
+                  color: status.foregroundColorFor(colorScheme),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -638,7 +645,7 @@ class _ExpiryCard extends StatelessWidget {
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       height: 1.35,
-                      color: status.foregroundColor,
+                      color: status.foregroundColorFor(colorScheme),
                     ),
                   ),
                 ),
@@ -669,16 +676,17 @@ class _QuantityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return _DetailsCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Quantity',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: FreshPalette.heading,
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 6),
@@ -688,16 +696,16 @@ class _QuantityCard extends StatelessWidget {
               fontSize: 14,
               color: item.isOutOfStock
                   ? AppColors.statusRed
-                  : FreshPalette.secondaryText,
+                  : colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 14),
           Container(
             height: 48,
             decoration: BoxDecoration(
-              color: FreshPalette.highlight.withValues(alpha: 0.55),
+              color: colorScheme.secondaryContainer.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.cardBorder),
+              border: Border.all(color: colorScheme.outline),
             ),
             clipBehavior: Clip.antiAlias,
             child: Row(
@@ -706,25 +714,25 @@ class _QuantityCard extends StatelessWidget {
                   icon: Icons.remove,
                   tooltip: 'Decrease quantity',
                   enabled: canDecrement,
-                  foreground: FreshPalette.heading,
+                  foreground: colorScheme.onSurface,
                   onPressed: onDecrement,
                 ),
                 Container(
                   width: 1,
                   height: double.infinity,
-                  color: AppColors.cardBorder,
+                  color: colorScheme.outline,
                 ),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Center(
                       child: isUpdating
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.5,
-                                color: FreshPalette.selected,
+                                color: colorScheme.primary,
                               ),
                             )
                           : FittedBox(
@@ -732,10 +740,10 @@ class _QuantityCard extends StatelessWidget {
                               child: Text(
                                 item.quantityLabel,
                                 maxLines: 1,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
-                                  color: FreshPalette.heading,
+                                  color: colorScheme.onSurface,
                                 ),
                               ),
                             ),
@@ -745,13 +753,13 @@ class _QuantityCard extends StatelessWidget {
                 Container(
                   width: 1,
                   height: double.infinity,
-                  color: AppColors.cardBorder,
+                  color: colorScheme.outline,
                 ),
                 _QuantityButton(
                   icon: Icons.add,
                   tooltip: 'Increase quantity',
                   enabled: onIncrement != null && !isUpdating,
-                  foreground: FreshPalette.selected,
+                  foreground: colorScheme.primary,
                   onPressed: onIncrement ?? () {},
                 ),
               ],
@@ -780,6 +788,7 @@ class _QuantityButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Tooltip(
       message: tooltip,
       child: Material(
@@ -794,7 +803,7 @@ class _QuantityButton extends StatelessWidget {
               size: 20,
               color: enabled
                   ? foreground
-                  : FreshPalette.secondaryText.withValues(alpha: 0.35),
+                  : colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
             ),
           ),
         ),
@@ -817,12 +826,13 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 18, color: FreshPalette.selected),
+          Icon(icon, size: 18, color: colorScheme.primary),
           const SizedBox(width: 10),
           Expanded(
             flex: 5,
@@ -830,10 +840,10 @@ class _InfoRow extends StatelessWidget {
               label,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: FreshPalette.secondaryText,
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -845,11 +855,11 @@ class _InfoRow extends StatelessWidget {
               textAlign: TextAlign.end,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 height: 1.25,
-                color: FreshPalette.heading,
+                color: colorScheme.onSurface,
               ),
             ),
           ),
@@ -859,7 +869,7 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-/// Shared white card chrome used by every section on this screen.
+/// Shared card chrome used by every section on this screen.
 class _DetailsCard extends StatelessWidget {
   const _DetailsCard({required this.child});
 
@@ -867,16 +877,18 @@ class _DetailsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: FreshPalette.card,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: colorScheme.outline),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.03),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),

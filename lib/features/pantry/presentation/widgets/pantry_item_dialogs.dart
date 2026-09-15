@@ -6,17 +6,18 @@ Future<bool> confirmDeletePantryItem(
   BuildContext context, {
   required String itemName,
 }) async {
+  final colorScheme = Theme.of(context).colorScheme;
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) {
       return AlertDialog(
-        backgroundColor: FreshPalette.card,
+        backgroundColor: colorScheme.surfaceContainerHighest,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Delete $itemName?',
-          style: const TextStyle(
-            color: FreshPalette.heading,
+          style: TextStyle(
+            color: colorScheme.onSurface,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -24,17 +25,14 @@ Future<bool> confirmDeletePantryItem(
           child: Text(
             'This will permanently remove $itemName from your pantry.\n'
             'Use “Used Up” instead if you consumed it.',
-            style: const TextStyle(
-              color: FreshPalette.secondaryText,
-              height: 1.4,
-            ),
+            style: TextStyle(color: colorScheme.onSurfaceVariant, height: 1.4),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             style: TextButton.styleFrom(
-              foregroundColor: FreshPalette.secondaryText,
+              foregroundColor: colorScheme.onSurfaceVariant,
               minimumSize: const Size(48, 48),
             ),
             child: const Text('Cancel'),
@@ -65,31 +63,32 @@ Future<bool?> showNoQuantityRemainingDialog(
   BuildContext context, {
   required String itemName,
 }) {
+  final colorScheme = Theme.of(context).colorScheme;
   return showDialog<bool>(
     context: context,
     builder: (context) {
       return AlertDialog(
-        backgroundColor: FreshPalette.card,
+        backgroundColor: colorScheme.surfaceContainerHighest,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'No $itemName remaining?',
-          style: const TextStyle(
-            color: FreshPalette.heading,
+          style: TextStyle(
+            color: colorScheme.onSurface,
             fontWeight: FontWeight.bold,
           ),
         ),
-        content: const SingleChildScrollView(
+        content: SingleChildScrollView(
           child: Text(
             'Keep this item in your pantry, or mark it as used up if you finished it.',
-            style: TextStyle(color: FreshPalette.secondaryText, height: 1.4),
+            style: TextStyle(color: colorScheme.onSurfaceVariant, height: 1.4),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             style: TextButton.styleFrom(
-              foregroundColor: FreshPalette.secondaryText,
+              foregroundColor: colorScheme.onSurfaceVariant,
               minimumSize: const Size(48, 48),
             ),
             child: const Text('Keep Item'),
@@ -97,8 +96,8 @@ Future<bool?> showNoQuantityRemainingDialog(
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: FreshPalette.primaryButton,
-              foregroundColor: Colors.white,
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
               minimumSize: const Size(48, 48),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),

@@ -142,13 +142,14 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.item != null;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: FreshPalette.pageBackground,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: FreshPalette.pageBackground,
-        foregroundColor: FreshPalette.heading,
-        surfaceTintColor: FreshPalette.pageBackground,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        surfaceTintColor: colorScheme.surface,
         title: Text(isEditing ? 'Edit Item' : 'Add Item'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -164,12 +165,16 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: FreshPalette.card,
+                  color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.cardBorder),
+                  border: Border.all(color: colorScheme.outline),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
+                      color: Colors.black.withValues(
+                        alpha: Theme.of(context).brightness == Brightness.dark
+                            ? 0.24
+                            : 0.03,
+                      ),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),

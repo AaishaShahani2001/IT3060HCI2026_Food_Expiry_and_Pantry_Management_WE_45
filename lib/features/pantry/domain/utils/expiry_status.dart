@@ -86,6 +86,29 @@ enum ExpiryStatus {
         return color;
     }
   }
+
+  /// Theme-aware indicator colour. Unknown uses [ColorScheme.onSurfaceVariant].
+  Color colorFor(ColorScheme colorScheme) {
+    if (this == ExpiryStatus.unknown) {
+      return colorScheme.onSurfaceVariant.withValues(alpha: 0.55);
+    }
+    return color;
+  }
+
+  /// Pastel fills in light mode; translucent status colour in dark mode.
+  Color backgroundColorFor(ColorScheme colorScheme) {
+    if (colorScheme.brightness == Brightness.dark) {
+      return colorFor(colorScheme).withValues(alpha: 0.2);
+    }
+    return backgroundColor;
+  }
+
+  Color foregroundColorFor(ColorScheme colorScheme) {
+    if (this == ExpiryStatus.unknown) {
+      return colorScheme.onSurfaceVariant;
+    }
+    return color;
+  }
 }
 
 abstract final class ExpiryStatusHelper {

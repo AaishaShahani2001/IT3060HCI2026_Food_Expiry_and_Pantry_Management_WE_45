@@ -4,6 +4,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/pantry_item.dart';
 import 'expiry_status_indicator.dart';
 import 'pantry_item_actions_sheet.dart';
+import 'pantry_quantity_stepper.dart';
 
 class PantryItemCard extends StatelessWidget {
   const PantryItemCard({
@@ -29,16 +30,18 @@ class PantryItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final canDecrement = !isUpdating;
 
     return Container(
       decoration: BoxDecoration(
-        color: FreshPalette.card,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: colorScheme.outline),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.03),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -49,7 +52,6 @@ class PantryItemCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top section: image, info, actions
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -73,13 +75,13 @@ class PantryItemCard extends StatelessWidget {
                                     width: 48,
                                     height: 48,
                                     decoration: BoxDecoration(
-                                      color: FreshPalette.highlight,
+                                      color: colorScheme.secondaryContainer,
                                       borderRadius: BorderRadius.circular(14),
                                     ),
                                     child: Icon(
                                       item.category.icon,
                                       size: 24,
-                                      color: FreshPalette.selected,
+                                      color: colorScheme.primary,
                                     ),
                                   ),
                                   Positioned(
@@ -103,10 +105,10 @@ class PantryItemCard extends StatelessWidget {
                                             item.name,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,
-                                              color: FreshPalette.heading,
+                                              color: colorScheme.onSurface,
                                             ),
                                           ),
                                         ),
@@ -118,7 +120,10 @@ class PantryItemCard extends StatelessWidget {
                                               vertical: 2,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: AppColors.statusRedBg,
+                                              color: isDark
+                                                  ? AppColors.statusRed
+                                                        .withValues(alpha: 0.2)
+                                                  : AppColors.statusRedBg,
                                               borderRadius:
                                                   BorderRadius.circular(8),
                                             ),
@@ -139,7 +144,10 @@ class PantryItemCard extends StatelessWidget {
                                               vertical: 2,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: AppColors.statusAmberBg,
+                                              color: isDark
+                                                  ? AppColors.statusAmber
+                                                        .withValues(alpha: 0.2)
+                                                  : AppColors.statusAmberBg,
                                               borderRadius:
                                                   BorderRadius.circular(8),
                                             ),
@@ -160,9 +168,9 @@ class PantryItemCard extends StatelessWidget {
                                       '${item.category.label} · ${item.location.label}',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 13,
-                                        color: FreshPalette.secondaryText,
+                                        color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
@@ -176,14 +184,14 @@ class PantryItemCard extends StatelessWidget {
                   ),
                 ),
                 if (isUpdating)
-                  const Padding(
-                    padding: EdgeInsets.all(8),
+                  Padding(
+                    padding: const EdgeInsets.all(8),
                     child: SizedBox(
                       width: 24,
                       height: 24,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        color: FreshPalette.selected,
+                        color: colorScheme.primary,
                       ),
                     ),
                   )
@@ -209,7 +217,7 @@ class PantryItemCard extends StatelessWidget {
                         }
                       },
                       icon: const Icon(Icons.more_vert_rounded, size: 22),
-                      color: FreshPalette.heading,
+                      color: colorScheme.onSurface,
                       constraints: const BoxConstraints(
                         minWidth: 48,
                         minHeight: 48,
@@ -219,15 +227,14 @@ class PantryItemCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            // Bottom section: quantity label + unified stepper
             Row(
               children: [
-                const Text(
+                Text(
                   'Quantity',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: FreshPalette.secondaryText,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -241,7 +248,7 @@ class PantryItemCard extends StatelessWidget {
                       ),
                       child: SizedBox(
                         width: 180,
-                        child: _QuantityStepper(
+                        child: PantryQuantityStepper(
                           quantityLabel: item.quantityLabel,
                           canDecrement: canDecrement,
                           isUpdating: isUpdating,
@@ -255,134 +262,6 @@ class PantryItemCard extends StatelessWidget {
               ],
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _QuantityStepper extends StatelessWidget {
-  const _QuantityStepper({
-    required this.quantityLabel,
-    required this.canDecrement,
-    required this.isUpdating,
-    required this.onIncrement,
-    required this.onDecrement,
-  });
-
-  final String quantityLabel;
-  final bool canDecrement;
-  final bool isUpdating;
-  final VoidCallback onIncrement;
-  final VoidCallback onDecrement;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 42,
-      decoration: BoxDecoration(
-        color: FreshPalette.highlight.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Row(
-        children: [
-          _StepperButton(
-            icon: Icons.remove,
-            tooltip: 'Decrease quantity',
-            enabled: canDecrement,
-            foreground: FreshPalette.heading,
-            onPressed: onDecrement,
-          ),
-          Container(
-            width: 1,
-            height: double.infinity,
-            color: AppColors.cardBorder,
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Center(
-                child: isUpdating
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: FreshPalette.selected,
-                        ),
-                      )
-                    : FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          quantityLabel,
-                          maxLines: 1,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: FreshPalette.heading,
-                          ),
-                        ),
-                      ),
-              ),
-            ),
-          ),
-          Container(
-            width: 1,
-            height: double.infinity,
-            color: AppColors.cardBorder,
-          ),
-          _StepperButton(
-            icon: Icons.add,
-            tooltip: 'Increase quantity',
-            enabled: !isUpdating,
-            foreground: FreshPalette.selected,
-            onPressed: onIncrement,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepperButton extends StatelessWidget {
-  const _StepperButton({
-    required this.icon,
-    required this.tooltip,
-    required this.enabled,
-    required this.foreground,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final bool enabled;
-  final Color foreground;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: enabled ? onPressed : null,
-          splashColor: FreshPalette.selected.withValues(alpha: 0.15),
-          highlightColor: FreshPalette.selected.withValues(alpha: 0.06),
-          child: SizedBox(
-            width: 42,
-            height: 42,
-            child: Icon(
-              icon,
-              size: 18,
-              color: enabled
-                  ? foreground
-                  : FreshPalette.secondaryText.withValues(alpha: 0.35),
-            ),
-          ),
         ),
       ),
     );
