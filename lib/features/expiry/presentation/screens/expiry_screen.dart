@@ -1,27 +1,89 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/router/app_routes.dart';
+import '../../../pantry/domain/models/pantry_item.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
 import '../providers/expiry_provider.dart';
 
-class ExpiryScreen extends ConsumerWidget {
+class ExpiryScreen extends ConsumerStatefulWidget {
   const ExpiryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ExpiryScreen> createState() => _ExpiryScreenState();
+}
+
+class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
+  bool _isSyncingAlerts = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _synchronizeAlerts();
+    });
+  }
+
+  Future<void> _synchronizeAlerts() async {
+    if (_isSyncingAlerts) return;
+
+    final itemsAsync = ref.read(pantryItemsProvider);
+
+    final items = itemsAsync.maybeWhen(
+      data: (items) => items,
+      orElse: () => const <PantryItem>[],
+    );
+
+    if (items.isEmpty) return;
+
+    setState(() {
+      _isSyncingAlerts = true;
+    });
+
+    try {
+      await ref.read(synchronizeExpiryAlertsProvider)(items);
+
+      if (mounted) {
+        ref.invalidate(expiryAlertsProvider);
+      }
+    } catch (error) {
+      debugPrint('Failed to synchronize expiry alerts: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncingAlerts = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _refresh() async {
+    await ref.read(pantryItemsProvider.notifier).refreshItems();
+
+    await _synchronizeAlerts();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final summary = ref.watch(expirySummaryProvider);
 
-    // All products, sorted by expiry urgency.
+    // All pantry products sorted by expiry urgency.
     final allItems = ref.watch(expiryItemsProvider);
 
-    // Only products that actually require attention.
+    // Only products requiring expiry attention.
     final smartAlertItems = ref.watch(smartAlertItemsProvider);
 
     final expiryService = ref.read(expiryServiceProvider);
 
     return Scaffold(
       backgroundColor: AppColors.cream,
+
+      // --------------------------------------------------
+      // APP BAR
+      // --------------------------------------------------
       appBar: AppBar(
         backgroundColor: AppColors.cream,
         elevation: 0,
@@ -32,26 +94,38 @@ class ExpiryScreen extends ConsumerWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Expiry Notifications',
+            onPressed: () {
+              context.push(AppRoutes.expiryNotifications);
+            },
+            icon: const Icon(
+              Icons.notifications_active_outlined,
+              color: AppColors.darkGreen,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
+
       body: RefreshIndicator(
         color: AppColors.primaryGreen,
-        onRefresh: () async {
-          await ref.read(pantryItemsProvider.notifier).refreshItems();
-        },
+        onRefresh: _refresh,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             const Text(
               'Monitor your products and take action before food expires.',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
             ),
 
             const SizedBox(height: 20),
 
-            // Summary
+            // --------------------------------------------------
+            // EXPIRY SUMMARY
+            // --------------------------------------------------
             Row(
               children: [
                 Expanded(
@@ -104,7 +178,9 @@ class ExpiryScreen extends ConsumerWidget {
 
             const SizedBox(height: 28),
 
-            // Smart Alerts heading
+            // --------------------------------------------------
+            // SMART ALERTS HEADER
+            // --------------------------------------------------
             Row(
               children: [
                 const Expanded(
@@ -117,6 +193,7 @@ class ExpiryScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+
                 if (smartAlertItems.isNotEmpty)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -141,33 +218,36 @@ class ExpiryScreen extends ConsumerWidget {
 
             const SizedBox(height: 12),
 
-            // Smart Alerts
+            // --------------------------------------------------
+            // SMART ALERT ITEMS / USE FIRST
+            // --------------------------------------------------
             if (smartAlertItems.isEmpty)
               const _EmptyState(
                 message: 'No products require expiry attention.',
               )
             else
-              ...smartAlertItems.map(
-                (item) {
-                  final days = expiryService.daysUntilExpiry(item);
-                  final priority = expiryService.alertPriority(item);
+              ...smartAlertItems.map((item) {
+                final days = expiryService.daysUntilExpiry(item);
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _ExpiryAlertCard(
-                      productName: item.name,
-                      quantity: item.quantityLabel,
-                      message: expiryService.expiryMessage(item),
-                      priority: priority,
-                      daysUntilExpiry: days,
-                    ),
-                  );
-                },
-              ),
+                final priority = expiryService.alertPriority(item);
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _ExpiryAlertCard(
+                    productName: item.name,
+                    quantity: item.quantityLabel,
+                    message: expiryService.expiryMessage(item),
+                    priority: priority,
+                    daysUntilExpiry: days,
+                  ),
+                );
+              }),
 
             const SizedBox(height: 18),
 
-            // All Products
+            // --------------------------------------------------
+            // ALL PRODUCTS
+            // --------------------------------------------------
             const Text(
               'All Products',
               style: TextStyle(
@@ -180,32 +260,32 @@ class ExpiryScreen extends ConsumerWidget {
             const SizedBox(height: 12),
 
             if (allItems.isEmpty)
-              const _EmptyState(
-                message: 'No pantry products found.',
-              )
+              const _EmptyState(message: 'No pantry products found.')
             else
-              ...allItems.map(
-                (item) {
-                  final days = expiryService.daysUntilExpiry(item);
+              ...allItems.map((item) {
+                final days = expiryService.daysUntilExpiry(item);
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _ProductExpiryCard(
-                      productName: item.name,
-                      quantity: item.quantityLabel,
-                      expiryMessage: expiryService.expiryMessage(item),
-                      status: item.expiryStatus.label,
-                      daysUntilExpiry: days,
-                    ),
-                  );
-                },
-              ),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _ProductExpiryCard(
+                    productName: item.name,
+                    quantity: item.quantityLabel,
+                    expiryMessage: expiryService.expiryMessage(item),
+                    status: item.expiryStatus.label,
+                    daysUntilExpiry: days,
+                  ),
+                );
+              }),
           ],
         ),
       ),
     );
   }
 }
+
+// ============================================================
+// SUMMARY CARD
+// ============================================================
 
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
@@ -229,9 +309,7 @@ class _SummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withValues(alpha: 0.18),
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Row(
         children: [
@@ -242,13 +320,11 @@ class _SummaryCard extends StatelessWidget {
               color: color.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 21,
-            ),
+            child: Icon(icon, color: color, size: 21),
           ),
+
           const SizedBox(width: 10),
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,6 +356,10 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
+// ============================================================
+// SMART ALERT CARD
+// ============================================================
+
 class _ExpiryAlertCard extends StatelessWidget {
   const _ExpiryAlertCard({
     required this.productName,
@@ -298,28 +378,27 @@ class _ExpiryAlertCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCritical = priority == 'critical';
+
     final isHigh = priority == 'high';
 
     final color = isCritical
         ? AppColors.statusRed
         : isHigh
-            ? AppColors.statusOrange
-            : AppColors.statusAmber;
+        ? AppColors.statusOrange
+        : AppColors.statusAmber;
 
     final backgroundColor = isCritical
         ? AppColors.statusRedBg
         : isHigh
-            ? AppColors.statusOrangeBg
-            : AppColors.statusAmberBg;
+        ? AppColors.statusOrangeBg
+        : AppColors.statusAmberBg;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withValues(alpha: 0.22),
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,7 +417,9 @@ class _ExpiryAlertCard extends StatelessWidget {
               color: color,
             ),
           ),
+
           const SizedBox(width: 12),
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,6 +436,7 @@ class _ExpiryAlertCard extends StatelessWidget {
                         ),
                       ),
                     ),
+
                     _PriorityBadge(
                       priority: priority,
                       color: color,
@@ -362,7 +444,9 @@ class _ExpiryAlertCard extends StatelessWidget {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 5),
+
                 Text(
                   quantity,
                   style: const TextStyle(
@@ -370,7 +454,9 @@ class _ExpiryAlertCard extends StatelessWidget {
                     fontSize: 12,
                   ),
                 ),
+
                 const SizedBox(height: 7),
+
                 Text(
                   message,
                   style: TextStyle(
@@ -379,6 +465,7 @@ class _ExpiryAlertCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+
                 if (daysUntilExpiry != null) ...[
                   const SizedBox(height: 4),
                   Text(
@@ -400,6 +487,10 @@ class _ExpiryAlertCard extends StatelessWidget {
   }
 }
 
+// ============================================================
+// PRIORITY BADGE
+// ============================================================
+
 class _PriorityBadge extends StatelessWidget {
   const _PriorityBadge({
     required this.priority,
@@ -418,10 +509,7 @@ class _PriorityBadge extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 8,
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(20),
@@ -437,6 +525,10 @@ class _PriorityBadge extends StatelessWidget {
     );
   }
 }
+
+// ============================================================
+// PRODUCT EXPIRY CARD
+// ============================================================
 
 class _ProductExpiryCard extends StatelessWidget {
   const _ProductExpiryCard({
@@ -456,30 +548,30 @@ class _ProductExpiryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isExpired = daysUntilExpiry != null && daysUntilExpiry! < 0;
-    final isSoon = daysUntilExpiry != null &&
+
+    final isSoon =
+        daysUntilExpiry != null &&
         daysUntilExpiry! >= 0 &&
         daysUntilExpiry! <= 3;
 
     final color = isExpired
         ? AppColors.statusRed
         : isSoon
-            ? AppColors.statusOrange
-            : AppColors.statusFresh;
+        ? AppColors.statusOrange
+        : AppColors.statusFresh;
 
     final backgroundColor = isExpired
         ? AppColors.statusRedBg
         : isSoon
-            ? AppColors.statusOrangeBg
-            : AppColors.statusFreshBg;
+        ? AppColors.statusOrangeBg
+        : AppColors.statusFreshBg;
 
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: AppColors.cardBorder,
-        ),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: Row(
         children: [
@@ -490,13 +582,11 @@ class _ProductExpiryCard extends StatelessWidget {
               color: backgroundColor,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              Icons.inventory_2_outlined,
-              color: color,
-              size: 22,
-            ),
+            child: Icon(Icons.inventory_2_outlined, color: color, size: 22),
           ),
+
           const SizedBox(width: 12),
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,7 +599,9 @@ class _ProductExpiryCard extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 const SizedBox(height: 3),
+
                 Text(
                   quantity,
                   style: const TextStyle(
@@ -517,7 +609,9 @@ class _ProductExpiryCard extends StatelessWidget {
                     fontSize: 11,
                   ),
                 ),
+
                 const SizedBox(height: 5),
+
                 Text(
                   expiryMessage,
                   style: TextStyle(
@@ -529,11 +623,9 @@ class _ProductExpiryCard extends StatelessWidget {
               ],
             ),
           ),
+
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 9,
-              vertical: 5,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
             decoration: BoxDecoration(
               color: backgroundColor,
               borderRadius: BorderRadius.circular(20),
@@ -553,26 +645,23 @@ class _ProductExpiryCard extends StatelessWidget {
   }
 }
 
+// ============================================================
+// EMPTY STATE
+// ============================================================
+
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.message,
-  });
+  const _EmptyState({required this.message});
 
   final String message;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 28,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.cardBorder,
-        ),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: Column(
         children: [
@@ -581,7 +670,9 @@ class _EmptyState extends StatelessWidget {
             color: AppColors.statusFresh,
             size: 40,
           ),
+
           const SizedBox(height: 10),
+
           Text(
             message,
             textAlign: TextAlign.center,
