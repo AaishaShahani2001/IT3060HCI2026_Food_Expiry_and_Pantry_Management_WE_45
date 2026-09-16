@@ -13,6 +13,7 @@ abstract final class AppRoutes {
   static const String expiry = '/expiry';
   static const String expiryNotifications = '/expiry/notifications';
   static const String shopping = '/shopping';
+  static const String addShoppingItem = '/shopping/add';
   static const String recipes = '/recipes';
   static const String settings = '/settings';
 
