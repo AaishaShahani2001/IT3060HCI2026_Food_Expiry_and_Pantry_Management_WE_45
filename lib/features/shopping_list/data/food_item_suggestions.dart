@@ -307,6 +307,15 @@ const Map<String, List<String>> foodItemSuggestionCategories = {
 
 final List<String> foodItemSuggestions = _buildFoodItemSuggestions();
 
+// Derived from the autocomplete catalogue, not a second food list.
+final Map<String, String> _categoryByFoodName = Map.unmodifiable({
+  for (final category in foodItemSuggestionCategories.entries)
+    for (final name in category.value) name.trim().toLowerCase(): category.key,
+});
+
+String foodItemCategoryFor(String name) =>
+    _categoryByFoodName[name.trim().toLowerCase()] ?? 'Other';
+
 List<String> _buildFoodItemSuggestions() {
   final suggestionsByName = <String, String>{};
 

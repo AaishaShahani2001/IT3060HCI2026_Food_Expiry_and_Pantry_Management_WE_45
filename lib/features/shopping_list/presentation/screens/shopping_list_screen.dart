@@ -1,14 +1,17 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_colors.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
 import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
-import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_list_repository.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/data/food_item_suggestions.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/shopping_error_message.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/widgets/shopping_item_tile.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/widgets/shopping_category_section.dart';
 import 'package:go_router/go_router.dart';
+
+enum _ShoppingFilter { all, toBuy, bought }
 
 class ShoppingListScreen extends ConsumerStatefulWidget {
   const ShoppingListScreen({super.key});
@@ -19,45 +22,45 @@ class ShoppingListScreen extends ConsumerStatefulWidget {
 
 class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   final Set<String> _selectedIds = {};
+  final Set<String> _collapsedCategories = {};
+  final TextEditingController _searchController = TextEditingController();
+  _ShoppingFilter _filter = _ShoppingFilter.all;
   bool _selectionMode = false;
   bool _isBusy = false;
   bool _showProgress = false;
   int _operationToken = 0;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<ShoppingItem> _visibleItems(List<ShoppingItem> items) {
+    final query = _searchController.text.trim().toLowerCase();
+    return items.where((item) {
+      final matchesTab = switch (_filter) {
+        _ShoppingFilter.all => true,
+        _ShoppingFilter.toBuy => !item.isPurchased,
+        _ShoppingFilter.bought => item.isPurchased,
+      };
+      return matchesTab && item.name.toLowerCase().contains(query);
+    }).toList();
+  }
 
   String? get _uid => ref.read(shoppingAuthUidProvider).asData?.value;
 
   bool _sameSession(String? uid, int token) =>
       mounted && token == _operationToken && uid != null && uid == _uid;
 
-  String _errorMessage(Object error) {
-    if (error is ShoppingListDeleteException) {
-      return '${error.deletedItemIds.length} items were already deleted, but the '
-          'remaining deletion failed. Your list is kept visible; reload to '
-          'check it or retry deletion. ${_errorMessage(error.cause)}';
-    }
-    if (error is FirebaseException) {
-      if (error.code == 'permission-denied') {
-        return 'Firestore permission-denied: ${error.message ?? 'Access denied.'} '
-            'Ask the team to check your access rules.';
-      }
-      if (error.code == 'unavailable') {
-        return 'Firestore is unavailable. Check your connection and retry.';
-      }
-      return 'Firestore ${error.code}: ${error.message ?? 'Please try again.'}';
-    }
-    if (error is StateError) return error.message;
-    if (error is FormatException) {
-      return 'A saved shopping item could not be read. Please ask the team to check its data.';
-    }
-    return 'Could not complete the shopping operation. Please try again.';
-  }
+  String _errorMessage(Object error) => shoppingErrorMessage(error);
 
-  void _showError(Object error, {VoidCallback? retry}) {
+  void _showError(Object error, {VoidCallback? retry, String? message}) {
     if (!mounted) return;
     debugPrint('Shopping List error: $error');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(_errorMessage(error)),
+        content: Text(message ?? _errorMessage(error)),
         duration: const Duration(seconds: 8),
         action: retry == null
             ? null
@@ -68,51 +71,74 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
 
   Future<void> _openAddItemScreen() async {
     if (_isBusy || _uid == null) return;
+    FocusScope.of(context).unfocus();
     final uid = _uid;
     final token = ++_operationToken;
     setState(() => _isBusy = true);
     try {
-      final item = await context.push<ShoppingItem>(AppRoutes.addShoppingItem);
+      final item = await context.push<ShoppingItem>(
+        Uri(
+          path: AppRoutes.addShoppingItem,
+          queryParameters: {'name': _searchController.text.trim()},
+        ).toString(),
+      );
       if (!_sameSession(uid, token) || item == null) return;
-      await _saveItem(item, uid!, token);
+      setState(() {
+        _filter = _ShoppingFilter.all;
+        _searchController.clear();
+        _collapsedCategories.remove(foodItemCategoryFor(item.name));
+      });
     } finally {
       if (mounted && token == _operationToken) setState(() => _isBusy = false);
     }
   }
 
-  Future<void> _saveItem(ShoppingItem item, String uid, int token) async {
-    setState(() => _showProgress = true);
-    try {
-      await ref.read(shoppingListProvider.notifier).addItem(item);
-    } catch (error) {
-      if (_sameSession(uid, token)) {
-        _showError(error, retry: () => _retrySave(item, uid));
-      }
-    } finally {
-      if (_sameSession(uid, token)) setState(() => _showProgress = false);
-    }
-  }
-
-  Future<void> _retrySave(ShoppingItem item, String uid) async {
-    if (_isBusy || uid != _uid) return;
+  Future<void> _persistChange(Future<void> Function() save) async {
+    final uid = _uid;
     final token = ++_operationToken;
-    setState(() => _isBusy = true);
+    setState(() {
+      _isBusy = true;
+      _showProgress = true;
+    });
     try {
-      await _saveItem(item, uid, token);
+      await save();
+    } catch (error) {
+      if (_sameSession(uid, token)) _showError(error);
     } finally {
-      if (mounted && token == _operationToken) setState(() => _isBusy = false);
+      if (mounted && token == _operationToken) {
+        setState(() {
+          _isBusy = false;
+          _showProgress = false;
+        });
+      }
     }
   }
 
-  void _updatePurchasedStatus(ShoppingItem item, bool isPurchased) {
+  Future<void> _updatePurchasedStatus(
+    ShoppingItem item,
+    bool isPurchased,
+  ) async {
     if (_isBusy || _selectionMode || item.id == null) return;
-    try {
-      ref
+    await _persistChange(
+      () => ref
           .read(shoppingListProvider.notifier)
-          .togglePurchased(item.id!, isPurchased);
-    } catch (error) {
-      _showError(error);
+          .togglePurchased(item.id!, isPurchased),
+    );
+  }
+
+  Future<void> _updateQuantity(ShoppingItem item, int quantity) async {
+    if (_isBusy ||
+        _selectionMode ||
+        item.id == null ||
+        quantity < 1 ||
+        quantity > 100) {
+      return;
     }
+    await _persistChange(
+      () => ref
+          .read(shoppingListProvider.notifier)
+          .updateItem(item.id!, item.copyWith(quantity: quantity)),
+    );
   }
 
   Future<void> _editItem(ShoppingItem item) async {
@@ -126,11 +152,16 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
         extra: item,
       );
       if (!_sameSession(uid, token) || updatedItem == null) return;
-      ref.read(shoppingListProvider.notifier).updateItem(item.id!, updatedItem);
+      // The form saves before returning, so cancellation/failure retains input.
     } catch (error) {
       if (_sameSession(uid, token)) _showError(error);
     } finally {
-      if (mounted && token == _operationToken) setState(() => _isBusy = false);
+      if (mounted && token == _operationToken) {
+        setState(() {
+          _isBusy = false;
+          _showProgress = false;
+        });
+      }
     }
   }
 
@@ -138,7 +169,10 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     if (_isBusy || item.id == null) return;
     setState(() {
       if (enter) {
+        FocusScope.of(context).unfocus();
         _selectionMode = true;
+        // Selection shows every match, including previously collapsed groups.
+        _collapsedCategories.clear();
         _selectedIds.add(item.id!);
       } else if (!_selectedIds.remove(item.id)) {
         _selectedIds.add(item.id!);
@@ -171,15 +205,15 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     final uid = _uid;
     final token = ++_operationToken;
     final items = ref.read(shoppingListProvider).asData?.value ?? [];
-    final all = !single && ids.length == items.length;
+    final all = !single && ids.length == _visibleItems(items).length;
     final title = single || ids.length == 1
         ? 'Delete item?'
         : all
-        ? 'Delete all items?'
+        ? 'Delete all selected items?'
         : 'Delete selected items?';
     final message = single || ids.length == 1
         ? 'Are you sure you want to delete this item?'
-        : all
+        : ids.length == items.length
         ? 'Are you sure you want to delete all items from your shopping list?'
         : 'Are you sure you want to delete ${ids.length} selected items?';
     setState(() => _isBusy = true);
@@ -227,6 +261,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
 
   Future<void> _reload() async {
     if (_isBusy) return;
+    final hadData = ref.read(shoppingListProvider).asData != null;
     _cancelSelection();
     final uid = _uid;
     final token = ++_operationToken;
@@ -234,28 +269,25 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     try {
       await ref.read(shoppingListProvider.notifier).reload();
     } catch (error) {
-      if (_sameSession(uid, token)) _showError(error);
+      if (_sameSession(uid, token)) {
+        _showError(
+          error,
+          message: hadData
+              ? "Couldn't refresh. Showing your current list."
+              : null,
+        );
+      }
     } finally {
       if (mounted && token == _operationToken) setState(() => _isBusy = false);
     }
   }
 
-  Widget _buildAddItemButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: FilledButton.icon(
-        onPressed: _isBusy ? null : _openAddItemScreen,
-        icon: const Icon(Icons.add),
-        label: const Text(AppStrings.addItem),
-      ),
-    );
-  }
-
   Widget _buildEmptyState(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Center(
-      child: SingleChildScrollView(
+      child: Padding(
         padding: const EdgeInsets.all(24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 360),
@@ -265,8 +297,8 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
               Container(
                 width: 88,
                 height: 88,
-                decoration: const BoxDecoration(
-                  color: AppColors.softGreen,
+                decoration: BoxDecoration(
+                  color: colors.secondaryContainer,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -280,7 +312,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                 AppStrings.shoppingListEmpty,
                 style: textTheme.headlineMedium?.copyWith(
                   fontSize: 22,
-                  color: AppColors.darkGreen,
+                  color: colors.onSurface,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -288,12 +320,16 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
               Text(
                 AppStrings.shoppingListEmptyDescription,
                 style: textTheme.bodyLarge?.copyWith(
-                  color: AppColors.textSecondary,
+                  color: colors.onSurfaceVariant,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 28),
-              _buildAddItemButton(),
+              const SizedBox(height: 16),
+              TextButton.icon(
+                onPressed: _isBusy ? null : _openAddItemScreen,
+                icon: const Icon(Icons.add),
+                label: const Text('Add your first item'),
+              ),
             ],
           ),
         ),
@@ -301,45 +337,281 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     );
   }
 
-  Widget _buildItemList(List<ShoppingItem> items) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                itemCount: items.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  return ShoppingItemTile(
-                    key: ValueKey(item.id),
-                    item: item,
-                    enabled: !_isBusy,
-                    selectionMode: _selectionMode,
-                    isSelected: _selectedIds.contains(item.id),
-                    onLongPress: () => _selectItem(item, enter: true),
-                    onSelectionTap: () => _selectItem(item),
-                    onPurchasedChanged: (value) =>
-                        _updatePurchasedStatus(item, value),
-                    onEdit: () => _editItem(item),
-                    onDelete: () {
-                      if (item.id != null) {
-                        _confirmDelete([item.id!], single: true);
-                      }
-                    },
-                  );
-                },
+  Widget _buildFilters(List<ShoppingItem> items) {
+    final colors = Theme.of(context).colorScheme;
+    final bought = items.where((item) => item.isPurchased).length;
+    final labels = [
+      'ALL (${items.length})',
+      'TO BUY (${items.length - bought})',
+      'BOUGHT ($bought)',
+    ];
+    return Row(
+      children: [
+        for (final filter in _ShoppingFilter.values) ...[
+          if (filter.index > 0) const SizedBox(width: 8),
+          Expanded(
+            child: Semantics(
+              selected: _filter == filter,
+              child: OutlinedButton(
+                onPressed: _isBusy || _selectionMode
+                    ? null
+                    : () => setState(() => _filter = filter),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: _filter == filter
+                      ? AppColors.mediumGreen
+                      : colors.surfaceContainerHighest,
+                  foregroundColor: _filter == filter
+                      ? Colors.white
+                      : colors.onSurface,
+                  disabledForegroundColor: _filter == filter
+                      ? Colors.white
+                      : colors.onSurfaceVariant,
+                  side: BorderSide(
+                    color: _filter == filter
+                        ? AppColors.mediumGreen
+                        : colors.outline.withValues(alpha: 0.6),
+                  ),
+                  minimumSize: const Size(0, 44),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 8,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  textStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                child: Text(labels[filter.index], textAlign: TextAlign.center),
               ),
             ),
-            if (!_selectionMode)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                child: _buildAddItemButton(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSearch() {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            key: const ValueKey('shopping-search'),
+            controller: _searchController,
+            enabled: !_isBusy && !_selectionMode,
+            onChanged: (_) => setState(() {}),
+            textInputAction: TextInputAction.search,
+            onSubmitted: (_) => FocusScope.of(context).unfocus(),
+            decoration: InputDecoration(
+              hintText: 'Add item or search...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchController.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear search',
+                      onPressed: _isBusy || _selectionMode
+                          ? null
+                          : () => setState(_searchController.clear),
+                      icon: const Icon(Icons.close),
+                    ),
+              filled: true,
+              fillColor: colors.surfaceContainerHighest,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
               ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: colors.outline.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (!_selectionMode) ...[
+          const SizedBox(width: 8),
+          IconButton.filled(
+            tooltip: 'Add shopping item',
+            onPressed: _isBusy ? null : _openAddItemScreen,
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.darkGreen,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            icon: const Icon(Icons.add),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildItemRow(ShoppingItem item) {
+    final uid = _uid;
+    return ShoppingItemTile(
+      key: ValueKey((uid, item.id)),
+      item: item,
+      enabled: !_isBusy,
+      selectionMode: _selectionMode,
+      isSelected: _selectedIds.contains(item.id),
+      onLongPress: () => _selectItem(item, enter: true),
+      onSelectionTap: () => _selectItem(item),
+      onPurchasedChanged: (value) => _updatePurchasedStatus(item, value),
+      onQuantityChanged: (value) => _updateQuantity(item, value),
+      onEdit: () {
+        // A menu opened under a previous account must not operate on this one.
+        if (uid != null && uid == _uid) _editItem(item);
+      },
+      onDelete: () {
+        if (uid != null && uid == _uid && item.id != null) {
+          _confirmDelete([item.id!], single: true);
+        }
+      },
+    );
+  }
+
+  Widget _buildItemList(List<ShoppingItem> items) {
+    final visible = _visibleItems(items);
+    final allSelected =
+        visible.isNotEmpty &&
+        visible.every((item) => _selectedIds.contains(item.id));
+    final groups = <String, List<ShoppingItem>>{};
+    for (final item in visible) {
+      groups.putIfAbsent(foodItemCategoryFor(item.name), () => []).add(item);
+    }
+    final categories = [
+      ...foodItemSuggestionCategories.keys,
+      'Other',
+    ].where(groups.containsKey).toList();
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Column(
+                children: [
+                  _buildFilters(items),
+                  const SizedBox(height: 12),
+                  _buildSearch(),
+                  if (_selectionMode)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 12,
+                        children: [
+                          const Text('Select matching items to delete'),
+                          TextButton(
+                            onPressed: _isBusy
+                                ? null
+                                : () => _selectAll(visible),
+                            child: Text(
+                              allSelected ? 'Deselect All' : 'Select All',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _reload,
+                child: CustomScrollView(
+                  key: ValueKey(('shopping-scroll', _uid)),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  slivers: [
+                    if (items.isEmpty &&
+                        _filter == _ShoppingFilter.all &&
+                        _searchController.text.trim().isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _buildEmptyState(context),
+                      )
+                    else if (visible.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.search_off, size: 36),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _searchController.text.trim().isNotEmpty
+                                      ? 'No matching items'
+                                      : _filter == _ShoppingFilter.toBuy
+                                      ? 'No items to buy'
+                                      : 'No bought items yet',
+                                  textAlign: TextAlign.center,
+                                ),
+                                TextButton(
+                                  onPressed: _isBusy
+                                      ? null
+                                      : () => setState(() {
+                                          _filter = _ShoppingFilter.all;
+                                          _searchController.clear();
+                                        }),
+                                  child: const Text('Clear filters'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            if (index.isOdd) return const SizedBox(height: 12);
+                            final category = categories[index ~/ 2];
+                            return ShoppingCategorySection(
+                              key: ValueKey(category),
+                              category: category,
+                              count: groups[category]!.length,
+                              expanded: !_collapsedCategories.contains(
+                                category,
+                              ),
+                              onToggle: _isBusy || _selectionMode
+                                  ? null
+                                  : () => setState(() {
+                                      if (!_collapsedCategories.remove(
+                                        category,
+                                      )) {
+                                        _collapsedCategories.add(category);
+                                      }
+                                    }),
+                              children: groups[category]!
+                                  .map(_buildItemRow)
+                                  .toList(),
+                            );
+                          }, childCount: categories.length * 2 - 1),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -376,6 +648,9 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
           _showProgress = false;
           _selectionMode = false;
           _selectedIds.clear();
+          _filter = _ShoppingFilter.all;
+          _searchController.clear();
+          _collapsedCategories.clear();
         });
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
       }
@@ -383,15 +658,6 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     final textTheme = Theme.of(context).textTheme;
     final auth = ref.watch(shoppingAuthUidProvider);
     final itemsAsync = ref.watch(shoppingListProvider);
-    // Never render retained AsyncData while reloading for a different account.
-    final items = itemsAsync.isLoading
-        ? <ShoppingItem>[]
-        : itemsAsync.asData?.value ?? [];
-    final allSelected =
-        items.isNotEmpty &&
-        items.every(
-          (item) => item.id != null && _selectedIds.contains(item.id),
-        );
 
     Widget body;
     if (auth.isLoading) {
@@ -410,11 +676,11 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     } else {
       body = itemsAsync.when(
         skipLoadingOnReload: false,
-        skipLoadingOnRefresh: false,
+        // Keep the scroll view mounted while RefreshIndicator awaits reload.
+        skipLoadingOnRefresh: true,
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => _buildError(error),
-        data: (items) =>
-            items.isEmpty ? _buildEmptyState(context) : _buildItemList(items),
+        data: _buildItemList,
       );
     }
 
@@ -438,15 +704,11 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                 : AppStrings.shoppingListTitle,
             style: textTheme.headlineMedium?.copyWith(
               fontSize: 20,
-              color: AppColors.darkGreen,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           actions: _selectionMode
               ? [
-                  TextButton(
-                    onPressed: _isBusy ? null : () => _selectAll(items),
-                    child: Text(allSelected ? 'Deselect All' : 'Select All'),
-                  ),
                   IconButton(
                     onPressed: _isBusy || _selectedIds.isEmpty
                         ? null
@@ -456,17 +718,8 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                     tooltip: 'Delete selected items',
                   ),
                 ]
-              : [
-                  if (auth.asData?.value != null)
-                    IconButton(
-                      onPressed: _isBusy || itemsAsync.isLoading
-                          ? null
-                          : _reload,
-                      icon: const Icon(Icons.refresh),
-                      tooltip: 'Reload shopping list',
-                    ),
-                ],
-          backgroundColor: AppColors.cream,
+              : null,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           elevation: 0,
           centerTitle: true,
         ),

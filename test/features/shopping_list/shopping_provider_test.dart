@@ -57,24 +57,30 @@ void main() {
     expect(items().single.name, 'Milk');
   });
 
-  test('local edit and purchase keep ID and do not persist', () async {
+  test('edit and purchase keep ID and persist after reload', () async {
     session.store.seed('alice', 'milk', 'Milk');
     await load();
-    notifier().togglePurchased('milk', true);
-    notifier().updateItem(
+    await notifier().togglePurchased('milk', true);
+    await notifier().updateItem(
       'milk',
-      const ShoppingItem(name: 'Fresh Milk', quantity: 3, isPurchased: true),
+      const ShoppingItem(
+        id: 'milk',
+        name: 'Fresh Milk',
+        quantity: 3,
+        isPurchased: true,
+      ),
     );
     expect(items().single.id, 'milk');
     expect(items().single.isPurchased, isTrue);
     expect(items().single.name, 'Fresh Milk');
     expect(
       session.store.documents['users/alice/shopping_items/milk']!['name'],
-      'Milk',
+      'Fresh Milk',
     );
     await notifier().reload();
-    expect(items().single.name, 'Milk');
-    expect(items().single.isPurchased, isFalse);
+    expect(items().single.name, 'Fresh Milk');
+    expect(items().single.quantity, 3);
+    expect(items().single.isPurchased, isTrue);
   });
 
   test(
@@ -225,6 +231,139 @@ void main() {
         session.store.documents.containsKey('users/bob/shopping_items/milk'),
         isTrue,
       );
+    },
+  );
+
+  test(
+    'optimistic update rolls back rejection and blocks duplicate pending writes',
+    () async {
+      session.store.seed('alice', 'milk', 'Milk');
+      await load();
+      final gate = Completer<void>();
+      session.store.updateGate = gate.future;
+      final error = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+      );
+      session.store.updateError = error;
+      final update = notifier().updateItem(
+        'milk',
+        items().single.copyWith(quantity: 3, isPurchased: true),
+      );
+      final rejected = expectLater(update, throwsA(same(error)));
+      expect(items().single.quantity, 3);
+      expect(items().single.isPurchased, isTrue);
+      expect(session.store.documents.values.single['quantity'], 2);
+      await expectLater(
+        notifier().togglePurchased('milk', false),
+        throwsStateError,
+      );
+      await expectLater(notifier().deleteItem('milk'), throwsStateError);
+      expect(session.store.updateCalls, 1);
+      gate.complete();
+      await rejected;
+      expect(items().single.quantity, 2);
+      expect(items().single.isPurchased, isFalse);
+      session.store.updateError = null;
+      await notifier().togglePurchased('milk', true);
+      await notifier().reload();
+      expect(items().single.isPurchased, isTrue);
+    },
+  );
+
+  test(
+    'quantity up and down persist, while no-op, missing IDs and bounds cannot write',
+    () async {
+      session.store.seed('alice', 'milk', 'Milk');
+      await load();
+      await notifier().updateItem('milk', items().single.copyWith(quantity: 3));
+      await notifier().updateItem('milk', items().single.copyWith(quantity: 2));
+      await notifier().reload();
+      expect(items().single.quantity, 2);
+      await notifier().updateItem('milk', items().single);
+      await notifier().togglePurchased('milk', false);
+      expect(session.store.updateCalls, 2);
+      for (final quantity in [0, 101]) {
+        await expectLater(
+          notifier().updateItem(
+            'milk',
+            items().single.copyWith(quantity: quantity),
+          ),
+          throwsArgumentError,
+        );
+      }
+      await expectLater(
+        notifier().updateItem(
+          'milk',
+          const ShoppingItem(name: 'Milk', quantity: 2),
+        ),
+        throwsStateError,
+      );
+      await expectLater(
+        notifier().updateItem(
+          'unknown',
+          items().single.copyWith(id: 'unknown'),
+        ),
+        throwsStateError,
+      );
+      await expectLater(
+        notifier().togglePurchased('unknown', true),
+        throwsStateError,
+      );
+      expect(session.store.updateCalls, 2);
+    },
+  );
+
+  for (final fails in [false, true]) {
+    test(
+      'old-account update completion (failure=$fails) cannot change the new account',
+      () async {
+        session.store.seed('alice', 'milk', 'Alice milk');
+        session.store.seed('bob', 'milk', 'Bob milk');
+        await load();
+        final gate = Completer<void>();
+        session.store.updateGate = gate.future;
+        if (fails) session.store.updateError = StateError('Update failed');
+        final update = notifier().updateItem(
+          'milk',
+          items().single.copyWith(name: 'Alice updated', quantity: 3),
+        );
+        final result = fails ? expectLater(update, throwsStateError) : update;
+        session.changeUser('bob');
+        await container.pump();
+        await load();
+        expect(items().single.name, 'Bob milk');
+        gate.complete();
+        await result;
+        expect(items().single.name, 'Bob milk');
+        expect(
+          session.store.documents['users/bob/shopping_items/milk']!['quantity'],
+          2,
+        );
+      },
+    );
+  }
+
+  test(
+    'sign-out and stale auth block updates before stream delivery',
+    () async {
+      session.store.seed('alice', 'milk', 'Milk');
+      await load();
+      final saved = items().single;
+      session.uid = 'bob';
+      await expectLater(
+        notifier().updateItem('milk', saved.copyWith(quantity: 3)),
+        throwsStateError,
+      );
+      session.changeUser(null);
+      await container.pump();
+      await load();
+      await expectLater(
+        notifier().togglePurchased('milk', true),
+        throwsStateError,
+      );
+      expect(items(), isEmpty);
+      expect(session.store.updateCalls, 0);
     },
   );
 }

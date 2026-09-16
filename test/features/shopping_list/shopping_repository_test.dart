@@ -243,4 +243,119 @@ void main() {
     expect(session.store.commitCalls, 1);
     expect(session.store.documents.length, 5);
   });
+
+  test(
+    'update uses the same document, survives reread, and preserves other data',
+    () async {
+      session.store.documents['users/alice'] = {'name': 'Alice'};
+      session.store.seed('alice', 'id-1', 'Milk');
+      session.store.seed('bob', 'id-1', 'Bob milk');
+      await session.repository.updateShoppingItem(
+        'alice',
+        const ShoppingItem(
+          id: 'id-1',
+          name: ' Fresh Milk ',
+          quantity: 100,
+          isPurchased: true,
+        ),
+      );
+      final fresh = ShoppingListRepository(
+        firestore: session.store,
+        currentUid: () => session.uid,
+      );
+      final saved = (await fresh.getShoppingItems('alice')).single;
+      expect(saved.id, 'id-1');
+      expect(saved.toMap(), {
+        'name': 'Fresh Milk',
+        'quantity': 100,
+        'isPurchased': true,
+      });
+      expect(session.store.documents.length, 3);
+      expect(session.store.documents['users/alice'], {'name': 'Alice'});
+      expect(
+        session.store.documents['users/bob/shopping_items/id-1']!['name'],
+        'Bob milk',
+      );
+      expect(session.store.addCalls, 0);
+      expect(session.store.updateCalls, 1);
+    },
+  );
+
+  test(
+    'update rejects invalid IDs, names, and quantity before writing',
+    () async {
+      for (final id in [null, '', ' ', '.', '..', 'users/bob', '../other']) {
+        await expectLater(
+          session.repository.updateShoppingItem(
+            'alice',
+            ShoppingItem(id: id, name: 'Milk', quantity: 2),
+          ),
+          throwsArgumentError,
+        );
+      }
+      for (final quantity in [0, -1, 101]) {
+        await expectLater(
+          session.repository.updateShoppingItem(
+            'alice',
+            ShoppingItem(id: 'milk', name: 'Milk', quantity: quantity),
+          ),
+          throwsArgumentError,
+        );
+      }
+      await expectLater(
+        session.repository.updateShoppingItem(
+          'alice',
+          const ShoppingItem(id: 'milk', name: ' ', quantity: 1),
+        ),
+        throwsArgumentError,
+      );
+      expect(session.store.updateCalls, 0);
+    },
+  );
+
+  test(
+    'update rejects wrong or missing auth and never recreates a missing document',
+    () async {
+      const item = ShoppingItem(id: 'milk', name: 'Milk', quantity: 2);
+      await expectLater(
+        session.repository.updateShoppingItem('bob', item),
+        throwsStateError,
+      );
+      session.uid = null;
+      await expectLater(
+        session.repository.updateShoppingItem('alice', item),
+        throwsStateError,
+      );
+      expect(session.store.updateCalls, 0);
+      session.uid = 'alice';
+      await expectLater(
+        session.repository.updateShoppingItem('alice', item),
+        throwsA(
+          isA<FirebaseException>().having((e) => e.code, 'code', 'not-found'),
+        ),
+      );
+      expect(session.store.documents, isEmpty);
+      expect(session.store.addCalls, 0);
+    },
+  );
+
+  test(
+    'rejected update surfaces permission-denied without modifying storage',
+    () async {
+      session.store.seed('alice', 'milk', 'Milk');
+      final error = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+      );
+      session.store.updateError = error;
+      await expectLater(
+        session.repository.updateShoppingItem(
+          'alice',
+          const ShoppingItem(id: 'milk', name: 'Milk', quantity: 3),
+        ),
+        throwsA(same(error)),
+      );
+      expect(session.store.documents.values.single['quantity'], 2);
+    },
+  );
 }

@@ -64,6 +64,24 @@ class ShoppingListRepository {
   Future<void> deleteShoppingItem(String uid, String itemId) =>
       deleteShoppingItems(uid, [itemId]);
 
+  Future<void> updateShoppingItem(String uid, ShoppingItem item) async {
+    final id = item.id;
+    if (id == null ||
+        id.trim().isEmpty ||
+        id.contains('/') ||
+        id == '.' ||
+        id == '..') {
+      throw ArgumentError('A saved shopping item needs a valid document ID.');
+    }
+    if (item.name.trim().isEmpty || item.quantity < 1 || item.quantity > 100) {
+      throw ArgumentError('Enter an item name and a quantity from 1 to 100.');
+    }
+    // update fails if the document was deleted; it must never recreate it.
+    await _items(
+      uid,
+    ).doc(id).update(item.copyWith(name: item.name.trim()).toMap());
+  }
+
   Future<void> deleteShoppingItems(String uid, List<String> itemIds) async {
     final collection = _items(uid);
     final ids = itemIds.toSet().toList();

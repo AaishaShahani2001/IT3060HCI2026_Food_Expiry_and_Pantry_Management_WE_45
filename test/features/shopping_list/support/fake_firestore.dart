@@ -11,9 +11,12 @@ class FakeShoppingFirestore extends Fake implements FirebaseFirestore {
   Future<void>? readGate;
   Future<void>? addGate;
   Future<void>? deleteGate;
+  Future<void>? updateGate;
   Object? readError;
   Object? addError;
   Object? deleteError;
+  Object? updateError;
+  int updateCalls = 0;
   int? failCommitNumber;
   void Function()? afterCommit;
   int readCalls = 0;
@@ -87,6 +90,18 @@ class _Document extends Fake
   final String path;
   @override
   String get id => path.split('/').last;
+
+  @override
+  Future<void> update(Map<Object, Object?> data) async {
+    store.updateCalls++;
+    await store.updateGate;
+    if (store.updateError case final error?) throw error;
+    final document = store.documents[path];
+    if (document == null) {
+      throw FirebaseException(plugin: 'cloud_firestore', code: 'not-found');
+    }
+    document.addAll(data.cast<String, dynamic>());
+  }
 
   @override
   CollectionReference<Map<String, dynamic>> collection(String path) =>
