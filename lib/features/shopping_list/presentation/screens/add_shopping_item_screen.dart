@@ -21,6 +21,7 @@ class _AddShoppingItemScreenState extends State<AddShoppingItemScreen> {
   late final TextEditingController _itemNameController;
   late final TextEditingController _quantityController;
   final FocusNode _itemNameFocusNode = FocusNode();
+  bool _hasSubmitted = false;
 
   bool get _isEditing => widget.initialItem != null;
 
@@ -71,13 +72,16 @@ class _AddShoppingItemScreenState extends State<AddShoppingItemScreen> {
   }
 
   void _submitForm() {
+    if (_hasSubmitted) return;
     if (_formKey.currentState?.validate() ?? false) {
       final item = ShoppingItem(
+        id: widget.initialItem?.id,
         name: _itemNameController.text.trim(),
         quantity: int.parse(_quantityController.text.trim()),
         isPurchased: widget.initialItem?.isPurchased ?? false,
       );
 
+      _hasSubmitted = true;
       context.pop(item);
     }
   }
