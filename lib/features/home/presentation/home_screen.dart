@@ -10,6 +10,7 @@ import '../../pantry/presentation/providers/pantry_providers.dart';
 import 'widgets/home_header.dart';
 import 'widgets/summary_card.dart';
 import 'widgets/welcome_section.dart';
+import 'widgets/home_waste_summary_card.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -129,6 +130,10 @@ class HomeScreen extends ConsumerWidget {
                 icon: Icons.shopping_cart_outlined,
                 onTap: () => context.go(AppRoutes.shopping),
               ),
+
+              const SizedBox(height: 10),
+
+              const HomeWasteSummaryCard(),
 
               const SizedBox(height: 10),
 
