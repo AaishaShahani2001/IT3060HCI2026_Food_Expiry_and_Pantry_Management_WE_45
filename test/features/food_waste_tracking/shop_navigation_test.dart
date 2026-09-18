@@ -15,6 +15,7 @@ import 'package:food_expiry_and_pantry_management/features/shopping_list/present
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/screens/shopping_list_screen.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/screens/add_shopping_item_screen.dart';
 import 'support/waste_test_session.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/pantry_waste_provider.dart';
 
 class _TestUserName extends CurrentUserNameNotifier {
   @override
@@ -50,6 +51,7 @@ void main() {
               unknown: 0,
             )),
             foodWasteRepositoryProvider.overrideWithValue(session.repository),
+            wastePantryServiceProvider.overrideWithValue(session.pantry),
             wasteAuthUidProvider.overrideWith((ref) => session.auth()),
             wasteClockProvider.overrideWithValue(() => wasteTestNow),
             shoppingListRepositoryProvider.overrideWithValue(

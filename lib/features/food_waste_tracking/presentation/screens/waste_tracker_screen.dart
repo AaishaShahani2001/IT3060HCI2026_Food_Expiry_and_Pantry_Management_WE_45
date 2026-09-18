@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/food_waste_record.dart';
 import '../../models/waste_summary.dart';
 import '../providers/food_waste_provider.dart';
+import '../providers/pantry_waste_provider.dart';
+import '../widgets/expired_pantry_section.dart';
+import '../widgets/waste_motion.dart';
 import '../waste_feedback.dart';
 import '../widgets/waste_period_selector.dart';
 import '../widgets/waste_record_tile.dart';
@@ -29,14 +32,20 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
       _session == session &&
       ref.read(foodWasteRepositoryProvider).isCurrentUser(uid);
 
-  Future<void> _record([FoodWasteRecord? record]) async {
+  Future<void> _record([
+    FoodWasteRecord? record,
+    PantryWasteSource? pantrySource,
+  ]) async {
     if (_busy || _uid == null) return;
     setState(() => _busy = true);
     final session = _session;
     try {
       await Navigator.of(context).push(
         MaterialPageRoute<bool>(
-          builder: (_) => RecordWasteScreen(initialRecord: record),
+          builder: (_) => RecordWasteScreen(
+            initialRecord: record,
+            pantrySource: pantrySource,
+          ),
         ),
       );
     } finally {
@@ -61,6 +70,13 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
           }
 
           return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+            ),
+            icon: Icon(
+              Icons.delete_outline,
+              color: Theme.of(context).colorScheme.error,
+            ),
             title: const Text('Delete waste record?'),
             content: const Text('Are you sure you want to delete this record?'),
             actions: [
@@ -69,6 +85,12 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
                 child: const Text('Cancel'),
               ),
               FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                  foregroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onErrorContainer,
+                ),
                 onPressed: () => answer(true),
                 child: const Text('Delete'),
               ),
@@ -96,15 +118,17 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
     setState(() => _busy = true);
     try {
       await ref.read(foodWasteProvider.notifier).reload();
+      if (_current(uid, session) && !widget.history) {
+        ref.invalidate(wastePantryItemsProvider(uid!));
+      }
     } catch (error) {
       if (mounted && _current(uid, session)) {
         debugPrint('Waste Tracker refresh error: $error');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${wasteErrorMessage(error, action: 'refresh')}${hadData ? ' Showing your current waste records.' : ''}',
-            ),
-          ),
+        showWasteMessage(
+          context,
+          hadData
+              ? "Couldn't refresh. Showing current data."
+              : wasteErrorMessage(error, action: 'refresh'),
         );
       }
     } finally {
@@ -123,34 +147,46 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
       ),
       WasteSummaryCard(
         title: 'Quantity Logged',
-        value: wasteNumber(summary.quantity),
+        value: summary.quantityValue,
         detail: summary.quantityDetail,
         icon: Icons.scale_outlined,
       ),
       WasteSummaryCard(
         title: 'Estimated Value',
         value: wasteMoney(summary.estimatedValue),
-        detail: 'Estimated cost of waste',
+        detail: 'Cost of logged waste',
         icon: Icons.payments_outlined,
       ),
       WasteSummaryCard(
         title: 'Trend vs Previous Period',
-        value: trend == null
-            ? 'No previous data'
-            : '${trend > 0 ? '+' : ''}${trend.toStringAsFixed(0)}%',
-        detail: 'Record count vs ${_period.comparisonLabel}. Lower is better.',
+        value: summary.trendValue,
+        detail: summary.trendDetail,
+        compactValue: trend == null || trend == 0,
+        valueColor: trend == null || trend == 0
+            ? null
+            : trend < 0
+            ? Theme.of(context).colorScheme.primary
+            : Colors.brown.shade700,
         icon: Icons.insights_outlined,
       ),
     ];
-    return LayoutBuilder(
-      builder: (context, constraints) => Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: [
-          for (final card in cards)
-            SizedBox(width: (constraints.maxWidth - 12) / 2, child: card),
+    // Natural row heights keep the 2x2 grid balanced without clipping large text.
+    return Column(
+      children: [
+        for (var row = 0; row < 2; row++) ...[
+          if (row > 0) const SizedBox(height: 10),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: cards[row * 2]),
+                const SizedBox(width: 10),
+                Expanded(child: cards[row * 2 + 1]),
+              ],
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 
@@ -164,57 +200,98 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
     final uid = _uid;
     final session = _session;
     return RefreshIndicator(
+      color: Theme.of(context).colorScheme.primary,
       onRefresh: _refresh,
       child: ListView(
         key: ValueKey(('waste-scroll', uid)),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           if (!widget.history) ...[
-            Card(
-              elevation: 0,
-              color: Theme.of(context).colorScheme.secondaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.eco_outlined,
-                      size: 32,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Small changes\nmake a big difference!',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Track your food waste and build better habits.',
-                    ),
-                  ],
+            WasteEntrance(
+              child: WasteSurface(
+                padding: EdgeInsets.zero,
+                color: Theme.of(context).colorScheme.secondaryContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.1),
+                        child: Icon(
+                          Icons.eco_outlined,
+                          size: 22,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Track waste. Build better habits.',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             WastePeriodSelector(
               selected: _period,
               onChanged: (period) => setState(() => _period = period),
             ),
-            const SizedBox(height: 16),
-            _summaryCards(summary),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
+            WasteEntrance(
+              key: ValueKey(('summary', _period)),
+              child: _summaryCards(summary),
+            ),
+            if (summary.reasonInsight != null) ...[
+              const SizedBox(height: 10),
+              Semantics(
+                label: 'Insight',
+                child: Text(
+                  summary.reasonInsight!,
+                  key: const ValueKey('waste-insight'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
           ],
-          FilledButton.icon(
-            onPressed: _busy ? null : () => _record(),
-            icon: const Icon(Icons.add),
-            label: const Padding(
-              padding: EdgeInsets.all(12),
-              child: Text('Record Waste'),
+          WastePress(
+            enabled: !_busy,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                elevation: 2,
+                shadowColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+              onPressed: _busy ? null : () => _record(),
+              icon: const Icon(Icons.add),
+              label: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text('Record Waste'),
+              ),
             ),
           ),
-          const SizedBox(height: 20),
+          if (!widget.history)
+            ExpiredPantrySection(
+              onRecord: _busy
+                  ? null
+                  : (source) {
+                      if (_current(source.uid, session)) _record(null, source);
+                    },
+            ),
+          const SizedBox(height: 12),
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -222,7 +299,7 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
             children: [
               Text(
                 widget.history ? 'All Waste Records' : 'Recent Waste Records',
-                style: Theme.of(context).textTheme.titleLarge,
+                style: Theme.of(context).textTheme.titleMedium,
               ),
               if (!widget.history)
                 TextButton(
@@ -238,41 +315,57 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          if (visible.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Column(
-                children: [
-                  const Icon(Icons.eco_outlined, size: 40),
-                  const SizedBox(height: 12),
-                  Text(
-                    records.isEmpty
-                        ? 'No waste recorded yet'
-                        : 'No waste recorded in this period',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Start tracking food waste to understand your habits.',
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
+          AnimatedSwitcher(
+            duration: wasteMotionDuration(context),
+            child: visible.isEmpty
+                ? Padding(
+                    key: const ValueKey('waste-empty'),
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.eco_outlined, size: 40),
+                        const SizedBox(height: 12),
+                        Text(
+                          widget.history
+                              ? 'No waste recorded yet'
+                              : switch (_period) {
+                                  WastePeriod.today =>
+                                    'No waste recorded today',
+                                  WastePeriod.week =>
+                                    'No waste recorded this week',
+                                  WastePeriod.month =>
+                                    'No waste recorded this month',
+                                },
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Keep tracking to understand your habits. Every record helps.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(key: ValueKey('waste-has-records')),
+          ),
           for (final record in visible)
-            WasteRecordTile(
+            WasteEntrance(
               key: ValueKey(record.id),
-              record: record,
-              onEdit: _busy
-                  ? null
-                  : () {
-                      if (_current(uid, session)) _record(record);
-                    },
-              onDelete: _busy
-                  ? null
-                  : () {
-                      if (_current(uid, session)) _delete(record);
-                    },
+              child: WasteRecordTile(
+                key: ValueKey(record.id),
+                record: record,
+                now: ref.read(wasteClockProvider)(),
+                onEdit: _busy
+                    ? null
+                    : () {
+                        if (_current(uid, session)) _record(record);
+                      },
+                onDelete: _busy
+                    ? null
+                    : () {
+                        if (_current(uid, session)) _delete(record);
+                      },
+              ),
             ),
         ],
       ),

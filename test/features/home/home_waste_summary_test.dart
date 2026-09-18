@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/pantry_waste_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -74,6 +75,7 @@ void main() {
             unknown: 0,
           )),
           foodWasteRepositoryProvider.overrideWithValue(session.repository),
+          wastePantryServiceProvider.overrideWithValue(session.pantry),
           wasteAuthUidProvider.overrideWith((ref) => session.auth()),
           wasteClockProvider.overrideWithValue(() => wasteTestNow),
         ],
@@ -135,7 +137,7 @@ void main() {
     );
     session.seed('bob', 'private', draft(value: 5000));
     await open(tester);
-    expect(value(tester), '2 items wasted\nRs. 350.00 this week');
+    expect(value(tester), '2 items wasted\nRs. 350 this week');
     expect(session.store.readCalls, 1);
   });
 
@@ -207,13 +209,14 @@ void main() {
         tester.element(find.byType(WasteTrackerScreen)),
       );
       await tester.runAsync(
-        () =>
-            container.read(foodWasteProvider.notifier).save(draft(value: 250)),
+        () => container
+            .read(foodWasteProvider.notifier)
+            .save(draft(name: 'Rice', value: 250)),
       );
       await tester.pumpAndSettle();
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(value(tester), '2 items wasted\nRs. 350.00 this week');
+      expect(value(tester), '2 items wasted\nRs. 350 this week');
       expect(session.store.readCalls, 1);
     },
   );
@@ -224,7 +227,7 @@ void main() {
       session.seed('alice', 'a', draft(value: 100));
       session.seed('bob', 'b', draft(value: 25));
       await open(tester);
-      expect(value(tester), contains('Rs. 100.00'));
+      expect(value(tester), contains('Rs. 100'));
       final gate = Completer<void>();
       session.store.readGate = gate.future;
       session.changeUser('bob');
@@ -234,7 +237,7 @@ void main() {
       gate.complete();
       session.store.readGate = null;
       await tester.pumpAndSettle();
-      expect(value(tester), '1 item wasted\nRs. 25.00 this week');
+      expect(value(tester), '1 item wasted\nRs. 25 this week');
       session.changeUser(null);
       await tester.pumpAndSettle();
       expect(value(tester), 'Tap to view');
@@ -250,7 +253,7 @@ void main() {
       await open(tester, size: const Size(320, 700), scale: 2);
       await tester.ensureVisible(find.byType(HomeWasteSummaryCard));
       await tester.pumpAndSettle();
-      expect(value(tester), '1000 items wasted\nRs. 987654321250.00 this week');
+      expect(value(tester), '1000 items wasted\nRs. 987,654,321,250 this week');
       expect(tester.takeException(), isNull);
     },
   );

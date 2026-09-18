@@ -101,9 +101,10 @@ void main() {
       wasteTestNow,
     );
     expect(summary.count, 2);
-    expect(summary.quantity, 2.5);
+    expect(summary.quantitiesByUnit, {'kg': 0.5, 'pcs': 2});
+    expect(summary.quantityValue, '2 units');
     expect(summary.mixedUnits, isTrue);
-    expect(summary.quantityDetail, 'Mixed units • numeric total');
+    expect(summary.quantityDetail, '0.5 kg • 2 pcs');
     expect(summary.estimatedValue, 125.5);
     expect(wasteMoney(summary.estimatedValue), 'Rs. 125.50');
   });
@@ -130,14 +131,140 @@ void main() {
       -100,
     );
   });
-  test('no previous records means no percentage, not a fabricated zero', () {
+  test('no baseline is safe; both empty periods mean no change', () {
     expect(
       WasteSummary([draft()], WastePeriod.today, wasteTestNow).trendPercent,
       isNull,
     );
+    expect(WasteSummary([], WastePeriod.today, wasteTestNow).trendPercent, 0);
     expect(
-      WasteSummary([], WastePeriod.today, wasteTestNow).trendPercent,
-      isNull,
+      WasteSummary([], WastePeriod.today, wasteTestNow).trendValue,
+      'No change',
+    );
+    final noBaseline = WasteSummary([draft()], WastePeriod.today, wasteTestNow);
+    expect(noBaseline.trendValue, 'No previous data');
+    expect(noBaseline.trendDetail, 'Record more waste to see trends');
+  });
+  test(
+    'single unit adds only that unit; many units have a compact breakdown',
+    () {
+      final single = WasteSummary(
+        [
+          draft(quantity: 2, unit: 'bottle'),
+          draft(quantity: 3, unit: 'bottle'),
+        ],
+        WastePeriod.today,
+        wasteTestNow,
+      );
+      expect(single.quantityValue, '5');
+      expect(single.quantityDetail, 'bottle');
+      final mixed = WasteSummary(
+        [
+          draft(quantity: 2, unit: 'bottle'),
+          draft(quantity: 1.5, unit: 'kg'),
+          draft(quantity: 4, unit: 'pcs'),
+          draft(unit: 'pack'),
+          draft(unit: 'g'),
+        ],
+        WastePeriod.today,
+        wasteTestNow,
+      );
+      expect(mixed.quantityValue, '5 units');
+      expect(mixed.quantityDetail, '2 bottle • 2 g • 1.5 kg • +2 more');
+    },
+  );
+  test('money uses grouped whole values or cents rounded to two places', () {
+    expect(wasteMoney(0), 'Rs. 0');
+    expect(wasteMoney(1000), 'Rs. 1,000');
+    expect(wasteMoney(12500), 'Rs. 12,500');
+    expect(wasteMoney(450.5), 'Rs. 450.50');
+    expect(wasteMoney(1234.567), 'Rs. 1,234.57');
+    expect(wasteMoney(999.999), 'Rs. 1,000');
+    expect(wasteMoney(987654321250), 'Rs. 987,654,321,250');
+    // Display formatting must not round small quantities in an edit form.
+    expect(wasteNumber(0.001), '0.001');
+  });
+  test(
+    'reason insights are selected-period only with explicit tie handling',
+    () {
+      final summary = WasteSummary(
+        [
+          draft(),
+          draft(),
+          draft().copyWith(reason: 'Spoiled'),
+          ...List.generate(
+            5,
+            (_) =>
+                draft(date: DateTime(2026, 9, 1)).copyWith(reason: 'Spoiled'),
+          ),
+        ],
+        WastePeriod.today,
+        wasteTestNow,
+      );
+      expect(
+        summary.reasonInsight,
+        'Most common reason: Expired (2/3). Check dates before shopping.',
+      );
+      expect(
+        WasteSummary([], WastePeriod.today, wasteTestNow).reasonInsight,
+        isNull,
+      );
+      expect(
+        WasteSummary([draft()], WastePeriod.today, wasteTestNow).reasonInsight,
+        isNull,
+      );
+      expect(
+        WasteSummary(
+          [draft(), draft().copyWith(reason: 'Other')],
+          WastePeriod.today,
+          wasteTestNow,
+        ).reasonInsight,
+        contains('tied'),
+      );
+    },
+  );
+  test(
+    'trends use counts not money or quantities and include directional wording',
+    () {
+      final yesterday = draft(value: 10000, date: DateTime(2026, 9, 15));
+      final lower = WasteSummary(
+        [draft(), yesterday, yesterday],
+        WastePeriod.today,
+        wasteTestNow,
+      );
+      expect(lower.trendValue, '↓ 50%');
+      expect(lower.trendDetail, 'Fewer records than yesterday');
+      final higher = WasteSummary(
+        [draft(), draft(), yesterday],
+        WastePeriod.today,
+        wasteTestNow,
+      );
+      expect(higher.trendValue, '↑ 100%');
+      expect(higher.trendDetail, 'More records than yesterday');
+    },
+  );
+  test('UTC instants use local calendar boundaries and relative dates', () {
+    final localMidnight = DateTime(2026, 9, 16);
+    final summary = WasteSummary(
+      [draft(date: localMidnight.toUtc())],
+      WastePeriod.today,
+      wasteTestNow,
+    );
+    expect(summary.count, 1);
+    expect(wasteRelativeDate(localMidnight.toUtc(), wasteTestNow), 'Today');
+    expect(
+      wasteRelativeDate(DateTime(2026, 9, 15, 23), wasteTestNow),
+      'Yesterday',
+    );
+    expect(wasteRelativeDate(DateTime(2026, 9, 1), wasteTestNow), '01/09/2026');
+  });
+  test('equal dates have deterministic document ordering', () {
+    expect(
+      newestWasteFirst([
+        draft().copyWith(id: 'z'),
+        draft().copyWith(id: 'a'),
+      ]).map((r) => r.id),
+      ['a', 'z'],
     );
   });
   test(

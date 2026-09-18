@@ -17,9 +17,19 @@ void showWasteError(
   String action = 'save',
 }) {
   debugPrint('Waste Tracker $action error: $error');
+  showWasteMessage(context, wasteErrorMessage(error, action: action));
+}
+
+void showWasteMessage(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..clearSnackBars()
     ..showSnackBar(
-      SnackBar(content: Text(wasteErrorMessage(error, action: action))),
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 2,
+        duration: const Duration(seconds: 4),
+      ),
     );
 }

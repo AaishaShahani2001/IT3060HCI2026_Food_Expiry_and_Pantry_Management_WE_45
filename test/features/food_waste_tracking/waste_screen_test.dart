@@ -6,7 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:food_expiry_and_pantry_management/core/theme/app_theme.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/food_waste_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/screens/waste_tracker_screen.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/widgets/waste_summary_card.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/widgets/waste_period_selector.dart';
 import 'support/waste_test_session.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/pantry_waste_provider.dart';
 
 void main() {
   late WasteTestSession session;
@@ -27,6 +30,7 @@ void main() {
       ProviderScope(
         overrides: [
           foodWasteRepositoryProvider.overrideWithValue(session.repository),
+          wastePantryServiceProvider.overrideWithValue(session.pantry),
           wasteAuthUidProvider.overrideWith((ref) => session.auth()),
           wasteClockProvider.overrideWithValue(() => wasteTestNow),
         ],
@@ -84,6 +88,153 @@ void main() {
     await tap(tester, find.text(action).last);
   }
 
+  testWidgets(
+    'compact balanced grid shows recent heading and first record on phone',
+    (tester) async {
+      session.seed('alice', 'id', draft());
+      await open(tester, size: const Size(390, 844));
+      final cards = find.byType(WasteSummaryCard);
+      expect(cards, findsNWidgets(4));
+      expect(
+        tester.getSize(cards.at(0)).height,
+        tester.getSize(cards.at(1)).height,
+      );
+      expect(
+        tester.getSize(cards.at(2)).height,
+        tester.getSize(cards.at(3)).height,
+      );
+      expect(tester.getSize(cards.at(0)).height, lessThan(140));
+      expect(
+        tester.getTopLeft(find.text('Recent Waste Records')).dy,
+        lessThan(700),
+      );
+      expect(tester.getBottomLeft(find.text('Apples')).dy, lessThan(844));
+      expect(find.text('No previous data'), findsOneWidget);
+      expect(find.text('Record more waste to see trends'), findsOneWidget);
+      final buttons = find.descendant(
+        of: find.byType(WastePeriodSelector),
+        matching: find.byType(TextButton),
+      );
+      expect(
+        tester.getSize(buttons.at(0)).width,
+        tester.getSize(buttons.at(1)).width,
+      );
+      expect(
+        tester.getSize(buttons.at(1)).width,
+        tester.getSize(buttons.at(2)).width,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'insight and all summary fields follow period; empty insight hidden',
+    (tester) async {
+      session.seed('alice', 'a', draft(unit: 'bottle', value: 1000));
+      session.seed(
+        'alice',
+        'b',
+        draft(quantity: 1.5, unit: 'kg', value: 450.5),
+      );
+      session.seed(
+        'alice',
+        'old',
+        draft(
+          name: 'Old',
+          date: DateTime(2026, 9, 1),
+          value: 5000,
+        ).copyWith(reason: 'Spoiled'),
+      );
+      await open(tester);
+      expect(find.text('2 units'), findsOneWidget);
+      expect(find.text('2 bottle • 1.5 kg'), findsOneWidget);
+      expect(find.text('Rs. 1,450.50'), findsOneWidget);
+      expect(
+        find.textContaining('Most common reason: Expired (2/2)'),
+        findsOneWidget,
+      );
+      await tap(tester, find.text('This Month'));
+      expect(find.text('3 units'), findsOneWidget);
+      expect(find.text('Rs. 6,450.50'), findsOneWidget);
+      expect(
+        find.textContaining('Most common reason: Expired (2/3)'),
+        findsOneWidget,
+      );
+      session.changeUser('bob');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('waste-insight')), findsNothing);
+      expect(find.text('No waste recorded this month'), findsOneWidget);
+      expect(find.text('Rs. 6,450.50'), findsNothing);
+    },
+  );
+  testWidgets('duplicate Cancel keeps draft and Save Anyway writes once', (
+    tester,
+  ) async {
+    session.seed('alice', 'id', draft());
+    await open(tester);
+    await openForm(tester);
+    await fill(tester, name: '  APPLES ');
+    await tap(tester, find.byKey(const ValueKey('save-waste')));
+    expect(
+      find.text('This waste record looks similar to one already saved.'),
+      findsOneWidget,
+    );
+    expect(session.store.addCalls, 0);
+    await tap(tester, find.text('Cancel'));
+    expect(find.byKey(const ValueKey('waste-name')), findsOneWidget);
+    expect(session.store.documents.length, 1);
+    await tap(tester, find.byKey(const ValueKey('save-waste')));
+    final saveAnyway = find.widgetWithText(FilledButton, 'Save Anyway');
+    await tester.tap(saveAnyway);
+    await tester.tap(saveAnyway, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(session.store.addCalls, 1);
+    expect(session.store.documents.length, 2);
+    expect(find.byKey(const ValueKey('waste-name')), findsNothing);
+  });
+  testWidgets(
+    'account change during duplicate confirmation cannot save draft',
+    (tester) async {
+      session.seed('alice', 'id', draft());
+      await open(tester);
+      await openForm(tester);
+      await fill(tester, name: 'Apples');
+      await tap(tester, find.byKey(const ValueKey('save-waste')));
+      session.changeUser('bob');
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('Save Anyway'));
+      expect(session.store.addCalls, 0);
+      expect(find.textContaining('Your account changed.'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+    },
+  );
+  testWidgets(
+    'large text, long values, many records and mixed units stay scrollable',
+    (tester) async {
+      final units = ['kg', 'pcs', 'bottle', 'pack', 'g', 'L'];
+      for (var i = 0; i < 12; i++) {
+        session.seed(
+          'alice',
+          '$i',
+          draft(
+            name: 'Long homemade vegetable rice dish number $i',
+            unit: units[i % units.length],
+            value: 123456789012.5,
+          ),
+        );
+      }
+      await open(tester, size: const Size(320, 700), scale: 2);
+      expect(tester.takeException(), isNull);
+      await reveal(tester, find.text('Recent Waste Records'));
+      expect(tester.takeException(), isNull);
+      await reveal(
+        tester,
+        find.text('Long homemade vegetable rice dish number 10'),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('empty state, period selector and four summary cards', (
     tester,
   ) async {
@@ -92,9 +243,9 @@ void main() {
     expect(find.text('Quantity Logged'), findsOneWidget);
     expect(find.text('Estimated Value'), findsOneWidget);
     expect(find.text('Trend vs Previous Period'), findsOneWidget);
-    expect(find.text('No previous data'), findsOneWidget);
-    await reveal(tester, find.text('No waste recorded yet'));
-    expect(find.text('No waste recorded yet'), findsOneWidget);
+    expect(find.text('No change'), findsOneWidget);
+    await reveal(tester, find.text('No waste recorded today'));
+    expect(find.text('No waste recorded today'), findsOneWidget);
   });
   testWidgets(
     'create custom record, summary update and read after pull refresh',
@@ -231,7 +382,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Apples'), findsOneWidget);
     expect(
-      find.textContaining('Showing your current waste records.'),
+      find.text("Couldn't refresh. Showing current data."),
       findsOneWidget,
     );
   });
@@ -270,7 +421,6 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('waste-quantity')), '0.5');
     await tap(tester, find.byType(DropdownButtonFormField<String>).first);
     await tap(tester, find.text('kg').last);
-    await tap(tester, find.byType(DropdownButtonFormField<String>).last);
     await tap(tester, find.text('Cooked Too Much').last);
     await tap(tester, find.text('Date: 16/09/2026'));
     await tap(tester, find.text('15').last);

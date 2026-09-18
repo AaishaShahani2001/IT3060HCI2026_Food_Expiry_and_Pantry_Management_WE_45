@@ -29,6 +29,99 @@ void main() {
   List<FoodWasteRecord> records() =>
       container.read(foodWasteProvider).requireValue;
 
+  Future<WasteDuplicateWarning> warningFor(FoodWasteRecord record) async {
+    try {
+      await notifier().save(record);
+      fail('Expected duplicate warning before any write');
+    } on WasteDuplicateWarning catch (warning) {
+      return warning;
+    }
+  }
+
+  test(
+    'duplicate uses normalized name, local date, reason and unit quantity',
+    () async {
+      session.seed('alice', 'id', draft(name: 'Homemade Rice'));
+      await load();
+      await warningFor(
+        draft(name: '  homemade   RICE ', date: DateTime(2026, 9, 16, 23)),
+      );
+      expect(session.store.addCalls, 0);
+      await notifier().save(draft(name: 'Homemade Rice', quantity: 3));
+      await notifier().save(draft(name: 'Homemade Rice', unit: 'kg'));
+      await notifier().save(
+        draft(name: 'Homemade Rice').copyWith(reason: 'Spoiled'),
+      );
+      await notifier().save(
+        draft(name: 'Homemade Rice', date: DateTime(2026, 9, 15)),
+      );
+      expect(session.store.addCalls, 4);
+    },
+  );
+  test(
+    'Save Anyway creates once; edit excludes itself but warns for another record',
+    () async {
+      session.seed('alice', 'id', draft());
+      await load();
+      await notifier().save(records().single.copyWith(estimatedValue: 150));
+      expect(session.store.updateCalls, 1);
+      final candidate = draft();
+      final warning = await warningFor(candidate);
+      await notifier().save(candidate, confirmedDuplicate: warning);
+      expect(records().length, 2);
+      expect(session.store.addCalls, 1);
+      // The new matching record invalidates the old confirmation.
+      await expectLater(
+        notifier().save(candidate, confirmedDuplicate: warning),
+        throwsA(isA<WasteDuplicateWarning>()),
+      );
+      await warningFor(records().first.copyWith(estimatedValue: 200));
+      expect(session.store.updateCalls, 1);
+    },
+  );
+  test(
+    'duplicate confirmation cannot be reused for changed draft or refreshed data',
+    () async {
+      session.seed('alice', 'id', draft());
+      await load();
+      final candidate = draft();
+      final warning = await warningFor(candidate);
+      await expectLater(
+        notifier().save(
+          candidate.copyWith(estimatedValue: 999),
+          confirmedDuplicate: warning,
+        ),
+        throwsA(isA<WasteDuplicateWarning>()),
+      );
+      await notifier().reload();
+      await expectLater(
+        notifier().save(candidate, confirmedDuplicate: warning),
+        throwsA(isA<WasteDuplicateWarning>()),
+      );
+      expect(session.store.addCalls, 0);
+    },
+  );
+  test(
+    'duplicate detection and confirmation are isolated to authenticated user',
+    () async {
+      session.seed('bob', 'id', draft());
+      await load();
+      await notifier().save(
+        draft(),
+      ); // Bob's matching record does not block Alice.
+      final candidate = draft();
+      final warning = await warningFor(candidate);
+      session.changeUser('bob');
+      await Future<void>.delayed(Duration.zero);
+      await load();
+      await expectLater(
+        notifier().save(candidate, confirmedDuplicate: warning),
+        throwsA(isA<WasteDuplicateWarning>()),
+      );
+      expect(session.store.addCalls, 1);
+    },
+  );
+
   test(
     'create/read uses generated documents in current user waste_records',
     () async {
@@ -144,7 +237,10 @@ void main() {
     session.store.addError = failure;
     session.store.updateError = failure;
     session.store.deleteError = failure;
-    await expectLater(notifier().save(draft()), throwsA(same(failure)));
+    await expectLater(
+      notifier().save(draft(name: 'New meal')),
+      throwsA(same(failure)),
+    );
     await expectLater(
       notifier().save(records().single.copyWith(itemName: 'Changed')),
       throwsA(same(failure)),

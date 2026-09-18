@@ -28,6 +28,8 @@ class FoodWasteRecord {
     required this.reason,
     required this.estimatedValue,
     required this.wastedAt,
+    this.source,
+    this.sourcePantryItemId,
   });
 
   final String? id;
@@ -37,6 +39,8 @@ class FoodWasteRecord {
   final String reason;
   final double estimatedValue;
   final DateTime wastedAt;
+  final String? source;
+  final String? sourcePantryItemId;
 
   void validate() {
     if (itemName.trim().isEmpty ||
@@ -45,7 +49,12 @@ class FoodWasteRecord {
         !estimatedValue.isFinite ||
         estimatedValue < 0 ||
         !wasteUnits.contains(unit) ||
-        !wasteReasons.contains(reason)) {
+        !wasteReasons.contains(reason) ||
+        (source != null && source != 'pantry') ||
+        ((source == null) != (sourcePantryItemId == null)) ||
+        (sourcePantryItemId != null &&
+            (sourcePantryItemId!.trim().isEmpty ||
+                sourcePantryItemId!.contains('/')))) {
       throw ArgumentError('Invalid waste record.');
     }
   }
@@ -66,6 +75,8 @@ class FoodWasteRecord {
     reason: reason ?? this.reason,
     estimatedValue: estimatedValue ?? this.estimatedValue,
     wastedAt: wastedAt ?? this.wastedAt,
+    source: source,
+    sourcePantryItemId: sourcePantryItemId,
   );
 
   Map<String, dynamic> toMap() {
@@ -77,6 +88,8 @@ class FoodWasteRecord {
       'reason': reason,
       'estimatedValue': estimatedValue,
       'wastedAt': Timestamp.fromDate(wastedAt),
+      if (source != null) 'source': source,
+      if (sourcePantryItemId != null) 'sourcePantryItemId': sourcePantryItemId,
     };
   }
 
@@ -93,7 +106,10 @@ class FoodWasteRecord {
         unit is! String ||
         reason is! String ||
         value is! num ||
-        date is! Timestamp) {
+        date is! Timestamp ||
+        (data['source'] != null && data['source'] is! String) ||
+        (data['sourcePantryItemId'] != null &&
+            data['sourcePantryItemId'] is! String)) {
       throw const FormatException('Invalid waste record.');
     }
     final record = FoodWasteRecord(
@@ -104,6 +120,8 @@ class FoodWasteRecord {
       reason: reason,
       estimatedValue: value.toDouble(),
       wastedAt: date.toDate(),
+      source: data['source'] as String?,
+      sourcePantryItemId: data['sourcePantryItemId'] as String?,
     );
     try {
       record.validate();
