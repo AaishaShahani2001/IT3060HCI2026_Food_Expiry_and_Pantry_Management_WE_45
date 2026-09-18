@@ -3,12 +3,16 @@ class ShoppingItem {
   final String name;
   final int quantity;
   final bool isPurchased;
+  final String? source;
+  final String? sourcePantryItemId;
 
   const ShoppingItem({
     this.id,
     required this.name,
     required this.quantity,
     this.isPurchased = false,
+    this.source,
+    this.sourcePantryItemId,
   });
 
   ShoppingItem copyWith({
@@ -16,12 +20,16 @@ class ShoppingItem {
     String? name,
     int? quantity,
     bool? isPurchased,
+    String? source,
+    String? sourcePantryItemId,
   }) {
     return ShoppingItem(
       id: id ?? this.id,
       name: name ?? this.name,
       quantity: quantity ?? this.quantity,
       isPurchased: isPurchased ?? this.isPurchased,
+      source: source ?? this.source,
+      sourcePantryItemId: sourcePantryItemId ?? this.sourcePantryItemId,
     );
   }
 
@@ -29,6 +37,8 @@ class ShoppingItem {
     'name': name,
     'quantity': quantity,
     'isPurchased': isPurchased,
+    if (source != null) 'source': source,
+    if (sourcePantryItemId != null) 'sourcePantryItemId': sourcePantryItemId,
   };
 
   factory ShoppingItem.fromMap(String id, Map<String, dynamic> data) {
@@ -49,6 +59,10 @@ class ShoppingItem {
       name: name,
       quantity: quantity,
       isPurchased: isPurchased,
+      source: data['source'] is String ? data['source'] as String : null,
+      sourcePantryItemId: data['sourcePantryItemId'] is String
+          ? data['sourcePantryItemId'] as String
+          : null,
     );
   }
 }
