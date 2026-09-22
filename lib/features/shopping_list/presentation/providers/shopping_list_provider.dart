@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_list_repository.dart';
@@ -17,6 +19,8 @@ final shoppingAuthUidProvider = StreamProvider<String?>((ref) {
 
 enum ShoppingDuplicateAction { increaseQuantity, moveToBuy, addAnyway }
 
+enum LowStockShoppingResult { unchanged, added, reactivated }
+
 class ShoppingDuplicateException implements Exception {
   const ShoppingDuplicateException(this.existing);
   final ShoppingItem existing;
@@ -29,7 +33,15 @@ class ShoppingQuantityLimitException implements Exception {
 class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
   String? _uid;
   int _generation = 0;
-  bool _mutationInProgress = false;
+  Completer<void> _idle = Completer<void>()..complete();
+  bool get _mutationInProgress => !_idle.isCompleted;
+  set _mutationInProgress(bool busy) {
+    if (busy) {
+      _idle = Completer<void>();
+    } else if (!_idle.isCompleted) {
+      _idle.complete();
+    }
+  }
 
   ShoppingListRepository get _repository =>
       ref.read(shoppingListRepositoryProvider);
@@ -39,6 +51,7 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
     final generation = ++_generation;
     _uid = null;
     _mutationInProgress = false;
+    ref.onDispose(() => _mutationInProgress = false);
     final repository = ref.watch(shoppingListRepositoryProvider);
     final uid = await ref.watch(shoppingAuthUidProvider.future);
     if (!ref.mounted || generation != _generation) return [];
@@ -178,7 +191,10 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
       throw ShoppingDuplicateException(duplicate);
     }
     // Editing name/quantity never changes the current Bought status.
-    final updated = item.copyWith(isPurchased: originals.single.isPurchased);
+    final updated = originals.single.copyWith(
+      name: item.name,
+      quantity: item.quantity,
+    );
     await updateItem(item.id!, updated);
     return updated;
   }
@@ -249,6 +265,87 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
       throw StateError('The shopping item changed. Refresh before updating.');
     }
     await updateItem(itemId, matches.single.copyWith(isPurchased: isPurchased));
+  }
+
+  /// Background sync shares the manual-operation lock, but never opens a
+  /// duplicate dialog or changes a manual item. The owner and stock episode are
+  /// rechecked after each wait, before issuing a write.
+  Future<LowStockShoppingResult> ensureLowStockItem({
+    required String expectedUid,
+    required String pantryItemId,
+    required String name,
+    required bool reactivateBought,
+    required bool Function() stillEligible,
+  }) async {
+    await future;
+    while (ref.mounted && _mutationInProgress) {
+      await _idle.future;
+    }
+    if (!ref.mounted || _uid != expectedUid || !stillEligible()) {
+      return LowStockShoppingResult.unchanged;
+    }
+    final uid = _requireUser();
+    if (pantryItemId.trim().isEmpty || name.trim().isEmpty) {
+      throw ArgumentError('A saved Pantry item is required.');
+    }
+    final generation = _generation;
+    _mutationInProgress = true;
+    try {
+      // Refresh before matching: another screen/device may have added an item
+      // since this notifier loaded. This is not a cross-device transaction.
+      final items = await _repository.getShoppingItems(uid);
+      if (!_isCurrent(generation, uid) || !stillEligible()) {
+        return LowStockShoppingResult.unchanged;
+      }
+      state = AsyncData(items);
+      final matches = items
+          .where(
+            (item) =>
+                item.sourcePantryItemId == pantryItemId ||
+                _normalizedName(item.name) == _normalizedName(name),
+          )
+          .toList();
+      if (matches.any((item) => !item.isPurchased)) {
+        return LowStockShoppingResult.unchanged;
+      }
+      final linked =
+          matches
+              .where(
+                (item) =>
+                    item.source == 'low_stock' &&
+                    item.sourcePantryItemId == pantryItemId,
+              )
+              .toList()
+            ..sort((a, b) => a.id!.compareTo(b.id!));
+      if (linked.isNotEmpty && reactivateBought) {
+        final updated = linked.first.copyWith(isPurchased: false);
+        await _repository.updateShoppingItem(uid, updated);
+        if (_isCurrent(generation, uid)) {
+          state = AsyncData([
+            for (final item in items)
+              if (item.id == updated.id) updated else item,
+          ]);
+        }
+        return LowStockShoppingResult.reactivated;
+      }
+      // Startup Bought matches, including manual Bought items, are respected.
+      if (matches.isNotEmpty) return LowStockShoppingResult.unchanged;
+      final created = await _repository.addShoppingItem(
+        uid,
+        ShoppingItem(
+          name: name.trim(),
+          quantity: 1,
+          source: 'low_stock',
+          sourcePantryItemId: pantryItemId,
+        ),
+      );
+      if (_isCurrent(generation, uid)) {
+        state = AsyncData([...items, created]);
+      }
+      return LowStockShoppingResult.added;
+    } finally {
+      if (ref.mounted && generation == _generation) _mutationInProgress = false;
+    }
   }
 }
 

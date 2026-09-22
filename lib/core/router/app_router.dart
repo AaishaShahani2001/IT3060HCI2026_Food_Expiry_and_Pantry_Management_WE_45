@@ -19,6 +19,7 @@ import '../../features/shared_pantry/presentation/screens/shared_pantry_screen.d
 import '../../features/shopping_list/models/shopping_item.dart';
 import '../../features/shopping_list/presentation/screens/add_shopping_item_screen.dart';
 import '../../features/shopping_list/presentation/screens/shopping_list_screen.dart';
+import '../../features/food_waste_tracking/presentation/screens/waste_tracker_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
 
 import 'app_routes.dart';
@@ -80,6 +81,11 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.addShoppingItem,
       builder: (context, state) =>
           AddShoppingItemScreen(initialItem: state.extra as ShoppingItem?),
+    ),
+
+    GoRoute(
+      path: AppRoutes.wasteTracker,
+      builder: (context, state) => const WasteTrackerScreen(),
     ),
 
     ShellRoute(
