@@ -2,7 +2,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../providers/pantry_providers.dart';
@@ -82,7 +81,7 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             behavior: SnackBarBehavior.floating,
-            backgroundColor: AppColors.statusRed,
+            backgroundColor: Theme.of(context).colorScheme.error,
             content: Text(mapPantryFirestoreError(error)),
           ),
         );

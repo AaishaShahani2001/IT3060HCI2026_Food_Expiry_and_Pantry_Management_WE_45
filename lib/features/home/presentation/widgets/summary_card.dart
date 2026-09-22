@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:food_expiry_and_pantry_management/core/constants/app_colors.dart';
 
 class SummaryCard extends StatelessWidget {
   final String title;
   final String value;
   final IconData icon;
-  final Color iconColor;
+  final Color? iconColor;
   final VoidCallback? onTap;
 
   const SummaryCard({
@@ -13,16 +12,18 @@ class SummaryCard extends StatelessWidget {
     required this.title,
     required this.value,
     required this.icon,
-    this.iconColor = AppColors.primaryGreen,
+    this.iconColor,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final resolvedIconColor = iconColor ?? colorScheme.primary;
 
     return Material(
-      color: AppColors.white,
+      color: colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -32,7 +33,7 @@ class SummaryCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: AppColors.indicatorInactive.withValues(alpha: 0.5),
+              color: colorScheme.outline.withValues(alpha: 0.7),
             ),
           ),
           child: Row(
@@ -40,10 +41,10 @@ class SummaryCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.12),
+                  color: resolvedIconColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: iconColor, size: 24),
+                child: Icon(icon, color: resolvedIconColor, size: 24),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -54,7 +55,7 @@ class SummaryCard extends StatelessWidget {
                     Text(
                       title,
                       style: textTheme.bodyLarge?.copyWith(
-                        color: AppColors.textSecondary,
+                        color: colorScheme.onSurfaceVariant,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -63,7 +64,7 @@ class SummaryCard extends StatelessWidget {
                     Text(
                       value,
                       style: textTheme.titleLarge?.copyWith(
-                        color: AppColors.darkGreen,
+                        color: colorScheme.onSurface,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -71,9 +72,9 @@ class SummaryCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
-                color: AppColors.textSecondary,
+                color: colorScheme.onSurfaceVariant,
                 size: 20,
               ),
             ],

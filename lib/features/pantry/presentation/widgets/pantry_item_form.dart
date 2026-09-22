@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/pantry_item.dart';
 
 class PantryItemFormData {
@@ -444,11 +443,11 @@ class _PantryItemFormState extends State<PantryItemForm> {
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.statusRed),
+        borderSide: BorderSide(color: colorScheme.error),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.statusRed, width: 1.8),
+        borderSide: BorderSide(color: colorScheme.error, width: 1.8),
       ),
     );
   }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:food_expiry_and_pantry_management/core/constants/app_colors.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/food_item_suggestions.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/quantity_presets.dart';
@@ -653,7 +652,7 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
                                     ? null
                                     : _submitForm,
                                 style: FilledButton.styleFrom(
-                                  backgroundColor: AppColors.darkGreen,
+                                  backgroundColor: colors.primary,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 20,
                                     vertical: 18,

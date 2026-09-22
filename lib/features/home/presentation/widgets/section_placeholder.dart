@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:food_expiry_and_pantry_management/core/constants/app_colors.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
 
 class SectionPlaceholder extends StatelessWidget {
@@ -10,6 +9,7 @@ class SectionPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -17,10 +17,9 @@ class SectionPlaceholder extends StatelessWidget {
           title,
           style: textTheme.headlineMedium?.copyWith(
             fontSize: 20,
-            color: AppColors.darkGreen,
+            color: colorScheme.onSurface,
           ),
         ),
-        backgroundColor: AppColors.cream,
         elevation: 0,
         centerTitle: true,
       ),
@@ -34,14 +33,14 @@ class SectionPlaceholder extends StatelessWidget {
                 Container(
                   width: 80,
                   height: 80,
-                  decoration: const BoxDecoration(
-                    color: AppColors.softGreen,
+                  decoration: BoxDecoration(
+                    color: colorScheme.secondaryContainer,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.construction_rounded,
                     size: 40,
-                    color: AppColors.primaryGreen,
+                    color: colorScheme.primary,
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -49,7 +48,7 @@ class SectionPlaceholder extends StatelessWidget {
                   title,
                   style: textTheme.headlineMedium?.copyWith(
                     fontSize: 22,
-                    color: AppColors.darkGreen,
+                    color: colorScheme.onSurface,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -57,7 +56,7 @@ class SectionPlaceholder extends StatelessWidget {
                 Text(
                   AppStrings.sectionComingSoon,
                   style: textTheme.bodyLarge?.copyWith(
-                    color: AppColors.textSecondary,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                   textAlign: TextAlign.center,
                 ),

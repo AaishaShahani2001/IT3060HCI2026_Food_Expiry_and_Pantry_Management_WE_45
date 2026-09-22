@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:food_expiry_and_pantry_management/core/constants/app_colors.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
 
 class WelcomeSection extends StatelessWidget {
@@ -8,16 +7,17 @@ class WelcomeSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.softGreen,
+        color: colorScheme.secondaryContainer,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.darkGreen.withValues(alpha: 0.05),
+            color: colorScheme.primary.withValues(alpha: 0.08),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -32,7 +32,7 @@ class WelcomeSection extends StatelessWidget {
                 Text(
                   AppStrings.homeWelcome,
                   style: textTheme.headlineMedium?.copyWith(
-                    color: AppColors.darkGreen,
+                    color: colorScheme.onSurface,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
@@ -41,7 +41,7 @@ class WelcomeSection extends StatelessWidget {
                 Text(
                   AppStrings.homeWelcomeMessage,
                   style: textTheme.bodyLarge?.copyWith(
-                    color: AppColors.textSecondary,
+                    color: colorScheme.onSurfaceVariant,
                     fontSize: 14,
                     height: 1.4,
                   ),
@@ -52,14 +52,14 @@ class WelcomeSection extends StatelessWidget {
           const SizedBox(width: 12),
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              color: AppColors.white,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.eco_rounded,
               size: 32,
-              color: AppColors.primaryGreen,
+              color: colorScheme.primary,
             ),
           ),
         ],

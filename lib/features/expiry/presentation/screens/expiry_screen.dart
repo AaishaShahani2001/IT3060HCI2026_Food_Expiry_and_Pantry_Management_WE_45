@@ -78,21 +78,17 @@ class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
 
     final expiryService = ref.read(expiryServiceProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.cream,
+    final colorScheme = Theme.of(context).colorScheme;
 
+    return Scaffold(
       // --------------------------------------------------
       // APP BAR
       // --------------------------------------------------
       appBar: AppBar(
-        backgroundColor: AppColors.cream,
         elevation: 0,
         title: const Text(
           'Expiry Monitoring',
-          style: TextStyle(
-            color: AppColors.darkGreen,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
@@ -100,25 +96,24 @@ class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
             onPressed: () {
               context.push(AppRoutes.expiryNotifications);
             },
-            icon: const Icon(
-              Icons.notifications_active_outlined,
-              color: AppColors.darkGreen,
-              size: 26,
-            ),
+            icon: const Icon(Icons.notifications_active_outlined, size: 26),
           ),
           const SizedBox(width: 8),
         ],
       ),
 
       body: RefreshIndicator(
-        color: AppColors.primaryGreen,
+        color: colorScheme.primary,
         onRefresh: _refresh,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
-            const Text(
+            Text(
               'Monitor your products and take action before food expires.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 14,
+              ),
             ),
 
             const SizedBox(height: 20),
@@ -134,7 +129,11 @@ class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
                     value: summary.expired.toString(),
                     icon: Icons.error_outline_rounded,
                     color: AppColors.statusRed,
-                    backgroundColor: AppColors.statusRedBg,
+                    backgroundColor: _statusSurface(
+                      colorScheme,
+                      AppColors.statusRed,
+                      AppColors.statusRedBg,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -144,7 +143,11 @@ class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
                     value: summary.expiringSoon.toString(),
                     icon: Icons.warning_amber_rounded,
                     color: AppColors.statusOrange,
-                    backgroundColor: AppColors.statusOrangeBg,
+                    backgroundColor: _statusSurface(
+                      colorScheme,
+                      AppColors.statusOrange,
+                      AppColors.statusOrangeBg,
+                    ),
                   ),
                 ),
               ],
@@ -160,7 +163,11 @@ class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
                     value: summary.fresh.toString(),
                     icon: Icons.check_circle_outline_rounded,
                     color: AppColors.statusFresh,
-                    backgroundColor: AppColors.statusFreshBg,
+                    backgroundColor: _statusSurface(
+                      colorScheme,
+                      AppColors.statusFresh,
+                      AppColors.statusFreshBg,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -169,8 +176,12 @@ class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
                     title: 'Unknown',
                     value: summary.unknown.toString(),
                     icon: Icons.help_outline_rounded,
-                    color: AppColors.textSecondary,
-                    backgroundColor: AppColors.white,
+                    color: colorScheme.onSurfaceVariant,
+                    backgroundColor: _statusSurface(
+                      colorScheme,
+                      colorScheme.onSurfaceVariant,
+                      colorScheme.surfaceContainerHighest,
+                    ),
                   ),
                 ),
               ],
@@ -183,11 +194,11 @@ class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
             // --------------------------------------------------
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Smart Alerts',
                     style: TextStyle(
-                      color: AppColors.darkGreen,
+                      color: colorScheme.onSurface,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -201,7 +212,11 @@ class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.statusRedBg,
+                      color: _statusSurface(
+                        colorScheme,
+                        AppColors.statusRed,
+                        AppColors.statusRedBg,
+                      ),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -248,10 +263,10 @@ class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
             // --------------------------------------------------
             // ALL PRODUCTS
             // --------------------------------------------------
-            const Text(
+            Text(
               'All Products',
               style: TextStyle(
-                color: AppColors.darkGreen,
+                color: colorScheme.onSurface,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -342,8 +357,8 @@ class _SummaryCard extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 11,
                   ),
                 ),
@@ -381,22 +396,28 @@ class _ExpiryAlertCard extends StatelessWidget {
 
     final isHigh = priority == 'high';
 
+    final colorScheme = Theme.of(context).colorScheme;
+
     final color = isCritical
         ? AppColors.statusRed
         : isHigh
         ? AppColors.statusOrange
         : AppColors.statusAmber;
 
-    final backgroundColor = isCritical
-        ? AppColors.statusRedBg
-        : isHigh
-        ? AppColors.statusOrangeBg
-        : AppColors.statusAmberBg;
+    final backgroundColor = _statusSurface(
+      colorScheme,
+      color,
+      isCritical
+          ? AppColors.statusRedBg
+          : isHigh
+          ? AppColors.statusOrangeBg
+          : AppColors.statusAmberBg,
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
@@ -429,8 +450,8 @@ class _ExpiryAlertCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         productName,
-                        style: const TextStyle(
-                          color: AppColors.darkGreen,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
@@ -449,8 +470,8 @@ class _ExpiryAlertCard extends StatelessWidget {
 
                 Text(
                   quantity,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
                     fontSize: 12,
                   ),
                 ),
@@ -472,8 +493,8 @@ class _ExpiryAlertCard extends StatelessWidget {
                     daysUntilExpiry! < 0
                         ? 'Requires immediate attention'
                         : 'Consider prioritizing this item',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
+                    style: TextStyle(
+                      color: colorScheme.onSurfaceVariant,
                       fontSize: 11,
                     ),
                   ),
@@ -554,24 +575,30 @@ class _ProductExpiryCard extends StatelessWidget {
         daysUntilExpiry! >= 0 &&
         daysUntilExpiry! <= 3;
 
+    final colorScheme = Theme.of(context).colorScheme;
+
     final color = isExpired
         ? AppColors.statusRed
         : isSoon
         ? AppColors.statusOrange
         : AppColors.statusFresh;
 
-    final backgroundColor = isExpired
-        ? AppColors.statusRedBg
-        : isSoon
-        ? AppColors.statusOrangeBg
-        : AppColors.statusFreshBg;
+    final backgroundColor = _statusSurface(
+      colorScheme,
+      color,
+      isExpired
+          ? AppColors.statusRedBg
+          : isSoon
+          ? AppColors.statusOrangeBg
+          : AppColors.statusFreshBg,
+    );
 
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: colorScheme.outline),
       ),
       child: Row(
         children: [
@@ -593,8 +620,8 @@ class _ProductExpiryCard extends StatelessWidget {
               children: [
                 Text(
                   productName,
-                  style: const TextStyle(
-                    color: AppColors.darkGreen,
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
@@ -604,8 +631,8 @@ class _ProductExpiryCard extends StatelessWidget {
 
                 Text(
                   quantity,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
                     fontSize: 11,
                   ),
                 ),
@@ -656,12 +683,14 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: colorScheme.outline),
       ),
       child: Column(
         children: [
@@ -676,13 +705,21 @@ class _EmptyState extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
           ),
         ],
       ),
     );
   }
+}
+
+Color _statusSurface(
+  ColorScheme colorScheme,
+  Color status,
+  Color lightBackground,
+) {
+  if (colorScheme.brightness == Brightness.dark) {
+    return status.withValues(alpha: 0.2);
+  }
+  return lightBackground;
 }

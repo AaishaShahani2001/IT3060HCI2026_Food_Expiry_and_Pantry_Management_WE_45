@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
-
 Future<bool> confirmDeletePantryItem(
   BuildContext context, {
   required String itemName,
@@ -40,8 +38,8 @@ Future<bool> confirmDeletePantryItem(
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.statusRed,
-              foregroundColor: Colors.white,
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
               minimumSize: const Size(88, 48),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
