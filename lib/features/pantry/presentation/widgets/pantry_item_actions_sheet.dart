@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/pantry_item.dart';
 
 enum PantryItemSheetAction { edit, usedUp, delete }
@@ -71,10 +70,10 @@ Future<PantryItemSheetAction?> showPantryItemActionsSheet({
                 const Divider(height: 24),
                 _ActionTile(
                   icon: Icons.delete_outline,
-                  iconColor: AppColors.statusRed,
+                  iconColor: Theme.of(context).colorScheme.error,
                   title: 'Delete Item',
                   subtitle: 'Remove an incorrect or unwanted entry',
-                  titleColor: AppColors.statusRed,
+                  titleColor: Theme.of(context).colorScheme.error,
                   onTap: () =>
                       Navigator.of(context).pop(PantryItemSheetAction.delete),
                 ),

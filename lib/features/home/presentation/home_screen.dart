@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:food_expiry_and_pantry_management/core/constants/app_colors.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
 import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
 import 'package:go_router/go_router.dart';
@@ -18,6 +17,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final pantrySummary = ref.watch(pantrySummaryProvider);
     final expirySummary = ref.watch(expirySummaryProvider);
 
@@ -40,21 +40,21 @@ class HomeScreen extends ConsumerWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEAF4EE),
+                    color: colorScheme.secondaryContainer,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFD5E7DC)),
+                    border: Border.all(color: colorScheme.outline),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
                       CircleAvatar(
                         radius: 22,
-                        backgroundColor: Colors.white,
+                        backgroundColor: colorScheme.surfaceContainerHighest,
                         child: Icon(
                           Icons.person_outline_rounded,
-                          color: Color(0xFF2E6B4E),
+                          color: colorScheme.secondary,
                         ),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,15 +64,15 @@ class HomeScreen extends ConsumerWidget {
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF1F4D38),
+                                color: colorScheme.onSurface,
                               ),
                             ),
-                            SizedBox(height: 3),
+                            const SizedBox(height: 3),
                             Text(
                               'Manage your preferences and pantry type',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF6B7280),
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -81,7 +81,7 @@ class HomeScreen extends ConsumerWidget {
                       Icon(
                         Icons.arrow_forward_ios_rounded,
                         size: 16,
-                        color: Color(0xFF2E6B4E),
+                        color: colorScheme.secondary,
                       ),
                     ],
                   ),
@@ -99,7 +99,7 @@ class HomeScreen extends ConsumerWidget {
                 style: textTheme.headlineMedium?.copyWith(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.darkGreen,
+                  color: colorScheme.onSurface,
                 ),
               ),
 

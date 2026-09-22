@@ -20,7 +20,7 @@ enum ExpiryStatus {
       case ExpiryStatus.expired:
         return AppColors.statusRed;
       case ExpiryStatus.unknown:
-        return AppColors.textSecondary.withValues(alpha: 0.5);
+        return FreshPalette.secondaryText.withValues(alpha: 0.5);
     }
   }
 
@@ -74,14 +74,14 @@ enum ExpiryStatus {
       case ExpiryStatus.expired:
         return AppColors.statusRedBg;
       case ExpiryStatus.unknown:
-        return AppColors.iconBg;
+        return FreshPalette.secondaryText.withValues(alpha: 0.12);
     }
   }
 
   Color get foregroundColor {
     switch (this) {
       case ExpiryStatus.unknown:
-        return AppColors.textSecondary;
+        return FreshPalette.secondaryText;
       default:
         return color;
     }

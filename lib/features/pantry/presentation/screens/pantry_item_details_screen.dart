@@ -170,7 +170,7 @@ class _PantryItemDetailsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.statusRed,
+          backgroundColor: Theme.of(context).colorScheme.error,
           content: Text(error.toString()),
         ),
       );

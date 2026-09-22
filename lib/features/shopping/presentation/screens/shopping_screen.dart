@@ -28,15 +28,14 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     final summary = ref.watch(shoppingSummaryProvider);
     final filters = ref.watch(shoppingFilterProvider);
 
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.cream,
       appBar: AppBar(
         title: const Text(
           'Shopping List',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
-        backgroundColor: AppColors.cream,
-        foregroundColor: AppColors.darkGreen,
         elevation: 0,
         actions: [
           IconButton(
@@ -55,8 +54,8 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showShoppingItemForm(context),
-        backgroundColor: AppColors.primaryGreen,
-        foregroundColor: Colors.white,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
         icon: const Icon(Icons.add),
         label: const Text('Add Item'),
       ),
@@ -123,32 +122,34 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     required String value,
     required IconData icon,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: colorScheme.outline),
       ),
       child: Column(
         children: [
-          Icon(icon, size: 22, color: AppColors.mediumGreen),
+          Icon(icon, size: 22, color: colorScheme.secondary),
           const SizedBox(height: 7),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
-              color: AppColors.darkGreen,
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
-              color: AppColors.textSecondary,
+              color: colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -158,6 +159,8 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   }
 
   Widget _buildSearchField() {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return TextField(
       controller: _searchController,
       onChanged: (value) {
@@ -181,43 +184,43 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
               )
             : null,
         filled: true,
-        fillColor: AppColors.white,
+        fillColor: colorScheme.surfaceContainerHighest,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.cardBorder),
+          borderSide: BorderSide(color: colorScheme.outline),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.cardBorder),
+          borderSide: BorderSide(color: colorScheme.outline),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: AppColors.primaryGreen,
-            width: 1.5,
-          ),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
         ),
       ),
     );
   }
 
   Widget _buildFilters(ShoppingFilterState filters) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Row(
       children: [
         Expanded(
           child: DropdownButtonFormField<ShoppingItemPriority?>(
             initialValue: filters.priority,
+            dropdownColor: colorScheme.surfaceContainerHighest,
             decoration: InputDecoration(
               labelText: 'Priority',
               filled: true,
-              fillColor: AppColors.white,
+              fillColor: colorScheme.surfaceContainerHighest,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.cardBorder),
+                borderSide: BorderSide(color: colorScheme.outline),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.cardBorder),
+                borderSide: BorderSide(color: colorScheme.outline),
               ),
             ),
             items: [
@@ -244,9 +247,9 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
             dense: true,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: AppColors.cardBorder),
+              side: BorderSide(color: colorScheme.outline),
             ),
-            tileColor: AppColors.white,
+            tileColor: colorScheme.surfaceContainerHighest,
             title: const Text(
               'Purchased',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
@@ -270,6 +273,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   }
 
   Widget _buildShoppingItemCard(ShoppingItem item) {
+    final colorScheme = Theme.of(context).colorScheme;
     final priorityColor = _priorityColor(item.priority);
 
     return Dismissible(
@@ -284,20 +288,20 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
-          color: AppColors.statusRed,
+          color: colorScheme.error,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Icon(Icons.delete_outline, color: Colors.white),
+        child: Icon(Icons.delete_outline, color: colorScheme.onError),
       ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: item.isCompleted
-                ? AppColors.indicatorInactive
-                : AppColors.cardBorder,
+                ? colorScheme.tertiary.withValues(alpha: 0.7)
+                : colorScheme.outline,
           ),
         ),
         child: ListTile(
@@ -307,7 +311,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
           ),
           leading: Checkbox(
             value: item.isCompleted,
-            activeColor: AppColors.primaryGreen,
+            activeColor: colorScheme.primary,
             onChanged: (_) {
               ref.read(shoppingItemsProvider.notifier).toggleCompleted(item.id);
             },
@@ -317,8 +321,8 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
             style: TextStyle(
               fontWeight: FontWeight.w700,
               color: item.isCompleted
-                  ? AppColors.textSecondary
-                  : AppColors.darkGreen,
+                  ? colorScheme.onSurfaceVariant
+                  : colorScheme.onSurface,
               decoration: item.isCompleted ? TextDecoration.lineThrough : null,
             ),
           ),
@@ -328,8 +332,8 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
               children: [
                 Text(
                   item.quantityLabel,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -375,14 +379,15 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
 
   Widget _buildEmptyState() {
     final filters = ref.read(shoppingFilterProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
       margin: const EdgeInsets.only(top: 30),
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: colorScheme.outline),
       ),
       child: Column(
         children: [
@@ -391,17 +396,17 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                 ? Icons.search_off_rounded
                 : Icons.shopping_cart_outlined,
             size: 52,
-            color: AppColors.mediumGreen,
+            color: colorScheme.secondary,
           ),
           const SizedBox(height: 14),
           Text(
             filters.hasActiveFilters
                 ? 'No matching items'
                 : 'Your shopping list is empty',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w700,
-              color: AppColors.darkGreen,
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 7),
@@ -410,7 +415,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                 ? 'Try changing your search or filters.'
                 : 'Add items you need to buy.',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.textSecondary),
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -418,31 +423,33 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
   }
 
   Widget _buildErrorState(Object error) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       margin: const EdgeInsets.only(top: 30),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.statusRed.withValues(alpha: 0.3)),
+        border: Border.all(color: colorScheme.error.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
-          const Icon(Icons.error_outline, size: 46, color: AppColors.statusRed),
+          Icon(Icons.error_outline, size: 46, color: colorScheme.error),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Unable to load shopping list',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: AppColors.darkGreen,
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             error.toString(),
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.textSecondary),
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 16),
           ElevatedButton(
@@ -523,7 +530,7 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.cream,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setModalState) {
@@ -545,21 +552,23 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                         item == null
                             ? 'Add Shopping Item'
                             : 'Edit Shopping Item',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.darkGreen,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 20),
                       TextFormField(
                         controller: nameController,
                         textCapitalization: TextCapitalization.sentences,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Item name',
                           hintText: 'e.g. Milk',
                           filled: true,
-                          fillColor: AppColors.white,
+                          fillColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
@@ -579,10 +588,12 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
                                   ),
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Quantity',
                                 filled: true,
-                                fillColor: AppColors.white,
+                                fillColor: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest,
                               ),
                               validator: (value) {
                                 final quantity = double.tryParse(value ?? '');
@@ -599,10 +610,12 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               initialValue: unit,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Unit',
                                 filled: true,
-                                fillColor: AppColors.white,
+                                fillColor: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest,
                               ),
                               items: const [
                                 DropdownMenuItem(
@@ -645,10 +658,12 @@ class _ShoppingScreenState extends ConsumerState<ShoppingScreen> {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<ShoppingItemPriority>(
                         initialValue: priority,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Priority',
                           filled: true,
-                          fillColor: AppColors.white,
+                          fillColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
                         ),
                         items: ShoppingItemPriority.values
                             .map(

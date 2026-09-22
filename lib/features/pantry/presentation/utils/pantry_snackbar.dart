@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
-
 /// Shared Pantry SnackBars. Always hides the current one first.
 abstract final class PantrySnackBar {
   static const Duration undoVisibleFor = Duration(seconds: 6);
@@ -33,7 +31,9 @@ abstract final class PantrySnackBar {
       SnackBar(
         behavior: SnackBarBehavior.floating,
         duration: action != null ? undoVisibleFor : const Duration(seconds: 4),
-        backgroundColor: isError ? AppColors.statusRed : null,
+        backgroundColor: isError
+            ? Theme.of(messenger.context).colorScheme.error
+            : null,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         content: Semantics(

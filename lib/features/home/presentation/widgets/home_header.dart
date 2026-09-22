@@ -10,6 +10,7 @@ class HomeHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final userNameAsync = ref.watch(currentUserNameProvider);
     final userName = userNameAsync.when(
       data: (name) => name.isNotEmpty ? name : AppStrings.userFallback,
@@ -27,14 +28,14 @@ class HomeHeader extends ConsumerWidget {
               Text(
                 '${AppStrings.goodMorning},',
                 style: textTheme.bodyLarge?.copyWith(
-                  color: AppColors.textSecondary,
+                  color: colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               Text(
                 userName,
                 style: textTheme.titleLarge?.copyWith(
-                  color: AppColors.darkGreen,
+                  color: colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                 ),
                 maxLines: 1,
@@ -45,7 +46,7 @@ class HomeHeader extends ConsumerWidget {
         ),
         IconButton(
           onPressed: () {},
-          icon: const Icon(Icons.search, color: AppColors.darkGreen),
+          icon: Icon(Icons.search, color: colorScheme.onSurface),
           tooltip: AppStrings.searchTooltip,
         ),
         Stack(
@@ -53,9 +54,9 @@ class HomeHeader extends ConsumerWidget {
           children: [
             IconButton(
               onPressed: () {},
-              icon: const Icon(
+              icon: Icon(
                 Icons.notifications_outlined,
-                color: AppColors.darkGreen,
+                color: colorScheme.onSurface,
               ),
               tooltip: AppStrings.notificationsTooltip,
             ),

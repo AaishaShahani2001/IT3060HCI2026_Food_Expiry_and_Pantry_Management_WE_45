@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:food_expiry_and_pantry_management/core/constants/app_colors.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
 import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/food_item_suggestions.dart';
@@ -230,7 +229,8 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
             ),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.unreadBadge,
+                backgroundColor: Theme.of(dialogContext).colorScheme.error,
+                foregroundColor: Theme.of(dialogContext).colorScheme.onError,
               ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Delete'),
@@ -301,10 +301,10 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                   color: colors.secondaryContainer,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.shopping_cart_outlined,
                   size: 42,
-                  color: AppColors.primaryGreen,
+                  color: colors.primary,
                 ),
               ),
               const SizedBox(height: 24),
@@ -358,17 +358,17 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                     : () => setState(() => _filter = filter),
                 style: OutlinedButton.styleFrom(
                   backgroundColor: _filter == filter
-                      ? AppColors.mediumGreen
+                      ? colors.secondary
                       : colors.surfaceContainerHighest,
                   foregroundColor: _filter == filter
-                      ? Colors.white
+                      ? colors.onSecondary
                       : colors.onSurface,
                   disabledForegroundColor: _filter == filter
-                      ? Colors.white
+                      ? colors.onSecondary
                       : colors.onSurfaceVariant,
                   side: BorderSide(
                     color: _filter == filter
-                        ? AppColors.mediumGreen
+                        ? colors.secondary
                         : colors.outline.withValues(alpha: 0.6),
                   ),
                   minimumSize: const Size(0, 44),
@@ -440,8 +440,8 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
             tooltip: 'Add shopping item',
             onPressed: _isBusy ? null : _openAddItemScreen,
             style: IconButton.styleFrom(
-              backgroundColor: AppColors.darkGreen,
-              foregroundColor: Colors.white,
+              backgroundColor: colors.primary,
+              foregroundColor: colors.onPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -714,7 +714,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                         ? null
                         : () => _confirmDelete(_selectedIds.toList()),
                     icon: const Icon(Icons.delete_outline),
-                    color: AppColors.unreadBadge,
+                    color: Theme.of(context).colorScheme.error,
                     tooltip: 'Delete selected items',
                   ),
                 ]
