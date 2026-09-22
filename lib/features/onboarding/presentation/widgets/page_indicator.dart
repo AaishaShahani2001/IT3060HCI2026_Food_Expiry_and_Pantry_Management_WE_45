@@ -14,6 +14,12 @@ class PageIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeColor = isDark ? FreshPalette.highlight : FreshPalette.selected;
+    final inactiveColor = isDark
+        ? FreshPalette.selected
+        : FreshPalette.highlight;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(count, (index) {
@@ -23,9 +29,9 @@ class PageIndicator extends StatelessWidget {
           curve: Curves.easeInOut,
           margin: const EdgeInsets.symmetric(horizontal: 4),
           height: 8,
-          width: isActive ? 24 : 8,
+          width: isActive ? 22 : 8,
           decoration: BoxDecoration(
-            color: isActive ? FreshPalette.selected : FreshPalette.highlight,
+            color: isActive ? activeColor : inactiveColor,
             borderRadius: BorderRadius.circular(8),
           ),
         );

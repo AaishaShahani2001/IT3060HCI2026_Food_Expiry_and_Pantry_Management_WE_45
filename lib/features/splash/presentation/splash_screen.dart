@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -6,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../../../firebase_options.dart';
 
@@ -20,6 +20,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   static const _navigationDelay = Duration(milliseconds: 2500);
+  static const _logoAsset = 'assets/images/HCI_LOGO.png';
 
   late final AnimationController _controller;
   late final Animation<double> _fadeAnimation;
@@ -76,74 +77,51 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: FreshPalette.pageBackground,
+      backgroundColor: isDark
+          ? FreshPalette.darkPageBackground
+          : FreshPalette.pageBackground,
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [FreshPalette.pageBackground, FreshPalette.highlight],
+            colors: isDark
+                ? const [
+                    FreshPalette.darkPageBackground,
+                    FreshPalette.darkAccentSurface,
+                    FreshPalette.darkPageBackground,
+                  ]
+                : const [
+                    FreshPalette.pageBackground,
+                    FreshPalette.accentSurface,
+                    FreshPalette.pageBackground,
+                  ],
           ),
         ),
         child: SafeArea(
           child: FadeTransition(
             opacity: _fadeAnimation,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                children: [
-                  const Spacer(flex: 3),
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: FreshPalette.card,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: FreshPalette.selected.withValues(alpha: 0.18),
-                          blurRadius: 28,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.kitchen_rounded,
-                      size: 58,
-                      color: FreshPalette.selected,
-                    ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final logoWidth = math.min(
+                  constraints.maxWidth * 0.9,
+                  math.min(constraints.maxHeight * 0.62, 440.0),
+                );
+
+                return Align(
+                  alignment: const Alignment(0, 0.08),
+                  child: Image.asset(
+                    _logoAsset,
+                    width: logoWidth,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    semanticLabel: 'PantryPal',
                   ),
-                  const SizedBox(height: 28),
-                  Text(
-                    AppStrings.appName,
-                    textAlign: TextAlign.center,
-                    style: textTheme.titleLarge?.copyWith(
-                      color: FreshPalette.heading,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    AppStrings.tagline,
-                    textAlign: TextAlign.center,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: FreshPalette.secondaryText,
-                    ),
-                  ),
-                  const Spacer(flex: 2),
-                  const SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      color: FreshPalette.selected,
-                    ),
-                  ),
-                  const Spacer(flex: 1),
-                ],
-              ),
+                );
+              },
             ),
           ),
         ),

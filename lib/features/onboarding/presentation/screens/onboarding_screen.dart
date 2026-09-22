@@ -24,6 +24,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(onboardingPageIndexProvider.notifier).setPage(0);
+    });
   }
 
   @override
@@ -32,7 +36,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
-  // Go to Login after onboarding
+  // Existing completion path: onboarding ends on the login route.
   void _goLogin() {
     context.go(AppRoutes.login);
   }
@@ -52,30 +56,30 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(onboardingPageIndexProvider);
     final isLastPage = currentIndex == OnboardingData.items.length - 1;
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: FreshPalette.pageBackground,
+      backgroundColor: isDark
+          ? colorScheme.surface
+          : FreshPalette.pageBackground,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
           child: Column(
             children: [
               SizedBox(
-                height: 48,
+                height: 44,
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: isLastPage
                       ? const SizedBox.shrink()
                       : TextButton(
                           onPressed: _goLogin,
-                          style: TextButton.styleFrom(
-                            foregroundColor: FreshPalette.selected,
-                          ),
                           child: const Text(AppStrings.skip),
                         ),
                 ),
               ),
-
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
@@ -90,21 +94,32 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   },
                 ),
               ),
-
+              const SizedBox(height: 16),
               PageIndicator(
                 count: OnboardingData.items.length,
                 currentIndex: currentIndex,
               ),
-
-              const SizedBox(height: 24),
-
+              const SizedBox(height: 22),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: isLastPage ? _goLogin : _onNext,
                   style: FilledButton.styleFrom(
-                    backgroundColor: FreshPalette.primaryButton,
-                    foregroundColor: Colors.white,
+                    backgroundColor: isDark
+                        ? colorScheme.primary
+                        : FreshPalette.primaryButton,
+                    foregroundColor: isDark
+                        ? colorScheme.onPrimary
+                        : FreshPalette.card,
+                    minimumSize: const Size.fromHeight(54),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   child: Text(
                     isLastPage ? AppStrings.getStarted : AppStrings.next,
