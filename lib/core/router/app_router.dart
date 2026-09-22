@@ -70,7 +70,11 @@ final GoRouter appRouter = GoRouter(
         final pantryId = state.uri.queryParameters['pantryId'];
 
         if (pantryId == null || pantryId.isEmpty) {
-          return const Scaffold(body: Center(child: Text('Pantry not found.')));
+          return const Scaffold(
+            body: Center(
+              child: Text('Pantry not found.'),
+            ),
+          );
         }
 
         return SharedPantryMembersScreen(pantryId: pantryId);
@@ -103,7 +107,8 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => const PantryScreen(),
           routes: [
             GoRoute(
-              // Child path is 'items', not '/items', so the location is /pantry/items.
+              // Child path is 'items', not '/items',
+              // so the location is /pantry/items.
               path: 'items',
               builder: (context, state) => const PantryItemsScreen(),
             ),
@@ -117,7 +122,8 @@ final GoRouter appRouter = GoRouter(
 
         GoRoute(
           path: AppRoutes.expiryNotifications,
-          builder: (context, state) => const ExpiryNotificationSettingsScreen(),
+          builder: (context, state) =>
+          const ExpiryNotificationSettingsScreen(),
         ),
 
         GoRoute(
