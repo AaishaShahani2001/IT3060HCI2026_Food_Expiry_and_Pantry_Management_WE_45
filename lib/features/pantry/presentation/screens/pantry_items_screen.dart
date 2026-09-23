@@ -97,6 +97,12 @@ class _PantryItemsScreenState extends ConsumerState<PantryItemsScreen> {
           'All Pantry Items',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        // Info action moved here from the count toolbar under the chips.
+        // AppBar keeps the title in place and centers this action with it.
+        actionsPadding: const EdgeInsets.only(right: 4),
+        actions: const [
+          ExpiryStatusLegendButton(),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => openPantryAddItem(context),
@@ -144,13 +150,8 @@ class _PantryItemsScreenState extends ConsumerState<PantryItemsScreen> {
               SliverToBoxAdapter(
                 child: PantryActiveFilterChips(onSearchCleared: _clearSearch),
               ),
-              SliverToBoxAdapter(
-                child: _AllItemsToolbar(
-                  itemsAsync: itemsAsync,
-                  matchingCount: filteredItems.length,
-                  filters: filters,
-                ),
-              ),
+              // Count label removed. Only the view toggle remains, on the right.
+              const SliverToBoxAdapter(child: _AllItemsToolbar()),
               ..._listSlivers(itemsAsync, filteredItems, viewMode),
             ],
           ),
@@ -214,49 +215,18 @@ class _PantryItemsScreenState extends ConsumerState<PantryItemsScreen> {
   }
 }
 
+/// Right-aligned card/list toggle. The item-count label and info action
+/// that used to share this row have been removed from this section.
 class _AllItemsToolbar extends StatelessWidget {
-  const _AllItemsToolbar({
-    required this.itemsAsync,
-    required this.matchingCount,
-    required this.filters,
-  });
-
-  final AsyncValue<List<PantryItem>> itemsAsync;
-  final int matchingCount;
-  final PantryFilterState filters;
+  const _AllItemsToolbar();
 
   @override
   Widget build(BuildContext context) {
-    final label = itemsAsync.maybeWhen(
-      data: (items) {
-        if (filters.hasActiveFilters) {
-          return '$matchingCount of ${items.length} items';
-        }
-        return '$matchingCount items';
-      },
-      orElse: () => 'Loading items...',
-    );
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 12, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          const ExpiryStatusLegendButton(),
-          const SizedBox(width: 4),
-          const PantryViewModeToggle(),
-        ],
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 12, 8),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: PantryViewModeToggle(),
       ),
     );
   }

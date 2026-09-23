@@ -5,8 +5,8 @@ import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../expiry/presentation/providers/expiry_provider.dart';
-import '../../pantry/presentation/providers/pantry_providers.dart';
 import 'widgets/home_header.dart';
+import 'widgets/home_pantry_summary_card.dart';
 import 'widgets/summary_card.dart';
 import 'widgets/welcome_section.dart';
 import 'widgets/home_waste_summary_card.dart';
@@ -18,7 +18,6 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
-    final pantrySummary = ref.watch(pantrySummaryProvider);
     final expirySummary = ref.watch(expirySummaryProvider);
 
     return Scaffold(
@@ -88,9 +87,19 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
 
+              const SizedBox(height: 16),
+
+              // THIS MONTH WASTE TRACKER SUMMARY CARD
+              const HomeWasteSummaryCard(),
+
               const SizedBox(height: 20),
 
               const WelcomeSection(),
+
+              const SizedBox(height: 20),
+
+              // YOUR PANTRY SECTION — Modern 2-stat overview card
+              const HomePantrySummaryCard(),
 
               const SizedBox(height: 24),
 
@@ -104,15 +113,6 @@ class HomeScreen extends ConsumerWidget {
               ),
 
               const SizedBox(height: 12),
-
-              SummaryCard(
-                title: AppStrings.pantryItems,
-                value: _itemCountLabel(pantrySummary.total),
-                icon: Icons.kitchen_outlined,
-                onTap: () => context.go(AppRoutes.pantry),
-              ),
-
-              const SizedBox(height: 10),
 
               SummaryCard(
                 title: AppStrings.expiringSoon,
@@ -130,10 +130,6 @@ class HomeScreen extends ConsumerWidget {
                 icon: Icons.shopping_cart_outlined,
                 onTap: () => context.go(AppRoutes.shopping),
               ),
-
-              const SizedBox(height: 10),
-
-              const HomeWasteSummaryCard(),
 
               const SizedBox(height: 10),
 

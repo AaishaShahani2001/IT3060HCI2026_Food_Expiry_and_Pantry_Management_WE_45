@@ -105,54 +105,21 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
               SliverToBoxAdapter(child: _buildHeader(context, filters)),
               if (_isSearchVisible)
                 SliverToBoxAdapter(child: _buildSearchField()),
+              // No extra gap under the chips: the item-count row that used to
+              // sit here has been removed.
               SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: PantryLocationSelector(
-                    selectedLocation: filters.selectedLocation,
-                    locationCounts: locationCounts,
-                    onLocationSelected: (location) {
-                      ref
-                          .read(pantryFilterProvider.notifier)
-                          .setLocation(location);
-                    },
-                  ),
+                child: PantryLocationSelector(
+                  selectedLocation: filters.selectedLocation,
+                  locationCounts: locationCounts,
+                  onLocationSelected: (location) {
+                    ref
+                        .read(pantryFilterProvider.notifier)
+                        .setLocation(location);
+                  },
                 ),
               ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _resultsLabel(itemsAsync, filteredItems, filters),
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      const ExpiryStatusLegendButton(),
-                      if (filters.hasActiveFilters)
-                        TextButton(
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _isSearchVisible = false);
-                            ref
-                                .read(pantryFilterProvider.notifier)
-                                .clearFilters();
-                          },
-                          style: TextButton.styleFrom(
-                            foregroundColor: colorScheme.primary,
-                          ),
-                          child: const Text('Clear filters'),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+              // Item-count text ("N items in your pantry") is not shown here.
+              // The expiry info action now lives in the header, after Filter.
               ..._previewSlivers(itemsAsync, filteredItems, previewItems),
             ],
           ),
@@ -278,6 +245,9 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
               child: const Icon(Icons.filter_list_rounded),
             ),
           ),
+          // Relocated from the removed item-count row. Same legend sheet,
+          // tooltip, and tap behaviour; sized like the header actions.
+          const ExpiryStatusLegendButton(forHeader: true),
         ],
       ),
     );
@@ -327,22 +297,6 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  String _resultsLabel(
-    AsyncValue<List<PantryItem>> itemsAsync,
-    List<PantryItem> filteredItems,
-    PantryFilterState filters,
-  ) {
-    return itemsAsync.maybeWhen(
-      data: (items) {
-        if (filters.hasActiveFilters || filters.selectedLocation != null) {
-          return '${filteredItems.length} of ${items.length} items';
-        }
-        return '${items.length} items in your pantry';
-      },
-      orElse: () => 'Loading items...',
     );
   }
 }

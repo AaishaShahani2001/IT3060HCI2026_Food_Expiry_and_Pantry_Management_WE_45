@@ -49,9 +49,15 @@ class ExpiryStatusIndicator extends StatelessWidget {
   }
 }
 
-/// Compact info button that reveals the expiry colour legend on tap.
+/// Info button that reveals the expiry colour legend on tap.
+///
+/// The compact style is the default. [forHeader] matches the pantry header
+/// search and filter IconButtons so the three actions share one aligned row.
 class ExpiryStatusLegendButton extends StatelessWidget {
-  const ExpiryStatusLegendButton({super.key});
+  const ExpiryStatusLegendButton({this.forHeader = false, super.key});
+
+  /// Use header IconButton metrics instead of the compact toolbar style.
+  final bool forHeader;
 
   static Future<void> show(BuildContext context) {
     return showModalBottomSheet<void>(
@@ -67,11 +73,17 @@ class ExpiryStatusLegendButton extends StatelessWidget {
     return IconButton(
       onPressed: () => show(context),
       tooltip: 'Expiry indicators',
-      icon: const Icon(Icons.info_outline_rounded, size: 20),
-      color: colorScheme.onSurfaceVariant,
-      visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-      padding: EdgeInsets.zero,
+      // Header uses the same outlined icon and tap target as Search/Filter.
+      icon: Icon(
+        Icons.info_outline_rounded,
+        size: forHeader ? null : 20,
+      ),
+      color: forHeader ? null : colorScheme.onSurfaceVariant,
+      visualDensity: forHeader ? null : VisualDensity.compact,
+      constraints: forHeader
+          ? null
+          : const BoxConstraints(minWidth: 36, minHeight: 36),
+      padding: forHeader ? null : EdgeInsets.zero,
     );
   }
 }

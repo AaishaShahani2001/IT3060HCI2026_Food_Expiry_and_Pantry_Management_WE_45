@@ -8,6 +8,7 @@ class PantryQuantityStepper extends StatelessWidget {
     required this.isUpdating,
     required this.onIncrement,
     required this.onDecrement,
+    this.height = 42,
     super.key,
   });
 
@@ -16,16 +17,17 @@ class PantryQuantityStepper extends StatelessWidget {
   final bool isUpdating;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      height: 42,
+      height: height,
       decoration: BoxDecoration(
         color: colorScheme.secondaryContainer.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: colorScheme.outline),
       ),
       clipBehavior: Clip.antiAlias,
@@ -37,6 +39,7 @@ class PantryQuantityStepper extends StatelessWidget {
             enabled: canDecrement,
             foreground: colorScheme.onSurface,
             onPressed: onDecrement,
+            height: height,
           ),
           Container(
             width: 1,
@@ -83,6 +86,7 @@ class PantryQuantityStepper extends StatelessWidget {
             enabled: !isUpdating,
             foreground: colorScheme.primary,
             onPressed: onIncrement,
+            height: height,
           ),
         ],
       ),
@@ -97,6 +101,7 @@ class _StepperButton extends StatelessWidget {
     required this.enabled,
     required this.foreground,
     required this.onPressed,
+    this.height = 42,
   });
 
   final IconData icon;
@@ -104,6 +109,7 @@ class _StepperButton extends StatelessWidget {
   final bool enabled;
   final Color foreground;
   final VoidCallback onPressed;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -117,11 +123,11 @@ class _StepperButton extends StatelessWidget {
           splashColor: colorScheme.primary.withValues(alpha: 0.15),
           highlightColor: colorScheme.primary.withValues(alpha: 0.06),
           child: SizedBox(
-            width: 42,
-            height: 42,
+            width: height,
+            height: height,
             child: Icon(
               icon,
-              size: 18,
+              size: 16,
               color: enabled
                   ? foreground
                   : colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
