@@ -8,7 +8,7 @@ import '../../../expiry/presentation/providers/expiry_provider.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
 
 /// Home dashboard overview card for the user's pantry.
-///
+
 /// Displays real-time counts for Total Items and Expiring Soon items by
 /// consuming the existing [pantrySummaryProvider] and [expirySummaryProvider].
 class HomePantrySummaryCard extends ConsumerWidget {
@@ -18,7 +18,7 @@ class HomePantrySummaryCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final colorScheme = theme.colorScheme;
+    //final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
 
     // Watch raw pantry items stream state to handle loading and error states gracefully
@@ -129,17 +129,19 @@ class HomePantrySummaryCard extends ConsumerWidget {
                       iconColor: isDark
                           ? FreshPalette.highlight
                           : FreshPalette.primaryButton,
-                      iconBgColor: (isDark
-                              ? FreshPalette.highlight
-                              : FreshPalette.primaryButton)
-                          .withValues(alpha: 0.14),
+                      iconBgColor:
+                          (isDark
+                                  ? FreshPalette.highlight
+                                  : FreshPalette.primaryButton)
+                              .withValues(alpha: 0.14),
                       bgColor: isDark
                           ? FreshPalette.darkAccentSurface
                           : FreshPalette.accentSurface.withValues(alpha: 0.6),
-                      borderColor: (isDark
-                              ? FreshPalette.highlight
-                              : FreshPalette.primaryButton)
-                          .withValues(alpha: 0.2),
+                      borderColor:
+                          (isDark
+                                  ? FreshPalette.highlight
+                                  : FreshPalette.primaryButton)
+                              .withValues(alpha: 0.2),
                       count: totalCount,
                       label: 'Total Items',
                       isLoading: isLoading,
@@ -154,11 +156,15 @@ class HomePantrySummaryCard extends ConsumerWidget {
                     child: _PantryStatBox(
                       icon: Icons.access_time_rounded,
                       iconColor: AppColors.statusAmber,
-                      iconBgColor: AppColors.statusAmber.withValues(alpha: 0.15),
+                      iconBgColor: AppColors.statusAmber.withValues(
+                        alpha: 0.15,
+                      ),
                       bgColor: isDark
                           ? const Color(0xFF2C2216)
                           : AppColors.statusAmberBg,
-                      borderColor: AppColors.statusAmber.withValues(alpha: 0.25),
+                      borderColor: AppColors.statusAmber.withValues(
+                        alpha: 0.25,
+                      ),
                       count: expiringCount,
                       label: 'Expiring Soon',
                       isLoading: isLoading,
@@ -221,11 +227,7 @@ class _PantryStatBox extends StatelessWidget {
               color: iconBgColor,
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              icon,
-              size: 16,
-              color: iconColor,
-            ),
+            child: Icon(icon, size: 16, color: iconColor),
           ),
           const SizedBox(height: 10),
 
@@ -252,9 +254,7 @@ class _PantryStatBox extends StatelessWidget {
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 height: 1.1,
-                color: isDark
-                    ? FreshPalette.darkHeading
-                    : FreshPalette.heading,
+                color: isDark ? FreshPalette.darkHeading : FreshPalette.heading,
               ),
             ),
 
