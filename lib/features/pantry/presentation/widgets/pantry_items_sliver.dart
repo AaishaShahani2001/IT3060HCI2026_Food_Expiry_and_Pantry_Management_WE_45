@@ -33,9 +33,9 @@ class PantryItemsSliver extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final width = MediaQuery.sizeOf(context).width;
-    final isWide = width >= kPantryWideLayoutBreakpoint;
 
     if (viewMode == PantryViewMode.list) {
+      final isWide = width >= kPantryWideLayoutBreakpoint;
       return SliverPadding(
         padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
         sliver: SliverList.separated(
@@ -59,43 +59,29 @@ class PantryItemsSliver extends ConsumerWidget {
       );
     }
 
-    if (isWide) {
-      return SliverPadding(
-        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
-        sliver: SliverGrid(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            // Tall enough for the existing card plus quantity controls
-            // without a fixed pixel card width that would clip on tablets.
-            mainAxisExtent: 196,
-          ),
-          delegate: SliverChildBuilderDelegate((context, index) {
+    // Grid View mode (2 columns on mobile, 3-4 columns on larger screens)
+    final crossAxisCount = width >= 1100 ? 4 : (width >= 700 ? 3 : 2);
+
+    return SliverPadding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          mainAxisExtent: 224,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
             final item = items[index];
             return _BoundPantryItem(
               item: item,
               index: index,
               viewMode: PantryViewMode.cards,
             );
-          }, childCount: items.length),
+          },
+          childCount: items.length,
         ),
-      );
-    }
-
-    return SliverPadding(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
-      sliver: SliverList.separated(
-        itemCount: items.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return _BoundPantryItem(
-            item: item,
-            index: index,
-            viewMode: PantryViewMode.cards,
-          );
-        },
       ),
     );
   }

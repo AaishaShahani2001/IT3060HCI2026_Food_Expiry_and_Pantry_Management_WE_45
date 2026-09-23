@@ -19,7 +19,7 @@ class PantryRecentItemsHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
       child: Row(
         children: [
-          Flexible(
+          Expanded(
             child: Text(
               'Pantry Recent Items',
               maxLines: 1,
