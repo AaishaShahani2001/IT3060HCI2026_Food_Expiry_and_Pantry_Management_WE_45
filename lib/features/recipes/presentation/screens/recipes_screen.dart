@@ -15,6 +15,30 @@ class RecipesScreen extends ConsumerStatefulWidget {
 }
 
 class _RecipesScreenState extends ConsumerState<RecipesScreen> {
+
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+
+  Color get _screenBackground =>
+      _isDark ? const Color(0xFF121815) : AppColors.cream;
+
+  Color get _cardColor =>
+      _isDark ? const Color(0xFF1B2420) : AppColors.white;
+
+  Color get _primaryText =>
+      _isDark ? const Color(0xFFF1F5F3) : AppColors.darkGreen;
+
+  Color get _secondaryText =>
+      _isDark ? const Color(0xFFB8C2BD) : AppColors.textSecondary;
+
+  Color get _borderColor =>
+      _isDark ? const Color(0xFF34423B) : AppColors.cardBorder;
+
+  Color get _softGreenColor =>
+      _isDark ? const Color(0xFF1E3A2C) : AppColors.softGreen;
+
+  Color get _inputColor =>
+      _isDark ? const Color(0xFF202A25) : _cardColor;
+
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -32,27 +56,27 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
     final recommendations = ref.watch(recommendedRecipesProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: _screenBackground,
       appBar: AppBar(
         title: const Text(
           'Recipes',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
-        backgroundColor: AppColors.cream,
-        foregroundColor: AppColors.darkGreen,
+        backgroundColor: _screenBackground,
+        foregroundColor: _primaryText,
         elevation: 0,
         actions: [
           IconButton(
             tooltip: 'Clear filters',
             onPressed: filters.hasActiveFilters
                 ? () {
-                    ref.read(recipeFilterProvider.notifier).clearFilters();
+              ref.read(recipeFilterProvider.notifier).clearFilters();
 
-                    _searchController.clear();
-                    setState(() {});
-                  }
+              _searchController.clear();
+              setState(() {});
+            }
                 : null,
-            icon: const Icon(Icons.filter_alt_off_outlined),
+            icon: Icon(Icons.filter_alt_off_outlined),
           ),
         ],
       ),
@@ -129,16 +153,16 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: _cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: _borderColor),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.softGreen,
+              color: _softGreenColor,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: AppColors.mediumGreen, size: 22),
@@ -150,18 +174,18 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
               children: [
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.darkGreen,
+                    color: _primaryText,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: _secondaryText,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -187,32 +211,32 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
       },
       decoration: InputDecoration(
         hintText: 'Search recipes',
-        prefixIcon: const Icon(Icons.search),
+        prefixIcon: Icon(Icons.search),
         suffixIcon: _searchController.text.isNotEmpty
             ? IconButton(
-                onPressed: () {
-                  _searchController.clear();
+          onPressed: () {
+            _searchController.clear();
 
-                  ref.read(recipeFilterProvider.notifier).setSearchQuery('');
+            ref.read(recipeFilterProvider.notifier).setSearchQuery('');
 
-                  setState(() {});
-                },
-                icon: const Icon(Icons.clear),
-              )
+            setState(() {});
+          },
+          icon: Icon(Icons.clear),
+        )
             : null,
         filled: true,
-        fillColor: AppColors.white,
+        fillColor: _cardColor,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.cardBorder),
+          borderSide: BorderSide(color: _borderColor),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.cardBorder),
+          borderSide: BorderSide(color: _borderColor),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(
+          borderSide: BorderSide(
             color: AppColors.primaryGreen,
             width: 1.5,
           ),
@@ -234,14 +258,14 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
             decoration: InputDecoration(
               labelText: 'Category',
               filled: true,
-              fillColor: AppColors.white,
+              fillColor: _cardColor,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.cardBorder),
+                borderSide: BorderSide(color: _borderColor),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.cardBorder),
+                borderSide: BorderSide(color: _borderColor),
               ),
             ),
             items: [
@@ -250,7 +274,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                 child: Text('All categories'),
               ),
               ...RecipeCategory.values.map(
-                (category) => DropdownMenuItem<RecipeCategory?>(
+                    (category) => DropdownMenuItem<RecipeCategory?>(
                   value: category,
                   child: Text(category.label),
                 ),
@@ -268,9 +292,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
             dense: true,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: AppColors.cardBorder),
+              side: BorderSide(color: _borderColor),
             ),
-            tileColor: AppColors.white,
+            tileColor: _cardColor,
             title: const Text(
               'Favorites',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
@@ -301,9 +325,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: _cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: _borderColor),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -319,10 +343,10 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                   Expanded(
                     child: Text(
                       recipe.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.darkGreen,
+                        color: _primaryText,
                       ),
                     ),
                   ),
@@ -341,7 +365,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                           : Icons.favorite_border,
                       color: recipe.isFavorite
                           ? AppColors.statusRed
-                          : AppColors.textSecondary,
+                          : _secondaryText,
                     ),
                   ),
                 ],
@@ -353,8 +377,8 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                 recipe.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
+                style: TextStyle(
+                  color: _secondaryText,
                   height: 1.4,
                 ),
               ),
@@ -383,8 +407,8 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
   // ============================================================
 
   Widget _buildRecommendationSection(
-    List<RecipeRecommendation> recommendations,
-  ) {
+      List<RecipeRecommendation> recommendations,
+      ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -393,17 +417,17 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.softGreen,
+                color: _softGreenColor,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.auto_awesome,
                 size: 20,
                 color: AppColors.mediumGreen,
               ),
             ),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -412,15 +436,15 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.darkGreen,
+                      color: _primaryText,
                     ),
                   ),
                   SizedBox(height: 2),
                   Text(
-                    'Recipes based on your available food',
+                    'Recipes based on your available food & Based on your pantry, preferences & allergies',
                     style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textSecondary,
+                      color: _secondaryText,
                     ),
                   ),
                 ],
@@ -442,9 +466,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: _cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: _borderColor),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -460,16 +484,16 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                   Expanded(
                     child: Text(
                       recipe.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.darkGreen,
+                        color: _primaryText,
                       ),
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right,
-                    color: AppColors.textSecondary,
+                    color: _secondaryText,
                   ),
                 ],
               ),
@@ -480,9 +504,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                 recipe.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textSecondary,
+                  color: _secondaryText,
                   height: 1.4,
                 ),
               ),
@@ -523,7 +547,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.softGreen,
+        color: _softGreenColor,
         borderRadius: BorderRadius.circular(9),
       ),
       child: Row(
@@ -533,7 +557,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
           const SizedBox(width: 5),
           Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
               color: AppColors.mediumGreen,
@@ -623,8 +647,8 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
           top: false,
           child: Container(
             height: MediaQuery.of(sheetContext).size.height * 0.97,
-            decoration: const BoxDecoration(
-              color: AppColors.cream,
+            decoration: BoxDecoration(
+              color: _screenBackground,
               borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             ),
             child: Column(
@@ -644,14 +668,14 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                         },
                       ),
 
-                      const Expanded(
+                      Expanded(
                         child: Center(
                           child: Text(
                             'Recipe Details',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.darkGreen,
+                              color: _primaryText,
                             ),
                           ),
                         ),
@@ -714,10 +738,10 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                         // ==================================================
                         Text(
                           recipe.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 23,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.darkGreen,
+                            color: _primaryText,
                             height: 1.15,
                           ),
                         ),
@@ -738,10 +762,10 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                           recipe.description,
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             height: 1.55,
-                            color: AppColors.textSecondary,
+                            color: _secondaryText,
                           ),
                         ),
 
@@ -770,30 +794,30 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Ingredients',
                                     style: TextStyle(
                                       fontSize: 17,
                                       fontWeight: FontWeight.w800,
-                                      color: AppColors.darkGreen,
+                                      color: _primaryText,
                                     ),
                                   ),
                                   const SizedBox(width: 5),
                                   Text(
                                     '(${recipe.ingredients.length} items)',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 11,
-                                      color: AppColors.textSecondary,
+                                      color: _secondaryText,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            const Text(
+                            Text(
                               'Tap to check off',
                               style: TextStyle(
                                 fontSize: 10,
-                                color: AppColors.textSecondary,
+                                color: _secondaryText,
                               ),
                             ),
                           ],
@@ -824,12 +848,12 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                         // ==================================================
                         // INSTRUCTIONS
                         // ==================================================
-                        const Text(
+                        Text(
                           'Instructions',
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.darkGreen,
+                            color: _primaryText,
                           ),
                         ),
 
@@ -847,7 +871,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                 Container(
                   padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
                   decoration: BoxDecoration(
-                    color: AppColors.cream,
+                    color: _screenBackground,
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.08),
@@ -863,7 +887,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                       onPressed: () {
                         _showCookingMode(recipe);
                       },
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.play_circle_outline_rounded,
                         size: 18,
                       ),
@@ -913,7 +937,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
-                    color: AppColors.softGreen,
+                    color: _softGreenColor,
                     child: const Center(
                       child: Icon(
                         Icons.restaurant_menu_rounded,
@@ -981,7 +1005,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.cream,
+        color: _screenBackground,
         borderRadius: BorderRadius.circular(11),
         boxShadow: [
           BoxShadow(
@@ -995,15 +1019,15 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 12, color: AppColors.darkGreen),
+            Icon(icon, size: 12, color: _primaryText),
             const SizedBox(width: 4),
           ],
           Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
-              color: AppColors.darkGreen,
+              color: _primaryText,
             ),
           ),
         ],
@@ -1060,9 +1084,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
 
         const SizedBox(width: 5),
 
-        const Text(
+        Text(
           '(124)',
-          style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 10, color: _secondaryText),
         ),
 
         const SizedBox(width: 13),
@@ -1090,10 +1114,10 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
         const SizedBox(width: 4),
         Text(
           text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+            color: _secondaryText,
           ),
         ),
       ],
@@ -1168,7 +1192,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF5EE),
+        color: _isDark ? const Color(0xFF1E3A2C) : const Color(0xFFEAF5EE),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: AppColors.mediumGreen.withValues(alpha: 0.16),
@@ -1179,11 +1203,11 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
           Container(
             width: 28,
             height: 28,
-            decoration: const BoxDecoration(
-              color: AppColors.darkGreen,
+            decoration: BoxDecoration(
+              color: _primaryText,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.check_rounded,
               size: 17,
               color: Colors.white,
@@ -1198,10 +1222,10 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
               children: [
                 Text(
                   '$matchedCount of $totalIngredients ingredients in your pantry',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.darkGreen,
+                    color: _primaryText,
                   ),
                 ),
 
@@ -1227,12 +1251,12 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _cardColor,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
               '$matchPercentage% Match',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 9,
                 fontWeight: FontWeight.w800,
                 color: AppColors.mediumGreen,
@@ -1279,9 +1303,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
   }
 
   bool _ingredientIsAvailable(
-    String ingredient,
-    List<String> matchedIngredients,
-  ) {
+      String ingredient,
+      List<String> matchedIngredients,
+      ) {
     final ingredientName = ingredient.trim().toLowerCase();
 
     return matchedIngredients.any((matched) {
@@ -1301,10 +1325,10 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: _cardColor,
         borderRadius: BorderRadius.circular(11),
         border: Border.all(
-          color: isAvailable ? AppColors.cardBorder : const Color(0xFFE9C86A),
+          color: isAvailable ? _borderColor : const Color(0xFFE9C86A),
         ),
       ),
       child: Row(
@@ -1314,16 +1338,16 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
             width: 19,
             height: 19,
             decoration: BoxDecoration(
-              color: isAvailable ? AppColors.darkGreen : Colors.transparent,
+              color: isAvailable ? _primaryText : Colors.transparent,
               borderRadius: BorderRadius.circular(5),
               border: Border.all(
                 color: isAvailable
-                    ? AppColors.darkGreen
+                    ? _primaryText
                     : const Color(0xFFE9C86A),
               ),
             ),
             child: isAvailable
-                ? const Icon(Icons.check_rounded, size: 13, color: Colors.white)
+                ? Icon(Icons.check_rounded, size: 13, color: Colors.white)
                 : null,
           ),
 
@@ -1342,8 +1366,8 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
                     color: isAvailable
-                        ? AppColors.darkGreen
-                        : AppColors.darkGreen,
+                        ? _primaryText
+                        : _primaryText,
                   ),
                 ),
 
@@ -1352,9 +1376,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                     parsed.$2,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 8,
-                      color: AppColors.textSecondary,
+                      color: _secondaryText,
                     ),
                   ),
               ],
@@ -1389,8 +1413,8 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
     final missingIngredients = recipe.ingredients
         .where(
           (ingredient) =>
-              !_ingredientIsAvailable(ingredient, matchedIngredients),
-        )
+      !_ingredientIsAvailable(ingredient, matchedIngredients),
+    )
         .toList();
 
     if (missingIngredients.isEmpty) {
@@ -1408,12 +1432,12 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.cardBorder),
+          border: Border.all(color: _borderColor),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.add_rounded,
               size: 16,
               color: AppColors.mediumGreen,
@@ -1421,12 +1445,12 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
             const SizedBox(width: 5),
             Text(
               'Add ${missingIngredients.length} missing '
-              'ingredient${missingIngredients.length == 1 ? '' : 's'} '
-              'to Shopping List',
-              style: const TextStyle(
+                  'ingredient${missingIngredients.length == 1 ? '' : 's'} '
+                  'to Shopping List',
+              style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+                color: _secondaryText,
               ),
             ),
           ],
@@ -1436,8 +1460,8 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
   }
 
   Future<void> _addMissingIngredientsToShoppingList(
-    List<String> missingIngredients,
-  ) async {
+      List<String> missingIngredients,
+      ) async {
     if (missingIngredients.isEmpty) {
       return;
     }
@@ -1480,16 +1504,16 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
 
     if (addedCount > 0 && alreadyExistsCount == 0 && failedCount == 0) {
       message =
-          '$addedCount ingredient${addedCount == 1 ? '' : 's'} '
+      '$addedCount ingredient${addedCount == 1 ? '' : 's'} '
           'added to Shopping List';
     } else if (addedCount > 0) {
       message =
-          '$addedCount added'
+      '$addedCount added'
           '${alreadyExistsCount > 0 ? ', $alreadyExistsCount already on your list' : ''}'
           '${failedCount > 0 ? ', $failedCount failed' : ''}';
     } else if (alreadyExistsCount > 0 && failedCount == 0) {
       message =
-          'The missing ingredient${alreadyExistsCount == 1 ? '' : 's'} '
+      'The missing ingredient${alreadyExistsCount == 1 ? '' : 's'} '
           'is already on your Shopping List';
     } else {
       message = 'Could not add the missing ingredients to your Shopping List';
@@ -1541,9 +1565,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
           decoration: BoxDecoration(
-            color: AppColors.white,
+            color: _cardColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.cardBorder),
+            border: Border.all(color: _borderColor),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1552,16 +1576,16 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                 width: 25,
                 height: 25,
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE8F4ED),
+                decoration: BoxDecoration(
+                  color: _softGreenColor,
                   shape: BoxShape.circle,
                 ),
                 child: Text(
                   '$stepNumber',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.darkGreen,
+                    color: _primaryText,
                   ),
                 ),
               ),
@@ -1574,10 +1598,10 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                   children: [
                     Text(
                       parsed.$1,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.darkGreen,
+                        color: _primaryText,
                       ),
                     ),
 
@@ -1585,10 +1609,10 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                       const SizedBox(height: 3),
                       Text(
                         parsed.$2,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
                           height: 1.45,
-                          color: AppColors.textSecondary,
+                          color: _secondaryText,
                         ),
                       ),
                     ],
@@ -1629,9 +1653,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: _cardColor,
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: _borderColor),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4),
         ],
@@ -1639,7 +1663,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
       child: IconButton(
         padding: EdgeInsets.zero,
         onPressed: onPressed,
-        icon: Icon(icon, size: 17, color: iconColor ?? AppColors.textSecondary),
+        icon: Icon(icon, size: 17, color: iconColor ?? _secondaryText),
       ),
     );
   }
@@ -1660,8 +1684,8 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
           top: false,
           child: Container(
             height: MediaQuery.of(sheetContext).size.height * 0.97,
-            decoration: const BoxDecoration(
-              color: AppColors.cream,
+            decoration: BoxDecoration(
+              color: _screenBackground,
               borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             ),
             child: Column(
@@ -1681,14 +1705,14 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                         },
                       ),
 
-                      const Expanded(
+                      Expanded(
                         child: Center(
                           child: Text(
                             'Cooking Mode',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.darkGreen,
+                              color: _primaryText,
                             ),
                           ),
                         ),
@@ -1711,10 +1735,10 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                       children: [
                         Text(
                           recipe.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.darkGreen,
+                            color: _primaryText,
                           ),
                         ),
 
@@ -1743,9 +1767,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                             margin: const EdgeInsets.only(bottom: 10),
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppColors.white,
+                              color: _cardColor,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.cardBorder),
+                              border: Border.all(color: _borderColor),
                             ),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1755,12 +1779,12 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                                   height: 27,
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
-                                    color: AppColors.darkGreen,
+                                    color: _primaryText,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
                                     '$step',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
                                       color: Colors.white,
@@ -1773,14 +1797,14 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         parsed.$1,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 11.5,
                                           fontWeight: FontWeight.w700,
-                                          color: AppColors.darkGreen,
+                                          color: _primaryText,
                                         ),
                                       ),
 
@@ -1788,10 +1812,10 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                                         const SizedBox(height: 3),
                                         Text(
                                           parsed.$2,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 10,
                                             height: 1.4,
-                                            color: AppColors.textSecondary,
+                                            color: _secondaryText,
                                           ),
                                         ),
                                       ],
@@ -1813,7 +1837,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                 Container(
                   padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
                   decoration: BoxDecoration(
-                    color: AppColors.cream,
+                    color: _screenBackground,
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.08),
@@ -1829,7 +1853,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                       onPressed: () {
                         Navigator.pop(sheetContext);
                       },
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.check_circle_outline_rounded,
                         size: 18,
                       ),
@@ -1869,9 +1893,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
       margin: const EdgeInsets.only(top: 30),
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: _cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: _borderColor),
       ),
       child: Column(
         children: [
@@ -1889,10 +1913,10 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
             filters.hasActiveFilters
                 ? 'No matching recipes'
                 : 'No recipes available',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w700,
-              color: AppColors.darkGreen,
+              color: _primaryText,
             ),
           ),
 
@@ -1903,9 +1927,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                 ? 'Try changing your search or filters.'
                 : 'Recipes will appear here.',
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: AppColors.textSecondary,
+              color: _secondaryText,
             ),
           ),
         ],
@@ -1922,22 +1946,22 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
       margin: const EdgeInsets.only(top: 30),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: _cardColor,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.statusRed.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
-          const Icon(Icons.error_outline, size: 46, color: AppColors.statusRed),
+          Icon(Icons.error_outline, size: 46, color: AppColors.statusRed),
 
           const SizedBox(height: 12),
 
-          const Text(
+          Text(
             'Unable to load recipes',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: AppColors.darkGreen,
+              color: _primaryText,
             ),
           ),
 
@@ -1946,9 +1970,9 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
           Text(
             error.toString(),
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: AppColors.textSecondary,
+              color: _secondaryText,
             ),
           ),
 
@@ -1965,3 +1989,4 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
     );
   }
 }
+

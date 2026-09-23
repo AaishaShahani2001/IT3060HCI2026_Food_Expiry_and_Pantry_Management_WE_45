@@ -2,17 +2,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../features/recipes/presentation/providers/recipe_providers.dart';
 
 import '../../../../core/router/app_routes.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
@@ -234,6 +236,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         },
         SetOptions(merge: true),
       );
+      ref.invalidate(userDietaryProfileProvider);
 
       if (!mounted) return;
 
@@ -272,10 +275,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text(
+          title: Text(
             'Log out?',
           ),
-          content: const Text(
+          content: Text(
             'Are you sure you want to log out of PantryPal?',
           ),
           actions: [
@@ -285,7 +288,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   dialogContext,
                 ).pop(false);
               },
-              child: const Text(
+              child: Text(
                 'Cancel',
               ),
             ),
@@ -295,7 +298,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   dialogContext,
                 ).pop(true);
               },
-              child: const Text(
+              child: Text(
                 'Log out',
               ),
             ),
@@ -376,38 +379,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryGreen =
-    Color(0xFF2E6B4E);
+    const primaryGreen = Color(0xFF2E6B4E);
 
-    const darkGreen =
-    Color(0xFF1F4D38);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    const lightGreen =
-    Color(0xFFEAF4EE);
+    final darkGreen = isDark
+        ? const Color(0xFFE8F5EC)
+        : const Color(0xFF1F4D38);
 
-    const textDark =
-    Color(0xFF1F2933);
+    final lightGreen = isDark
+        ? const Color(0xFF1E3A2C)
+        : const Color(0xFFEAF4EE);
 
-    const textGrey =
-    Color(0xFF6B7280);
+    final textDark = isDark
+        ? const Color(0xFFF1F5F3)
+        : const Color(0xFF1F2933);
+
+    final textGrey = isDark
+        ? const Color(0xFFB8C2BD)
+        : const Color(0xFF6B7280);
+
+    final backgroundColor = isDark
+        ? const Color(0xFF121815)
+        : const Color(0xFFF8FAF9);
+
+    final cardColor = isDark
+        ? const Color(0xFF1B2420)
+        : Colors.white;
+
+    final borderColor = isDark
+        ? const Color(0xFF34423B)
+        : const Color(0xFFE3E9E6);
+
+    final inputColor = isDark
+        ? const Color(0xFF202A25)
+        : const Color(0xFFF7F8F8);
+
+    final subtleBorderColor = isDark
+        ? const Color(0xFF3A4741)
+        : const Color(0xFFE1E5E3);
+
+    final allergySelectedBackground = isDark
+        ? const Color(0xFF42251E)
+        : const Color(0xFFFFF1E8);
+
+    final allergySelectedBorder = isDark
+        ? const Color(0xFFE57373)
+        : const Color(0xFFD64545);
+
+    final allergySelectedText = isDark
+        ? const Color(0xFFFFB4A8)
+        : const Color(0xFF9F3A20);
+
+    final logoutBackground = isDark
+        ? const Color(0xFF351E20)
+        : const Color(0xFFFFF1F1);
 
     final user =
         _auth.currentUser;
 
     return Scaffold(
-      backgroundColor:
-      const Color(0xFFF8FAF9),
+      backgroundColor: backgroundColor,
 
       // ============================================================
       // APP BAR
       // ============================================================
 
       appBar: AppBar(
-        backgroundColor:
-        Colors.white,
+        backgroundColor: cardColor,
         elevation: 0,
         centerTitle: false,
-        title: const Text(
+        title: Text(
           'My Profile',
           style: TextStyle(
             color: darkGreen,
@@ -417,7 +460,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         iconTheme:
-        const IconThemeData(
+        IconThemeData(
           color: textDark,
         ),
       ),
@@ -457,8 +500,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 decoration:
                 BoxDecoration(
-                  color:
-                  Colors.white,
+                  color: cardColor,
                   borderRadius:
                   BorderRadius
                       .circular(
@@ -466,10 +508,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   border:
                   Border.all(
-                    color:
-                    const Color(
-                      0xFFE3E9E6,
-                    ),
+                    color: borderColor,
                   ),
                 ),
                 child: Row(
@@ -519,7 +558,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             TextOverflow
                                 .ellipsis,
                             style:
-                            const TextStyle(
+                            TextStyle(
                               fontSize: 18,
                               fontWeight:
                               FontWeight
@@ -541,7 +580,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             TextOverflow
                                 .ellipsis,
                             style:
-                            const TextStyle(
+                            TextStyle(
                               fontSize: 13,
                               color:
                               textGrey,
@@ -562,7 +601,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // PERSONAL INFORMATION
               // ==================================================
 
-              const Text(
+              Text(
                 'Personal information',
                 style: TextStyle(
                   fontSize: 18,
@@ -674,7 +713,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // PANTRY TYPE
               // ==================================================
 
-              const Text(
+              Text(
                 'Pantry type',
                 style: TextStyle(
                   fontSize: 18,
@@ -688,7 +727,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 height: 6,
               ),
 
-              const Text(
+              Text(
                 'Choose how you manage your pantry.',
                 style: TextStyle(
                   fontSize: 13,
@@ -749,7 +788,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // FOOD PREFERENCES
               // ==================================================
 
-              const Text(
+              Text(
                 'Food preferences',
                 style: TextStyle(
                   fontSize: 18,
@@ -763,7 +802,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 height: 6,
               ),
 
-              const Text(
+              Text(
                 'Select the foods and dietary preferences that suit you.',
                 style: TextStyle(
                   fontSize: 13,
@@ -844,12 +883,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           side:
                           BorderSide(
-                            color:
-                            selected
+                            color: selected
                                 ? primaryGreen
-                                : const Color(
-                              0xFFE1E5E3,
-                            ),
+                                : subtleBorderColor,
                           ),
                         ),
                       );
@@ -866,7 +902,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // ALLERGIES
               // ==================================================
 
-              const Text(
+              Text(
                 'Food allergies',
                 style: TextStyle(
                   fontSize: 18,
@@ -880,7 +916,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 height: 6,
               ),
 
-              const Text(
+              Text(
                 'Select any ingredients you need to avoid.',
                 style: TextStyle(
                   fontSize: 13,
@@ -935,21 +971,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             },
                           );
                         },
-                        selectedColor:
-                        const Color(
-                          0xFFFFF1E8,
-                        ),
-                        checkmarkColor:
-                        const Color(
-                          0xFFD64545,
-                        ),
+                        selectedColor: allergySelectedBackground,
+                        checkmarkColor: allergySelectedBorder,
                         labelStyle:
                         TextStyle(
                           color:
                           selected
-                              ? const Color(
-                            0xFF9F3A20,
-                          )
+                              ? allergySelectedText
                               : textDark,
                           fontWeight:
                           selected
@@ -969,12 +997,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           BorderSide(
                             color:
                             selected
-                                ? const Color(
-                              0xFFD64545,
-                            )
-                                : const Color(
-                              0xFFE1E5E3,
-                            ),
+                                ? allergySelectedBorder
+                                : subtleBorderColor,
                           ),
                         ),
                       );
@@ -1105,7 +1129,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       width: 12,
                     ),
 
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Your profile preferences will be used later to provide more relevant pantry and recipe suggestions.',
                         style:
@@ -1129,7 +1153,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // ACCOUNT
               // ==================================================
 
-              const Text(
+              Text(
                 'Account',
                 style: TextStyle(
                   fontSize: 18,
@@ -1165,8 +1189,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   decoration:
                   BoxDecoration(
-                    color:
-                    Colors.white,
+                    color: cardColor,
                     borderRadius:
                     BorderRadius
                         .circular(
@@ -1174,10 +1197,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     border:
                     Border.all(
-                      color:
-                      const Color(
-                        0xFFE3E9E6,
-                      ),
+                      color: borderColor,
                     ),
                   ),
                   child: Row(
@@ -1187,10 +1207,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         height: 44,
                         decoration:
                         BoxDecoration(
-                          color:
-                          const Color(
-                            0xFFEAF4EE,
-                          ),
+                          color: lightGreen,
                           borderRadius:
                           BorderRadius
                               .circular(
@@ -1212,7 +1229,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         width: 12,
                       ),
 
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment:
                           CrossAxisAlignment
@@ -1227,10 +1244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 fontWeight:
                                 FontWeight
                                     .w700,
-                                color:
-                                Color(
-                                  0xFF1F2933,
-                                ),
+                                color: textDark,
                               ),
                             ),
 
@@ -1244,10 +1258,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               TextStyle(
                                 fontSize:
                                 12,
-                                color:
-                                Color(
-                                  0xFF6B7280,
-                                ),
+                                color: textGrey,
                               ),
                             ),
                           ],
@@ -1294,8 +1305,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   decoration:
                   BoxDecoration(
-                    color:
-                    Colors.white,
+                    color: cardColor,
                     borderRadius:
                     BorderRadius
                         .circular(
@@ -1303,10 +1313,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     border:
                     Border.all(
-                      color:
-                      const Color(
-                        0xFFE3E9E6,
-                      ),
+                      color: borderColor,
                     ),
                   ),
                   child: Row(
@@ -1316,10 +1323,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         height: 44,
                         decoration:
                         BoxDecoration(
-                          color:
-                          const Color(
-                            0xFFEAF4EE,
-                          ),
+                          color: lightGreen,
                           borderRadius:
                           BorderRadius
                               .circular(
@@ -1341,7 +1345,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         width: 12,
                       ),
 
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment:
                           CrossAxisAlignment
@@ -1356,10 +1360,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 fontWeight:
                                 FontWeight
                                     .w700,
-                                color:
-                                Color(
-                                  0xFF1F2933,
-                                ),
+                                color: textDark,
                               ),
                             ),
 
@@ -1373,10 +1374,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               TextStyle(
                                 fontSize:
                                 12,
-                                color:
-                                Color(
-                                  0xFF6B7280,
-                                ),
+                                color: textGrey,
                               ),
                             ),
                           ],
@@ -1420,8 +1418,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   decoration:
                   BoxDecoration(
-                    color:
-                    Colors.white,
+                    color: cardColor,
                     borderRadius:
                     BorderRadius
                         .circular(
@@ -1429,10 +1426,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     border:
                     Border.all(
-                      color:
-                      const Color(
-                        0xFFE3E9E6,
-                      ),
+                      color: borderColor,
                     ),
                   ),
                   child: Row(
@@ -1442,10 +1436,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         height: 44,
                         decoration:
                         BoxDecoration(
-                          color:
-                          const Color(
-                            0xFFFFF1F1,
-                          ),
+                          color: logoutBackground,
                           borderRadius:
                           BorderRadius
                               .circular(
@@ -1467,7 +1458,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         width: 12,
                       ),
 
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment:
                           CrossAxisAlignment
@@ -1499,10 +1490,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               TextStyle(
                                 fontSize:
                                 12,
-                                color:
-                                Color(
-                                  0xFF6B7280,
-                                ),
+                                color: textGrey,
                               ),
                             ),
                           ],
@@ -1539,14 +1527,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String value,
     required Color primaryGreen,
   }) {
-    final selected =
-        _pantryType == value;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final cardColor = isDark
+        ? const Color(0xFF1B2420)
+        : Colors.white;
+
+    final selectedBackground = isDark
+        ? const Color(0xFF1E3A2C)
+        : const Color(0xFFEAF4EE);
+
+    final borderColor = isDark
+        ? const Color(0xFF34423B)
+        : const Color(0xFFE1E5E3);
+
+    final textDark = isDark
+        ? const Color(0xFFF1F5F3)
+        : const Color(0xFF1F2933);
+
+    final textGrey = isDark
+        ? const Color(0xFFB8C2BD)
+        : const Color(0xFF6B7280);
+
+    final selected = _pantryType == value;
 
     return InkWell(
-      borderRadius:
-      BorderRadius.circular(
-        14,
-      ),
+      borderRadius: BorderRadius.circular(14),
       onTap: _isSaving
           ? null
           : () {
@@ -1555,33 +1562,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       },
       child: AnimatedContainer(
-        duration:
-        const Duration(
-          milliseconds: 180,
-        ),
-        padding:
-        const EdgeInsets.all(
-          14,
-        ),
-        decoration:
-        BoxDecoration(
-          color: selected
-              ? const Color(
-            0xFFEAF4EE,
-          )
-              : Colors.white,
-          borderRadius:
-          BorderRadius.circular(
-            14,
-          ),
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected ? selectedBackground : cardColor,
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected
-                ? primaryGreen
-                : const Color(
-              0xFFE1E5E3,
-            ),
-            width:
-            selected ? 1.4 : 1,
+            color: selected ? primaryGreen : borderColor,
+            width: selected ? 1.4 : 1,
           ),
         ),
         child: Row(
@@ -1589,66 +1577,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               width: 44,
               height: 44,
-              decoration:
-              BoxDecoration(
+              decoration: BoxDecoration(
                 color: selected
-                    ? Colors.white
-                    : const Color(
-                  0xFFF1F3F2,
-                ),
-                borderRadius:
-                BorderRadius.circular(
-                  12,
-                ),
+                    ? (isDark
+                    ? const Color(0xFF253D32)
+                    : Colors.white)
+                    : (isDark
+                    ? const Color(0xFF252F2B)
+                    : const Color(0xFFF1F3F2)),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
-                _pantryTypeIcon(
-                  value,
-                ),
+                _pantryTypeIcon(value),
                 color: selected
                     ? primaryGreen
-                    : const Color(
-                  0xFF6B7280,
-                ),
+                    : textGrey,
               ),
             ),
 
-            const SizedBox(
-              width: 12,
-            ),
+            const SizedBox(width: 12),
 
             Expanded(
               child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style:
-                    const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      fontWeight:
-                      FontWeight.w700,
-                      color:
-                      Color(
-                        0xFF1F2933,
-                      ),
+                      fontWeight: FontWeight.w700,
+                      color: textDark,
                     ),
                   ),
 
-                  const SizedBox(
-                    height: 3,
-                  ),
+                  const SizedBox(height: 3),
 
                   Text(
                     subtitle,
-                    style:
-                    const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color:
-                      Color(
-                        0xFF6B7280,
-                      ),
+                      color: textGrey,
                     ),
                   ),
                 ],
@@ -1657,22 +1625,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             Radio<String>(
               value: value,
-              groupValue:
-              _pantryType,
-              activeColor:
-              primaryGreen,
-              onChanged:
-              _isSaving
+              groupValue: _pantryType,
+              activeColor: primaryGreen,
+              onChanged: _isSaving
                   ? null
                   : (newValue) {
-                if (newValue ==
-                    null) {
+                if (newValue == null) {
                   return;
                 }
 
                 setState(() {
-                  _pantryType =
-                      newValue;
+                  _pantryType = newValue;
                 });
               },
             ),
@@ -1689,22 +1652,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _sectionCard({
     required Widget child,
   }) {
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      padding:
-      const EdgeInsets.all(
-        16,
-      ),
-      decoration:
-      BoxDecoration(
-        color: Colors.white,
-        borderRadius:
-        BorderRadius.circular(
-          16,
-        ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF1B2420)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(
-            0xFFE3E9E6,
-          ),
+          color: isDark
+              ? const Color(0xFF34423B)
+              : const Color(0xFFE3E9E6),
         ),
       ),
       child: child,
@@ -1743,8 +1704,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       hintText: hintText,
       prefixIcon: Icon(icon),
       filled: true,
-      fillColor:
-      const Color(0xFFF7F8F8),
+      fillColor: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF202A25)
+          : const Color(0xFFF7F8F8),
       contentPadding:
       const EdgeInsets.symmetric(
         horizontal: 16,
@@ -1765,11 +1727,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         BorderRadius.circular(
           10,
         ),
-        borderSide:
-        const BorderSide(
-          color: Color(
-            0xFFE1E5E3,
-          ),
+        borderSide: BorderSide(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF3A4741)
+              : const Color(0xFFE1E5E3),
         ),
       ),
       focusedBorder:

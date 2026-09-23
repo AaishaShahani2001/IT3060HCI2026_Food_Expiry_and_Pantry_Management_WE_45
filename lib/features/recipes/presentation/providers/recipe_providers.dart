@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/repositories/mock_recipe_repository.dart';
@@ -8,6 +10,80 @@ import '../../../pantry/presentation/providers/pantry_providers.dart';
 final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
   return MockRecipeRepository();
 });
+
+// ================================================================
+// USER DIETARY PROFILE
+// ================================================================
+
+class UserDietaryProfile {
+  const UserDietaryProfile({
+    this.preferences = const [],
+    this.allergies = const [],
+  });
+
+  final List<String> preferences;
+  final List<String> allergies;
+}
+
+final userDietaryProfileProvider =
+FutureProvider<UserDietaryProfile>((ref) async {
+  final user = FirebaseAuth.instance.currentUser;
+
+  if (user == null) {
+    return const UserDietaryProfile();
+  }
+
+  final document = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .get();
+
+  final data = document.data();
+
+  if (data == null) {
+    return const UserDietaryProfile();
+  }
+
+  List<String> convertToList(dynamic value) {
+    if (value is List) {
+      return value
+          .map(
+            (item) => item.toString().trim().toLowerCase(),
+      )
+          .where(
+            (item) => item.isNotEmpty,
+      )
+          .toList();
+    }
+
+    if (value is String) {
+      return value
+          .split(',')
+          .map(
+            (item) => item.trim().toLowerCase(),
+      )
+          .where(
+            (item) => item.isNotEmpty,
+      )
+          .toList();
+    }
+
+    return const [];
+  }
+
+  return UserDietaryProfile(
+    preferences: convertToList(
+      data['foodPreferences'],
+    ),
+    allergies: convertToList(
+      data['allergies'],
+    ),
+  );
+});
+
+// ================================================================
+// RECIPE FILTER STATE
+// ================================================================
 
 class RecipeFilterState {
   const RecipeFilterState({
@@ -21,7 +97,9 @@ class RecipeFilterState {
   final bool favoritesOnly;
 
   bool get hasActiveFilters =>
-      searchQuery.isNotEmpty || category != null || favoritesOnly;
+      searchQuery.isNotEmpty ||
+          category != null ||
+          favoritesOnly;
 
   RecipeFilterState copyWith({
     String? searchQuery,
@@ -31,46 +109,26 @@ class RecipeFilterState {
   }) {
     return RecipeFilterState(
       searchQuery: searchQuery ?? this.searchQuery,
-      category: clearCategory ? null : (category ?? this.category),
-      favoritesOnly: favoritesOnly ?? this.favoritesOnly,
+      category: clearCategory
+          ? null
+          : (category ?? this.category),
+      favoritesOnly:
+      favoritesOnly ?? this.favoritesOnly,
     );
   }
 }
 
-/// Contains a recipe together with information about why it was recommended.
-class RecipeRecommendation {
-  const RecipeRecommendation({
-    required this.recipe,
-    required this.matchedIngredients,
-    required this.score,
-    this.expiringIngredient,
-    this.daysUntilExpiry,
-  });
-
-  final Recipe recipe;
-
-  /// Pantry items that match ingredients in this recipe.
-  final List<String> matchedIngredients;
-
-  /// Higher score = higher recommendation priority.
-  final int score;
-
-  /// The matched pantry item with the nearest expiry date.
-  final String? expiringIngredient;
-
-  /// Number of days remaining until the nearest expiry.
-  final int? daysUntilExpiry;
-
-  bool get hasExpiringIngredient =>
-      expiringIngredient != null && daysUntilExpiry != null;
-}
-
-class RecipeFilterNotifier extends Notifier<RecipeFilterState> {
+class RecipeFilterNotifier
+    extends Notifier<RecipeFilterState> {
   @override
-  RecipeFilterState build() => const RecipeFilterState();
+  RecipeFilterState build() {
+    return const RecipeFilterState();
+  }
 
   void setSearchQuery(String query) {
-    state = state.copyWith(searchQuery: query);
+    state = state.copyWith(
+      searchQuery: query,
+    );
   }
 
   void setCategory(RecipeCategory? category) {
@@ -81,7 +139,9 @@ class RecipeFilterNotifier extends Notifier<RecipeFilterState> {
   }
 
   void setFavoritesOnly(bool value) {
-    state = state.copyWith(favoritesOnly: value);
+    state = state.copyWith(
+      favoritesOnly: value,
+    );
   }
 
   void clearFilters() {
@@ -90,30 +150,46 @@ class RecipeFilterNotifier extends Notifier<RecipeFilterState> {
 }
 
 final recipeFilterProvider =
-NotifierProvider<RecipeFilterNotifier, RecipeFilterState>(
+NotifierProvider<
+    RecipeFilterNotifier,
+    RecipeFilterState>(
   RecipeFilterNotifier.new,
 );
 
-class RecipesNotifier extends AsyncNotifier<List<Recipe>> {
+// ================================================================
+// RECIPES NOTIFIER
+// ================================================================
+
+class RecipesNotifier
+    extends AsyncNotifier<List<Recipe>> {
   @override
   Future<List<Recipe>> build() async {
-    return ref.read(recipeRepositoryProvider).fetchRecipes();
+    return ref
+        .read(recipeRepositoryProvider)
+        .fetchRecipes();
   }
 
   Future<void> refreshRecipes() async {
     state = const AsyncLoading();
 
     state = await AsyncValue.guard(
-          () => ref.read(recipeRepositoryProvider).fetchRecipes(),
+          () => ref
+          .read(recipeRepositoryProvider)
+          .fetchRecipes(),
     );
   }
 
-  Future<void> addRecipe(Recipe recipe) async {
-    final repository = ref.read(recipeRepositoryProvider);
+  Future<void> addRecipe(
+      Recipe recipe,
+      ) async {
+    final repository =
+    ref.read(recipeRepositoryProvider);
 
-    final createdRecipe = await repository.addRecipe(recipe);
+    final createdRecipe =
+    await repository.addRecipe(recipe);
 
-    final currentRecipes = state.asData?.value ?? [];
+    final currentRecipes =
+        state.asData?.value ?? [];
 
     state = AsyncData([
       createdRecipe,
@@ -121,58 +197,85 @@ class RecipesNotifier extends AsyncNotifier<List<Recipe>> {
     ]);
   }
 
-  Future<void> updateRecipe(Recipe recipe) async {
-    final repository = ref.read(recipeRepositoryProvider);
+  Future<void> updateRecipe(
+      Recipe recipe,
+      ) async {
+    final repository =
+    ref.read(recipeRepositoryProvider);
 
-    final updatedRecipe = await repository.updateRecipe(recipe);
+    final updatedRecipe =
+    await repository.updateRecipe(recipe);
 
-    final currentRecipes = state.asData?.value ?? [];
+    final currentRecipes =
+        state.asData?.value ?? [];
 
     state = AsyncData(
       currentRecipes
           .map(
-            (entry) =>
-        entry.id == updatedRecipe.id ? updatedRecipe : entry,
+            (entry) => entry.id == updatedRecipe.id
+            ? updatedRecipe
+            : entry,
       )
           .toList(),
     );
   }
 
-  Future<void> deleteRecipe(String id) async {
-    final repository = ref.read(recipeRepositoryProvider);
+  Future<void> deleteRecipe(
+      String id,
+      ) async {
+    final repository =
+    ref.read(recipeRepositoryProvider);
 
     await repository.deleteRecipe(id);
 
-    final currentRecipes = state.asData?.value ?? [];
+    final currentRecipes =
+        state.asData?.value ?? [];
 
     state = AsyncData(
       currentRecipes
-          .where((recipe) => recipe.id != id)
+          .where(
+            (recipe) => recipe.id != id,
+      )
           .toList(),
     );
   }
 
-  Future<void> toggleFavorite(String id) async {
-    final currentRecipes = state.asData?.value;
+  Future<void> toggleFavorite(
+      String id,
+      ) async {
+    final currentRecipes =
+        state.asData?.value;
 
-    if (currentRecipes == null) return;
+    if (currentRecipes == null) {
+      return;
+    }
 
     final index = currentRecipes.indexWhere(
           (recipe) => recipe.id == id,
     );
 
-    if (index == -1) return;
+    if (index == -1) {
+      return;
+    }
 
-    final currentRecipe = currentRecipes[index];
+    final currentRecipe =
+    currentRecipes[index];
 
-    final updatedRecipe = currentRecipe.copyWith(
-      isFavorite: !currentRecipe.isFavorite,
+    final updatedRecipe =
+    currentRecipe.copyWith(
+      isFavorite:
+      !currentRecipe.isFavorite,
     );
 
-    final optimisticRecipes = [...currentRecipes];
-    optimisticRecipes[index] = updatedRecipe;
+    final optimisticRecipes =
+    [...currentRecipes];
 
-    state = AsyncData(optimisticRecipes);
+    optimisticRecipes[index] =
+        updatedRecipe;
+
+    state = AsyncData(
+      optimisticRecipes,
+    );
 
     try {
       final savedRecipe = await ref
@@ -180,57 +283,52 @@ class RecipesNotifier extends AsyncNotifier<List<Recipe>> {
           .updateRecipe(updatedRecipe);
 
       final latestRecipes =
-          state.asData?.value ?? optimisticRecipes;
+          state.asData?.value ??
+              optimisticRecipes;
 
       state = AsyncData(
         latestRecipes
             .map(
-              (recipe) => recipe.id == savedRecipe.id
+              (recipe) => recipe.id ==
+              savedRecipe.id
               ? savedRecipe
               : recipe,
         )
             .toList(),
       );
     } catch (_) {
-      state = AsyncData(currentRecipes);
+      state = AsyncData(
+        currentRecipes,
+      );
+
       rethrow;
     }
   }
 }
 
 final recipesProvider =
-AsyncNotifierProvider<RecipesNotifier, List<Recipe>>(
+AsyncNotifierProvider<
+    RecipesNotifier,
+    List<Recipe>>(
   RecipesNotifier.new,
 );
 
-final filteredRecipesProvider = Provider<List<Recipe>>((ref) {
-  final recipesAsync = ref.watch(recipesProvider);
-  final filters = ref.watch(recipeFilterProvider);
+// ================================================================
+// FILTERED RECIPES
+// ================================================================
+
+final filteredRecipesProvider =
+Provider<List<Recipe>>((ref) {
+  final recipesAsync =
+  ref.watch(recipesProvider);
+
+  final filters =
+  ref.watch(recipeFilterProvider);
 
   return recipesAsync.maybeWhen(
-    data: (recipes) => _applyFilters(recipes, filters),
+    data: (recipes) =>
+        _applyFilters(recipes, filters),
     orElse: () => const [],
-  );
-});
-
-final recipeSummaryProvider =
-Provider<({int total, int favorites})>((ref) {
-  final recipesAsync = ref.watch(recipesProvider);
-
-  return recipesAsync.maybeWhen(
-    data: (recipes) {
-      final favorites =
-          recipes.where((recipe) => recipe.isFavorite).length;
-
-      return (
-      total: recipes.length,
-      favorites: favorites,
-      );
-    },
-    orElse: () => (
-    total: 0,
-    favorites: 0,
-    ),
   );
 });
 
@@ -243,14 +341,19 @@ List<Recipe> _applyFilters(
         filters.searchQuery.isEmpty ||
             recipe.name
                 .toLowerCase()
-                .contains(filters.searchQuery.toLowerCase());
+                .contains(
+              filters.searchQuery
+                  .toLowerCase(),
+            );
 
     final matchesCategory =
         filters.category == null ||
-            recipe.category == filters.category;
+            recipe.category ==
+                filters.category;
 
     final matchesFavorites =
-        !filters.favoritesOnly || recipe.isFavorite;
+        !filters.favoritesOnly ||
+            recipe.isFavorite;
 
     return matchesSearch &&
         matchesCategory &&
@@ -258,148 +361,547 @@ List<Recipe> _applyFilters(
   }).toList();
 }
 
-/// Provides recipes recommended from the user's available pantry items.
-///
-/// Recommendation is rule-based:
-///
-/// - Available matching ingredient: +3 points
-/// - Matching ingredient expiring within 3 days: +5 points
-/// - Matching ingredient expiring within 7 days: +3 points
-///
-/// Recipes are sorted from highest score to lowest score.
-final recommendedRecipesProvider =
-Provider<List<RecipeRecommendation>>((ref) {
-  final pantryItemsAsync = ref.watch(pantryItemsProvider);
-  final recipesAsync = ref.watch(recipesProvider);
+// ================================================================
+// RECIPE SUMMARY
+// ================================================================
 
-  final pantryItems = pantryItemsAsync.maybeWhen(
-    data: (items) => items,
-    orElse: () => const [],
+final recipeSummaryProvider =
+Provider<({int total, int favorites})>(
+      (ref) {
+    final recipesAsync =
+    ref.watch(recipesProvider);
+
+    return recipesAsync.maybeWhen(
+      data: (recipes) {
+        final favorites = recipes
+            .where(
+              (recipe) =>
+          recipe.isFavorite,
+        )
+            .length;
+
+        return (
+        total: recipes.length,
+        favorites: favorites,
+        );
+      },
+      orElse: () => (
+      total: 0,
+      favorites: 0,
+      ),
+    );
+  },
+);
+
+// ================================================================
+// ALLERGY MATCHING
+// ================================================================
+
+bool _recipeContainsAllergy(
+    Recipe recipe,
+    String allergy,
+    ) {
+  final allergyKeywords =
+  <String, List<String>>{
+    'peanuts': [
+      'peanut',
+      'peanuts',
+    ],
+    'milk / dairy': [
+      'milk',
+      'yogurt',
+      'yoghurt',
+      'cheese',
+      'butter',
+      'cream',
+      'dairy',
+    ],
+    'eggs': [
+      'egg',
+      'eggs',
+    ],
+    'seafood': [
+      'seafood',
+      'fish',
+      'prawn',
+      'prawns',
+      'shrimp',
+      'crab',
+      'tuna',
+      'salmon',
+    ],
+    'soy': [
+      'soy',
+      'soya',
+      'soy sauce',
+      'tofu',
+      'edamame',
+    ],
+    'gluten': [
+      'wheat',
+      'bread',
+      'pasta',
+      'flour',
+      'noodles',
+      'gluten',
+    ],
+  };
+
+  final keywords =
+      allergyKeywords[allergy] ??
+          [allergy];
+
+  return recipe.ingredients.any(
+        (ingredient) {
+      final ingredientName =
+      ingredient.toLowerCase();
+
+      return keywords.any(
+            (keyword) =>
+            ingredientName.contains(
+              keyword,
+            ),
+      );
+    },
   );
+}
 
-  final recipes = recipesAsync.maybeWhen(
-    data: (items) => items,
-    orElse: () => const [],
-  );
+// ================================================================
+// DIETARY PREFERENCE MATCHING
+// ================================================================
 
-  if (pantryItems.isEmpty || recipes.isEmpty) {
-    return const [];
+int _preferenceScore(
+    Recipe recipe,
+    List<String> preferences,
+    ) {
+  var score = 0;
+
+  for (final preference
+  in preferences) {
+    final matchesTag = recipe.tags.any(
+          (tag) =>
+      tag.toLowerCase() ==
+          preference,
+    );
+
+    if (matchesTag) {
+      score += 6;
+    }
   }
 
-  final recommendations = <RecipeRecommendation>[];
+  return score;
+}
 
-  for (final recipe in recipes) {
-    final matchedIngredients = <String>[];
+// ================================================================
+// VEGETARIAN / VEGAN SAFETY
+// ================================================================
 
-    String? expiringIngredient;
-    int? daysUntilExpiry;
+bool _isVegetarianSafe(
+    Recipe recipe,
+    ) {
+  const meatKeywords = [
+    'chicken',
+    'beef',
+    'pork',
+    'mutton',
+    'lamb',
+    'meat',
+    'ham',
+    'bacon',
+    'sausage',
+    'turkey',
+    'duck',
+    'fish',
+    'prawn',
+    'prawns',
+    'shrimp',
+    'crab',
+    'tuna',
+    'salmon',
+    'seafood',
+  ];
 
-    int score = 0;
+  return !recipe.ingredients.any(
+        (ingredient) {
+      final value =
+      ingredient.toLowerCase();
 
-    for (final pantryItem in pantryItems) {
-      // Do not recommend recipes based on food that has no quantity left.
-      if (pantryItem.quantity <= 0) {
-        continue;
-      }
+      return meatKeywords.any(
+            (keyword) =>
+            value.contains(keyword),
+      );
+    },
+  );
+}
 
-      final pantryName = pantryItem.name.trim().toLowerCase();
+bool _isVeganSafe(
+    Recipe recipe,
+    ) {
+  const animalProductKeywords = [
+    'chicken',
+    'beef',
+    'pork',
+    'mutton',
+    'lamb',
+    'meat',
+    'fish',
+    'prawn',
+    'prawns',
+    'shrimp',
+    'crab',
+    'tuna',
+    'salmon',
+    'seafood',
+    'egg',
+    'eggs',
+    'milk',
+    'yogurt',
+    'yoghurt',
+    'cheese',
+    'butter',
+    'cream',
+    'honey',
+    'dairy',
+  ];
 
-      if (pantryName.isEmpty) {
-        continue;
-      }
+  return !recipe.ingredients.any(
+        (ingredient) {
+      final value =
+      ingredient.toLowerCase();
 
-      // Match pantry item name against recipe ingredients.
-      final ingredientMatches = recipe.ingredients.any(
-            (ingredient) {
-          final recipeIngredient =
-          ingredient.trim().toLowerCase();
+      return animalProductKeywords.any(
+            (keyword) =>
+            value.contains(keyword),
+      );
+    },
+  );
+}
 
-          if (recipeIngredient.isEmpty) {
-            return false;
-          }
+bool _violatesDietaryPreference(
+    Recipe recipe,
+    List<String> preferences,
+    ) {
+  if (preferences.contains(
+    'vegetarian',
+  )) {
+    if (!_isVegetarianSafe(recipe)) {
+      return true;
+    }
+  }
 
-          return recipeIngredient.contains(pantryName) ||
-              pantryName.contains(recipeIngredient);
-        },
+  if (preferences.contains(
+    'vegan',
+  )) {
+    if (!_isVeganSafe(recipe)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// ================================================================
+// RECOMMENDED RECIPES
+// ================================================================
+
+/// Provides recipes recommended using:
+///
+/// - User food allergies
+/// - User dietary preferences
+/// - Available pantry ingredients
+/// - Pantry expiry dates
+///
+/// Scoring:
+///
+/// Allergy conflict:
+///   Recipe is excluded.
+///
+/// Vegetarian / Vegan conflict:
+///   Recipe is excluded.
+///
+/// Preference match:
+///   +6 points
+///
+/// Available matching ingredient:
+///   +3 points
+///
+/// Matching ingredient expiring within 3 days:
+///   +5 points
+///
+/// Matching ingredient expiring within 7 days:
+///   +3 points
+///
+/// Only recipes using at least one available
+/// pantry ingredient are recommended.
+final recommendedRecipesProvider =
+Provider<List<RecipeRecommendation>>(
+      (ref) {
+    final pantryItemsAsync =
+    ref.watch(pantryItemsProvider);
+
+    final recipesAsync =
+    ref.watch(recipesProvider);
+
+    final profileAsync =
+    ref.watch(
+      userDietaryProfileProvider,
+    );
+
+    final pantryItems =
+    pantryItemsAsync.maybeWhen(
+      data: (items) => items,
+      orElse: () => const [],
+    );
+
+    final recipes =
+    recipesAsync.maybeWhen(
+      data: (items) => items,
+      orElse: () => const [],
+    );
+
+    final profile =
+    profileAsync.maybeWhen(
+      data: (value) => value,
+      orElse: () =>
+      const UserDietaryProfile(),
+    );
+
+    if (pantryItems.isEmpty ||
+        recipes.isEmpty) {
+      return const [];
+    }
+
+    final recommendations =
+    <RecipeRecommendation>[];
+
+    for (final recipe in recipes) {
+      // ==========================================================
+      // 1. ALLERGY SAFETY FILTER
+      // ==========================================================
+
+      final hasAllergyConflict =
+      profile.allergies.any(
+            (allergy) =>
+            _recipeContainsAllergy(
+              recipe,
+              allergy,
+            ),
       );
 
-      if (!ingredientMatches) {
+      if (hasAllergyConflict) {
         continue;
       }
 
-      // Available ingredient match.
-      score += 3;
+      // ==========================================================
+      // 2. DIETARY PREFERENCE SAFETY
+      // ==========================================================
 
-      if (!matchedIngredients.contains(pantryItem.name)) {
-        matchedIngredients.add(pantryItem.name);
-      }
+      final violatesDiet =
+      _violatesDietaryPreference(
+        recipe,
+        profile.preferences,
+      );
 
-      final expiryDate = pantryItem.expiryDate;
-
-      if (expiryDate == null) {
+      if (violatesDiet) {
         continue;
       }
 
-      final now = DateTime.now();
+      // ==========================================================
+      // 3. INITIAL PREFERENCE SCORE
+      // ==========================================================
 
-      final today = DateTime(
-        now.year,
-        now.month,
-        now.day,
+      var score = _preferenceScore(
+        recipe,
+        profile.preferences,
       );
 
-      final expiryDay = DateTime(
-        expiryDate.year,
-        expiryDate.month,
-        expiryDate.day,
-      );
+      final matchedIngredients =
+      <String>[];
 
-      final days = expiryDay.difference(today).inDays;
+      String? expiringIngredient;
+      int? daysUntilExpiry;
 
-      // Highest priority:
-      // ingredient expires within 3 days.
-      if (days >= 0 && days <= 3) {
-        score += 5;
+      // ==========================================================
+      // 4. PANTRY + EXPIRY MATCHING
+      // ==========================================================
 
-        if (daysUntilExpiry == null ||
-            days < daysUntilExpiry) {
-          expiringIngredient = pantryItem.name;
-          daysUntilExpiry = days;
+      for (final pantryItem
+      in pantryItems) {
+        // Do not recommend recipes based
+        // on food that has no quantity left.
+        if (pantryItem.quantity <= 0) {
+          continue;
         }
-      }
 
-      // Medium priority:
-      // ingredient expires within 7 days.
-      else if (days > 3 && days <= 7) {
+        final pantryName =
+        pantryItem.name
+            .trim()
+            .toLowerCase();
+
+        if (pantryName.isEmpty) {
+          continue;
+        }
+
+        // Match pantry item name against
+        // recipe ingredients.
+        final ingredientMatches =
+        recipe.ingredients.any(
+              (ingredient) {
+            final recipeIngredient =
+            ingredient
+                .trim()
+                .toLowerCase();
+
+            if (recipeIngredient.isEmpty) {
+              return false;
+            }
+
+            return recipeIngredient
+                .contains(pantryName) ||
+                pantryName.contains(
+                  recipeIngredient,
+                );
+          },
+        );
+
+        if (!ingredientMatches) {
+          continue;
+        }
+
+        // --------------------------------------------------------
+        // Available ingredient match
+        // --------------------------------------------------------
+
         score += 3;
 
-        if (daysUntilExpiry == null ||
-            days < daysUntilExpiry) {
-          expiringIngredient = pantryItem.name;
-          daysUntilExpiry = days;
+        if (!matchedIngredients
+            .contains(pantryItem.name)) {
+          matchedIngredients.add(
+            pantryItem.name,
+          );
         }
+
+        // --------------------------------------------------------
+        // Expiry priority
+        // --------------------------------------------------------
+
+        final expiryDate =
+            pantryItem.expiryDate;
+
+        if (expiryDate == null) {
+          continue;
+        }
+
+        final now = DateTime.now();
+
+        final today = DateTime(
+          now.year,
+          now.month,
+          now.day,
+        );
+
+        final expiryDay = DateTime(
+          expiryDate.year,
+          expiryDate.month,
+          expiryDate.day,
+        );
+
+        final days = expiryDay
+            .difference(today)
+            .inDays;
+
+        // Highest priority:
+        // ingredient expires within 3 days.
+        if (days >= 0 && days <= 3) {
+          score += 5;
+
+          if (daysUntilExpiry == null ||
+              days < daysUntilExpiry) {
+            expiringIngredient =
+                pantryItem.name;
+
+            daysUntilExpiry = days;
+          }
+        }
+
+        // Medium priority:
+        // ingredient expires within 7 days.
+        else if (days > 3 && days <= 7) {
+          score += 3;
+
+          if (daysUntilExpiry == null ||
+              days < daysUntilExpiry) {
+            expiringIngredient =
+                pantryItem.name;
+
+            daysUntilExpiry = days;
+          }
+        }
+      }
+
+      // ==========================================================
+      // 5. ONLY RECOMMEND RECIPES WITH PANTRY MATCHES
+      // ==========================================================
+
+      if (matchedIngredients
+          .isNotEmpty) {
+        recommendations.add(
+          RecipeRecommendation(
+            recipe: recipe,
+            matchedIngredients:
+            matchedIngredients,
+            score: score,
+            expiringIngredient:
+            expiringIngredient,
+            daysUntilExpiry:
+            daysUntilExpiry,
+          ),
+        );
       }
     }
 
-    // Only recommend recipes that use at least
-    // one currently available pantry ingredient.
-    if (matchedIngredients.isNotEmpty) {
-      recommendations.add(
-        RecipeRecommendation(
-          recipe: recipe,
-          matchedIngredients: matchedIngredients,
-          score: score,
-          expiringIngredient: expiringIngredient,
-          daysUntilExpiry: daysUntilExpiry,
-        ),
-      );
-    }
-  }
+    // ============================================================
+    // 6. SORT BY HIGHEST SCORE
+    // ============================================================
 
-  // Highest recommendation score first.
-  recommendations.sort(
-        (a, b) => b.score.compareTo(a.score),
-  );
+    recommendations.sort(
+          (a, b) =>
+          b.score.compareTo(a.score),
+    );
 
-  return recommendations;
-});
+    return recommendations;
+  },
+);
+
+// ================================================================
+// RECIPE RECOMMENDATION MODEL
+// ================================================================
+
+class RecipeRecommendation {
+  const RecipeRecommendation({
+    required this.recipe,
+    required this.matchedIngredients,
+    required this.score,
+    this.expiringIngredient,
+    this.daysUntilExpiry,
+  });
+
+  final Recipe recipe;
+
+  /// Pantry items that match ingredients
+  /// in this recipe.
+  final List<String> matchedIngredients;
+
+  /// Higher score means higher recommendation priority.
+  final int score;
+
+  /// Matched pantry item with the nearest expiry.
+  final String? expiringIngredient;
+
+  /// Number of days remaining until nearest expiry.
+  final int? daysUntilExpiry;
+
+  bool get hasExpiringIngredient =>
+      expiringIngredient != null &&
+          daysUntilExpiry != null;
+}
