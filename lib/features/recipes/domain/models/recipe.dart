@@ -8,6 +8,7 @@ class Recipe {
     this.category = RecipeCategory.other,
     this.preparationTime = 0,
     this.isFavorite = false,
+    this.tags = const [],
   });
 
   final String id;
@@ -19,6 +20,17 @@ class Recipe {
   final int preparationTime;
   final bool isFavorite;
 
+  /// Dietary / cuisine tags used by the recommendation engine.
+  ///
+  /// Examples:
+  /// vegetarian
+  /// vegan
+  /// non-vegetarian
+  /// sri lankan
+  /// low-carb
+  /// high-protein
+  final List<String> tags;
+
   Recipe copyWith({
     String? id,
     String? name,
@@ -28,6 +40,7 @@ class Recipe {
     RecipeCategory? category,
     int? preparationTime,
     bool? isFavorite,
+    List<String>? tags,
   }) {
     return Recipe(
       id: id ?? this.id,
@@ -38,6 +51,7 @@ class Recipe {
       category: category ?? this.category,
       preparationTime: preparationTime ?? this.preparationTime,
       isFavorite: isFavorite ?? this.isFavorite,
+      tags: tags ?? this.tags,
     );
   }
 }
@@ -54,14 +68,19 @@ enum RecipeCategory {
     switch (this) {
       case RecipeCategory.breakfast:
         return 'Breakfast';
+
       case RecipeCategory.lunch:
         return 'Lunch';
+
       case RecipeCategory.dinner:
         return 'Dinner';
+
       case RecipeCategory.snack:
         return 'Snack';
+
       case RecipeCategory.dessert:
         return 'Dessert';
+
       case RecipeCategory.other:
         return 'Other';
     }
