@@ -17,6 +17,33 @@ final lowStockDismissalsProvider =
       LowStockDismissalsNotifier.new,
     );
 
+final lowStockSuggestionExpansionProvider =
+    NotifierProvider<LowStockSuggestionExpansionNotifier, Map<String, bool>>(
+      LowStockSuggestionExpansionNotifier.new,
+    );
+
+class LowStockSuggestionExpansionNotifier extends Notifier<Map<String, bool>> {
+  @override
+  Map<String, bool> build() => const {};
+
+  void toggle({required String uid}) {
+    _requireCurrentUser(uid);
+    state = {...state, uid: !(state[uid] ?? true)};
+  }
+
+  void _requireCurrentUser(String uid) {
+    if (ref.read(shoppingAuthUidProvider).asData?.value != uid) {
+      throw StateError('Your account changed. Please try again.');
+    }
+  }
+}
+
+final currentLowStockSuggestionExpandedProvider = Provider<bool>((ref) {
+  final uid = ref.watch(shoppingAuthUidProvider).asData?.value;
+  if (uid == null) return true;
+  return ref.watch(lowStockSuggestionExpansionProvider)[uid] ?? true;
+});
+
 class LowStockDismissalsNotifier extends Notifier<Map<String, Set<String>>> {
   @override
   Map<String, Set<String>> build() => const {};

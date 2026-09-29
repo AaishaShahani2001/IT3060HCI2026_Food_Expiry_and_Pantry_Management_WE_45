@@ -14,6 +14,7 @@ import '../../features/profile/presentation/screens/change_password_screen.dart'
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/recipes/presentation/screens/recipes_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/settings/presentation/screens/low_stock_suggestion_settings_screen.dart';
 import '../../features/shared_pantry/presentation/screens/shared_pantry_members_screen.dart';
 import '../../features/shared_pantry/presentation/screens/shared_pantry_screen.dart';
 import '../../features/shopping_list/models/shopping_item.dart';
@@ -139,6 +140,11 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: AppRoutes.settings,
           builder: (context, state) => const SettingsScreen(),
+        ),
+
+        GoRoute(
+          path: AppRoutes.lowStockSuggestions,
+          builder: (context, state) => const LowStockSuggestionSettingsScreen(),
         ),
       ],
     ),

@@ -67,14 +67,22 @@ class LowStockSuggestionSettingsNotifier
   void setThreshold(PantryCategory category, int threshold) {
     final uid = _requireCurrentUser();
     state = state.copyWith(category: category, threshold: threshold);
+    unawaited(_persistThresholds(uid));
+  }
+
+  Future<void> resetThresholds() async {
+    final uid = _requireCurrentUser();
+    state = LowStockSuggestionSettings(enabled: state.enabled);
+    await _persistThresholds(uid);
+  }
+
+  Future<void> _persistThresholds(String uid) async {
     final encoded = jsonEncode({
       for (final entry in state.thresholds.entries) entry.key.name: entry.value,
     });
-    unawaited(
-      ref
-          .read(sharedPreferencesProvider)
-          ?.setString('$_keyPrefix.$uid.thresholds', encoded),
-    );
+    await ref
+        .read(sharedPreferencesProvider)
+        ?.setString('$_keyPrefix.$uid.thresholds', encoded);
   }
 
   String _requireCurrentUser() {

@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:food_expiry_and_pantry_management/core/theme/app_theme.dart';
 import 'package:food_expiry_and_pantry_management/core/providers/theme_mode_provider.dart';
+import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
+import 'package:food_expiry_and_pantry_management/features/home/presentation/widgets/home_shell.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/presentation/screens/pantry_item_form_screen.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
@@ -1629,6 +1631,114 @@ void main() {
   });
 
   testWidgets(
+    'suggestion expansion survives bottom-tab navigation and provider refreshes',
+    (tester) async {
+      tester.view.physicalSize = const Size(430, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final router = GoRouter(
+        initialLocation: AppRoutes.shopping,
+        routes: [
+          ShellRoute(
+            builder: (context, state, child) => HomeShell(child: child),
+            routes: [
+              GoRoute(
+                path: AppRoutes.home,
+                builder: (context, state) =>
+                    const Center(child: Text('Home destination')),
+              ),
+              GoRoute(
+                path: AppRoutes.shopping,
+                builder: (context, state) => const ShoppingListScreen(),
+              ),
+            ],
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            shoppingListRepositoryProvider.overrideWithValue(
+              session.repository,
+            ),
+            shoppingAuthUidProvider.overrideWith((ref) => session.auth()),
+            shoppingPantryItemsProvider.overrideWithValue(
+              AsyncData([
+                lowStockItem('milk', 'Milk'),
+                lowStockItem('eggs', 'Eggs'),
+              ]),
+            ),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.light,
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add All'), findsOneWidget);
+      await tester.tap(find.text('Low-stock suggestions (2)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add All'), findsNothing);
+      expect(find.text('Low-stock suggestions (2)'), findsOneWidget);
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(ShoppingListScreen)),
+      );
+      container.invalidate(lowStockShoppingSuggestionsProvider);
+      await tester.pump();
+      expect(find.text('Add All'), findsNothing);
+
+      await tester.tap(find.byIcon(Icons.home_outlined));
+      await tester.pumpAndSettle();
+      expect(find.text('Home destination'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+      await tester.pumpAndSettle();
+      expect(find.text('Low-stock suggestions (2)'), findsOneWidget);
+      expect(find.text('Add All'), findsNothing);
+
+      await tester.tap(find.text('Low-stock suggestions (2)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add All'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.home_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+      await tester.pumpAndSettle();
+      expect(find.text('Add All'), findsOneWidget);
+
+      await tester.tap(find.text('Add All'));
+      await tester.pumpAndSettle();
+      expect(session.store.addCalls, 2);
+      expect(find.textContaining('Low-stock suggestions'), findsNothing);
+    },
+  );
+
+  testWidgets('suggestion expansion is isolated by account for the session', (
+    tester,
+  ) async {
+    await openScreen(
+      tester,
+      seed: false,
+      pantryItems: [lowStockItem('milk', 'Milk')],
+    );
+    await tester.tap(find.text('Low-stock suggestions (1)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add All'), findsNothing);
+
+    session.changeUser('bob');
+    await tester.pumpAndSettle();
+    expect(find.text('Add All'), findsOneWidget);
+
+    session.changeUser('alice');
+    await tester.pumpAndSettle();
+    expect(find.text('Low-stock suggestions (1)'), findsOneWidget);
+    expect(find.text('Add All'), findsNothing);
+  });
+
+  testWidgets(
     'master setting hides suggestions and threshold updates show them',
     (tester) async {
       SharedPreferences.setMockInitialValues({
@@ -1678,6 +1788,10 @@ void main() {
       );
       await tester.tap(find.byTooltip('Dismiss Milk suggestion'));
       await tester.pump();
+      await tester.tap(find.text('Low-stock suggestions (2)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Low-stock suggestions (2)'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Dismiss All'));
       await tester.pumpAndSettle();
       expect(find.text('Dismiss all suggestions?'), findsOneWidget);

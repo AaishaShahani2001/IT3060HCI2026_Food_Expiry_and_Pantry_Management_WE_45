@@ -101,6 +101,42 @@ void main() {
     );
   });
 
+  test(
+    'reset restores category defaults without changing master toggle',
+    () async {
+      final notifier = container.read(
+        lowStockSuggestionSettingsProvider.notifier,
+      );
+      notifier.setEnabled(false);
+      notifier.setThreshold(PantryCategory.dairy, 4);
+      notifier.setThreshold(PantryCategory.fruits, 3);
+      await notifier.resetThresholds();
+
+      final settings = container.read(lowStockSuggestionSettingsProvider);
+      expect(settings.enabled, isFalse);
+      expect(settings.thresholds.values, everyElement(1));
+
+      final restored = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          shoppingAuthUidProvider.overrideWith((ref) => session.auth()),
+        ],
+      );
+      addTearDown(restored.dispose);
+      restored.listen(lowStockSuggestionSettingsProvider, (_, _) {});
+      await restored.read(shoppingAuthUidProvider.future);
+      await restored.pump();
+      expect(
+        restored.read(lowStockSuggestionSettingsProvider).thresholds.values,
+        everyElement(1),
+      );
+      expect(
+        restored.read(lowStockSuggestionSettingsProvider).enabled,
+        isFalse,
+      );
+    },
+  );
+
   for (final dark in [false, true]) {
     testWidgets(
       'settings card works on a narrow ${dark ? 'dark' : 'light'} display',
@@ -142,7 +178,7 @@ void main() {
         await tester.pump();
         final increase = tester.widget<IconButton>(
           find.ancestor(
-            of: find.byTooltip('Increase Dairy low-stock threshold'),
+            of: find.byTooltip('Increase Dairy low-stock level'),
             matching: find.byType(IconButton),
           ),
         );

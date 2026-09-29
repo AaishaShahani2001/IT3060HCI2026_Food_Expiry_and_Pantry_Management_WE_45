@@ -8,9 +8,12 @@ import '../../../../core/providers/current_user_provider.dart';
 import '../../../../core/providers/theme_mode_provider.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../shopping_list/presentation/providers/low_stock_suggestion_settings_provider.dart';
-import '../widgets/low_stock_suggestion_settings_card.dart';
 import '../widgets/settings_nav_card.dart';
 import '../widgets/theme_option_button.dart';
+
+final settingsUserEmailProvider = Provider<String?>((ref) {
+  return FirebaseAuth.instance.currentUser?.email;
+});
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -29,7 +32,7 @@ class SettingsScreen extends ConsumerWidget {
       error: (_, _) => AppStrings.userFallback,
     );
 
-    final email = FirebaseAuth.instance.currentUser?.email;
+    final email = ref.watch(settingsUserEmailProvider);
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -94,14 +97,12 @@ class SettingsScreen extends ConsumerWidget {
 
             const SizedBox(height: 12),
 
-            LowStockSuggestionSettingsCard(
-              settings: lowStockSettings,
-              onEnabledChanged: (enabled) => ref
-                  .read(lowStockSuggestionSettingsProvider.notifier)
-                  .setEnabled(enabled),
-              onThresholdChanged: (category, threshold) => ref
-                  .read(lowStockSuggestionSettingsProvider.notifier)
-                  .setThreshold(category, threshold),
+            SettingsNavCard(
+              icon: Icons.inventory_2_outlined,
+              title: 'Low Stock Suggestions',
+              detail: 'Control shopping suggestions and stock thresholds',
+              trailingLabel: lowStockSettings.enabled ? 'On' : 'Off',
+              onTap: () => context.push(AppRoutes.lowStockSuggestions),
             ),
 
             const SizedBox(height: 28),

@@ -37,7 +37,6 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   bool _selectionMode = false;
   bool _isBusy = false;
   bool _showProgress = false;
-  bool _lowStockSuggestionsExpanded = true;
   int _operationToken = 0;
 
   @override
@@ -670,6 +669,9 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
 
   Widget _buildItemList(List<ShoppingItem> items) {
     final suggestions = ref.watch(lowStockShoppingSuggestionsProvider);
+    final lowStockSuggestionsExpanded = ref.watch(
+      currentLowStockSuggestionExpandedProvider,
+    );
     final visible = _visibleItems(items);
     final allSelected =
         visible.isNotEmpty &&
@@ -701,11 +703,14 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                       onAddAll: () => _addAllLowStockSuggestions(suggestions),
                       onDismissAll: () =>
                           _dismissAllLowStockSuggestions(suggestions),
-                      expanded: _lowStockSuggestionsExpanded,
-                      onToggleExpanded: () => setState(
-                        () => _lowStockSuggestionsExpanded =
-                            !_lowStockSuggestionsExpanded,
-                      ),
+                      expanded: lowStockSuggestionsExpanded,
+                      onToggleExpanded: () {
+                        final uid = _uid;
+                        if (uid == null) return;
+                        ref
+                            .read(lowStockSuggestionExpansionProvider.notifier)
+                            .toggle(uid: uid);
+                      },
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -860,7 +865,6 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
           _filter = _ShoppingFilter.all;
           _searchController.clear();
           _collapsedCategories.clear();
-          _lowStockSuggestionsExpanded = true;
         });
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
       }

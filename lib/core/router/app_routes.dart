@@ -17,6 +17,7 @@ abstract final class AppRoutes {
   static const String wasteTracker = '/waste-tracker';
   static const String recipes = '/recipes';
   static const String settings = '/settings';
+  static const String lowStockSuggestions = '/settings/low-stock-suggestions';
 
   // Shared Pantry
   static const String sharedPantry = '/shared-pantry';
