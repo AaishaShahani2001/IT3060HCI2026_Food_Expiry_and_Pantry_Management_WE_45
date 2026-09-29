@@ -253,6 +253,10 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
   Widget build(BuildContext context) {
     final isEditing = widget.item != null;
     final colorScheme = Theme.of(context).colorScheme;
+    // Reuse the signed-in user's already loaded pantry stream. Name matching
+    // reads this list in memory and does not query Firestore per keystroke.
+    final existingItems =
+        ref.watch(pantryItemsProvider).asData?.value ?? const <PantryItem>[];
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -292,6 +296,7 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
                 ),
                 child: PantryItemForm(
                   initialItem: widget.item,
+                  existingItems: existingItems,
                   isSaving: _isSaving,
                   savingMessage: _savingMessage,
                   onSubmit: _handleSubmit,
