@@ -13,6 +13,7 @@ import '../utils/pantry_item_actions.dart';
 import '../widgets/expiry_status_indicator.dart';
 import '../widgets/mark_consumed_bottom_sheet.dart';
 import '../widgets/pantry_item_actions_sheet.dart';
+import '../widgets/pantry_item_image.dart';
 
 /// Local pantry item details screen.
 ///
@@ -348,7 +349,7 @@ class _PantryItemDetailsScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Name, category placeholder image, and expiry badge.
+                  // Name, category photo or icon, and expiry badge.
                   _HeaderCard(item: item),
                   const SizedBox(height: 16),
                   // Compact label/value rows, including price.
@@ -421,7 +422,7 @@ class _PantryItemDetailsScreenState
   }
 }
 
-/// Header: category icon placeholder, name, category, and status badge.
+/// Header: user photo or category icon, name, category, and status badge.
 class _HeaderCard extends StatelessWidget {
   const _HeaderCard({required this.item});
 
@@ -441,10 +442,14 @@ class _HeaderCard extends StatelessWidget {
               color: colorScheme.secondaryContainer,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Icon(
-              item.category.icon,
-              size: 40,
-              color: colorScheme.primary,
+            child: PantryItemImage(
+              item: item,
+              width: 84,
+              height: 84,
+              borderRadius: BorderRadius.circular(20),
+              iconSize: 40,
+              backgroundColor: colorScheme.secondaryContainer,
+              iconColor: colorScheme.primary,
             ),
           ),
           const SizedBox(width: 16),

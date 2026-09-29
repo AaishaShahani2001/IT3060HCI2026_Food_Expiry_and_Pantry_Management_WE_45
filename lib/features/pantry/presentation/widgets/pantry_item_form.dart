@@ -1,7 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../data/services/pantry_photo_storage_service.dart';
 import '../../domain/models/pantry_item.dart';
+import '../utils/pantry_snackbar.dart';
+import 'pantry_item_photo_field.dart';
 
 class PantryItemFormData {
   const PantryItemFormData({
@@ -12,6 +17,8 @@ class PantryItemFormData {
     required this.unit,
     required this.price,
     this.expiryDate,
+    this.selectedPhoto,
+    this.removeExistingPhoto = false,
   });
 
   final String name;
@@ -21,6 +28,13 @@ class PantryItemFormData {
   final PantryUnit unit;
   final double price;
   final DateTime? expiryDate;
+
+  /// Local file chosen in this session. Not uploaded until Save.
+  final XFile? selectedPhoto;
+
+  /// True when the user removed an existing Storage photo and did not pick a
+  /// replacement. Save then clears Firestore photo fields.
+  final bool removeExistingPhoto;
 }
 
 class PantryItemForm extends StatefulWidget {
@@ -28,11 +42,13 @@ class PantryItemForm extends StatefulWidget {
     required this.onSubmit,
     this.initialItem,
     this.isSaving = false,
+    this.savingMessage,
     super.key,
   });
 
   final PantryItem? initialItem;
   final bool isSaving;
+  final String? savingMessage;
   final Future<void> Function(PantryItemFormData data) onSubmit;
 
   @override
@@ -49,6 +65,9 @@ class _PantryItemFormState extends State<PantryItemForm> {
   late PantryLocation _location;
   late PantryUnit _unit;
   DateTime? _expiryDate;
+  XFile? _selectedPhoto;
+  Uint8List? _previewBytes;
+  bool _removeExistingPhoto = false;
 
   @override
   void initState() {
@@ -136,8 +155,117 @@ class _PantryItemFormState extends State<PantryItemForm> {
         unit: _unit,
         price: price,
         expiryDate: _expiryDate,
+        selectedPhoto: _selectedPhoto,
+        removeExistingPhoto: _removeExistingPhoto,
       ),
     );
+  }
+
+  bool get _hasPhotoPreview {
+    if (_previewBytes != null) return true;
+    final existingUrl = widget.initialItem?.photoUrl;
+    return !_removeExistingPhoto &&
+        existingUrl != null &&
+        existingUrl.trim().isNotEmpty;
+  }
+
+  Widget? get _photoPreview {
+    if (_previewBytes != null) {
+      return Image.memory(
+        _previewBytes!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        semanticLabel: 'Selected item photo',
+      );
+    }
+    final existingUrl = widget.initialItem?.photoUrl;
+    if (!_removeExistingPhoto &&
+        existingUrl != null &&
+        existingUrl.trim().isNotEmpty) {
+      return Image.network(
+        existingUrl,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        semanticLabel: 'Selected item photo',
+        errorBuilder: (context, error, stackTrace) {
+          return ColoredBox(
+            color: Theme.of(context).colorScheme.secondaryContainer,
+            child: Icon(
+              _category.icon,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          );
+        },
+      );
+    }
+    return null;
+  }
+
+  Future<void> _pickPhoto() async {
+    if (widget.isSaving) return;
+    final source = await showPantryPhotoSourceSheet(context);
+    if (source == null || !mounted) return;
+
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 75,
+      );
+      if (picked == null || !mounted) return;
+
+      final name = picked.name.toLowerCase();
+      final path = picked.path.toLowerCase();
+      const allowed = {'jpg', 'jpeg', 'png', 'webp'};
+      final extension = _fileExtension(name.isNotEmpty ? name : path);
+      if (extension != null && !allowed.contains(extension)) {
+        PantrySnackBar.error(
+          context,
+          'Please choose a JPEG, PNG, or WebP image.',
+        );
+        return;
+      }
+
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
+      if (bytes.length > PantryPhotoStorageService.maxBytes) {
+        PantrySnackBar.error(
+          context,
+          'This photo is too large. Choose an image under 5 MB.',
+        );
+        return;
+      }
+
+      setState(() {
+        _selectedPhoto = picked;
+        _previewBytes = bytes;
+        _removeExistingPhoto = false;
+      });
+    } catch (error) {
+      debugPrint('Pantry photo pick failed: $error');
+      if (!mounted) return;
+      PantrySnackBar.error(
+        context,
+        'Unable to open that photo. Please try another image.',
+      );
+    }
+  }
+
+  void _removePhoto() {
+    setState(() {
+      _selectedPhoto = null;
+      _previewBytes = null;
+      _removeExistingPhoto = widget.initialItem?.hasUserPhoto == true;
+    });
+  }
+
+  static String? _fileExtension(String value) {
+    final dot = value.lastIndexOf('.');
+    if (dot < 0 || dot == value.length - 1) return null;
+    return value.substring(dot + 1);
   }
 
   @override
@@ -147,6 +275,16 @@ class _PantryItemFormState extends State<PantryItemForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          PantryItemPhotoField(
+            category: _category,
+            hasPreview: _hasPhotoPreview,
+            preview: _photoPreview,
+            enabled: !widget.isSaving,
+            onAddPhoto: _pickPhoto,
+            onChangePhoto: _pickPhoto,
+            onRemovePhoto: _removePhoto,
+          ),
+          const SizedBox(height: 20),
           _buildLabel('Item name'),
           TextFormField(
             controller: _nameController,
@@ -369,13 +507,27 @@ class _PantryItemFormState extends State<PantryItemForm> {
               foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             child: widget.isSaving
-                ? SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Theme.of(context).colorScheme.onPrimary,
-                    ),
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                        ),
+                      ),
+                      if (widget.savingMessage != null) ...[
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: Text(
+                            widget.savingMessage!,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ],
                   )
                 : Text(
                     widget.initialItem == null ? 'Save item' : 'Update item',

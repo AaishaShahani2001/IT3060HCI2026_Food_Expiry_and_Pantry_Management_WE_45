@@ -4,6 +4,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/pantry_item.dart';
 import 'expiry_status_indicator.dart';
 import 'pantry_item_actions_sheet.dart';
+import 'pantry_item_image.dart';
 import 'pantry_quantity_stepper.dart';
 
 /// Compact horizontal tile for All Pantry Items list view.
@@ -36,11 +37,15 @@ class PantryItemListTile extends StatelessWidget {
     final canDecrement = !isUpdating;
 
     final cardBg = isDark ? FreshPalette.darkCard : FreshPalette.card;
-    final borderColor = isDark ? FreshPalette.darkOutline : FreshPalette.outline;
+    final borderColor = isDark
+        ? FreshPalette.darkOutline
+        : FreshPalette.outline;
     final thumbnailBg = isDark
         ? FreshPalette.darkAccentSurface
         : colorScheme.secondaryContainer.withValues(alpha: 0.65);
-    final primaryText = isDark ? FreshPalette.darkHeading : FreshPalette.heading;
+    final primaryText = isDark
+        ? FreshPalette.darkHeading
+        : FreshPalette.heading;
     final secondaryText = isDark
         ? FreshPalette.darkSecondaryText
         : FreshPalette.secondaryText;
@@ -82,10 +87,14 @@ class PantryItemListTile extends StatelessWidget {
                         color: thumbnailBg,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
-                        item.category.icon,
-                        size: 24,
-                        color: isDark
+                      child: PantryItemImage(
+                        item: item,
+                        width: 46,
+                        height: 46,
+                        borderRadius: BorderRadius.circular(12),
+                        iconSize: 24,
+                        backgroundColor: thumbnailBg,
+                        iconColor: isDark
                             ? FreshPalette.highlight
                             : FreshPalette.primaryButton,
                       ),
@@ -93,10 +102,7 @@ class PantryItemListTile extends StatelessWidget {
                     Positioned(
                       top: -2,
                       right: -2,
-                      child: ExpiryStatusIndicator(
-                        status: status,
-                        size: 11,
-                      ),
+                      child: ExpiryStatusIndicator(status: status, size: 11),
                     ),
                   ],
                 ),
@@ -131,7 +137,9 @@ class PantryItemListTile extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: isDark
-                                    ? AppColors.statusRed.withValues(alpha: 0.25)
+                                    ? AppColors.statusRed.withValues(
+                                        alpha: 0.25,
+                                      )
                                     : AppColors.statusRedBg,
                                 borderRadius: BorderRadius.circular(6),
                               ),
@@ -153,7 +161,9 @@ class PantryItemListTile extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: isDark
-                                    ? AppColors.statusAmber.withValues(alpha: 0.25)
+                                    ? AppColors.statusAmber.withValues(
+                                        alpha: 0.25,
+                                      )
                                     : AppColors.statusAmberBg,
                                 borderRadius: BorderRadius.circular(6),
                               ),
@@ -174,10 +184,7 @@ class PantryItemListTile extends StatelessWidget {
                         '${item.category.label} • ${item.location.label}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: secondaryText,
-                        ),
+                        style: TextStyle(fontSize: 11, color: secondaryText),
                       ),
                       const SizedBox(height: 3),
                       Row(
@@ -235,8 +242,7 @@ class PantryItemListTile extends StatelessWidget {
                               iconSize: 18,
                               tooltip: 'Actions for ${item.name}',
                               onPressed: () async {
-                                final action =
-                                    await showPantryItemActionsSheet(
+                                final action = await showPantryItemActionsSheet(
                                   context: context,
                                   item: item,
                                 );
@@ -280,4 +286,3 @@ class PantryItemListTile extends StatelessWidget {
     );
   }
 }
-

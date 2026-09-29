@@ -1,12 +1,16 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../data/services/pantry_firestore_service.dart';
+import '../../data/services/pantry_photo_storage_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../providers/pantry_providers.dart';
+import '../utils/pantry_snackbar.dart';
 import '../widgets/duplicate_item_dialog.dart';
 import '../widgets/pantry_item_form.dart';
+import '../widgets/pantry_photo_upload_failure_dialog.dart';
 
 class PantryItemFormScreen extends ConsumerStatefulWidget {
   const PantryItemFormScreen({this.item, super.key});
@@ -20,12 +24,18 @@ class PantryItemFormScreen extends ConsumerStatefulWidget {
 
 class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
   bool _isSaving = false;
+  String? _savingMessage;
 
   Future<void> _handleSubmit(PantryItemFormData data) async {
     if (_isSaving) return;
 
     FocusScope.of(context).unfocus();
-    setState(() => _isSaving = true);
+    setState(() {
+      _isSaving = true;
+      _savingMessage = data.selectedPhoto != null
+          ? 'Uploading photo and saving item…'
+          : 'Saving item…';
+    });
 
     try {
       final duplicate = ref
@@ -56,49 +66,70 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
         }
       }
 
-      await _persistItem(data);
+      final saved = await _persistItem(data);
+      if (!saved || !mounted) return;
 
-      if (mounted) {
-        Navigator.of(context).pop(true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            content: Text(
-              widget.item == null
-                  ? '${data.name} added to your pantry'
-                  : 'Item updated successfully.',
-            ),
-          ),
-        );
-      }
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.of(context).pop(true);
+      PantrySnackBar.showOn(
+        messenger,
+        message: widget.item == null
+            ? '${data.name} added to your pantry'
+            : 'Item updated successfully.',
+      );
+    } on _PhotoSaveCancelled {
+      return;
     } catch (error, stackTrace) {
       debugPrint('Pantry item save failed: $error');
       debugPrint('$stackTrace');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).colorScheme.error,
-            content: Text(mapPantryFirestoreError(error)),
-          ),
-        );
+        PantrySnackBar.error(context, mapPantryFirestoreError(error));
       }
     } finally {
       if (mounted) {
-        setState(() => _isSaving = false);
+        setState(() {
+          _isSaving = false;
+          _savingMessage = null;
+        });
       }
     }
   }
 
-  Future<void> _persistItem(PantryItemFormData data) async {
+  Future<bool> _persistItem(PantryItemFormData data) async {
     final notifier = ref.read(pantryItemsProvider.notifier);
     if (widget.item == null) {
+      return _addItem(notifier, data);
+    }
+    return _updateItem(notifier, data);
+  }
+
+  Future<bool> _addItem(
+    PantryItemsNotifier notifier,
+    PantryItemFormData data,
+  ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw const PantryFirestoreException('Please log in before continuing.');
+    }
+
+    // Generate the document ID first so Storage and Firestore share it.
+    final itemId = notifier.generateNewItemId(user.uid);
+    PantryPhotoUpload? photo;
+    if (data.selectedPhoto != null) {
+      photo = await _uploadWithRecovery(
+        notifier: notifier,
+        userId: user.uid,
+        itemId: itemId,
+        photo: data.selectedPhoto!,
+      );
+      if (photo == null && !mounted) return false;
+    }
+
+    try {
       await notifier.addItem(
         PantryItem(
-          id: '',
+          id: itemId,
+          firestoreId: itemId,
           name: data.name,
           category: data.category,
           location: data.location,
@@ -106,25 +137,53 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
           unit: data.unit,
           price: data.price,
           expiryDate: data.expiryDate,
+          photoUrl: photo?.downloadUrl,
+          photoStoragePath: photo?.storagePath,
         ),
       );
-      return;
+      return true;
+    } catch (error) {
+      if (photo != null) {
+        await notifier.deleteItemPhoto(storagePath: photo.storagePath);
+      }
+      rethrow;
     }
+  }
 
+  Future<bool> _updateItem(
+    PantryItemsNotifier notifier,
+    PantryItemFormData data,
+  ) async {
+    final existing = widget.item!;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       throw const PantryFirestoreException('Please log in before continuing.');
     }
 
-    if (!widget.item!.isConnectedToFirestore) {
+    if (!existing.isConnectedToFirestore) {
       throw const PantryFirestoreException(
         'This item is local-only and is not connected to Firestore yet.',
       );
     }
 
-    // copyWith keeps firestoreId, createdAt, and any fields the form
-    // does not collect (this model has no image or barcode).
-    final updatedItem = widget.item!.copyWith(
+    final itemId = existing.firestoreId!;
+    final previousPath = existing.photoStoragePath;
+    PantryPhotoUpload? replacement;
+    var clearPhoto = data.removeExistingPhoto && data.selectedPhoto == null;
+
+    if (data.selectedPhoto != null) {
+      replacement = await _uploadWithRecovery(
+        notifier: notifier,
+        userId: user.uid,
+        itemId: itemId,
+        photo: data.selectedPhoto!,
+      );
+      if (replacement == null) {
+        clearPhoto = false;
+      }
+    }
+
+    final updatedItem = existing.copyWith(
       name: data.name,
       category: data.category,
       location: data.location,
@@ -133,9 +192,61 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
       price: data.price,
       expiryDate: data.expiryDate,
       clearExpiryDate: data.expiryDate == null,
+      photoUrl: replacement?.downloadUrl,
+      photoStoragePath: replacement?.storagePath,
+      clearPhoto: clearPhoto,
     );
 
     await notifier.updateItem(updatedItem);
+
+    if (clearPhoto && previousPath != null && previousPath.trim().isNotEmpty) {
+      await notifier.deleteItemPhoto(storagePath: previousPath);
+    } else if (replacement != null &&
+        previousPath != null &&
+        previousPath.trim().isNotEmpty &&
+        previousPath != replacement.storagePath) {
+      // Keep the previous Storage object until the replacement URL is saved.
+      await notifier.deleteItemPhoto(storagePath: previousPath);
+    }
+
+    return true;
+  }
+
+  /// Returns the upload result, or null when the user chose Save Without Photo.
+  Future<PantryPhotoUpload?> _uploadWithRecovery({
+    required PantryItemsNotifier notifier,
+    required String userId,
+    required String itemId,
+    required XFile photo,
+  }) async {
+    while (mounted) {
+      try {
+        setState(() {
+          _savingMessage = 'Uploading photo and saving item…';
+        });
+        return await notifier.uploadItemPhoto(
+          userId: userId,
+          itemId: itemId,
+          photo: photo,
+        );
+      } catch (error, stackTrace) {
+        debugPrint('Pantry photo upload failed: $error');
+        debugPrint('$stackTrace');
+        if (!mounted) throw const _PhotoSaveCancelled();
+        setState(() => _savingMessage = null);
+        final action = await showPhotoUploadFailureDialog(context);
+        if (!mounted ||
+            action == null ||
+            action == PantryPhotoUploadFailureAction.cancel) {
+          throw const _PhotoSaveCancelled();
+        }
+        if (action == PantryPhotoUploadFailureAction.saveWithoutPhoto) {
+          setState(() => _savingMessage = 'Saving item…');
+          return null;
+        }
+      }
+    }
+    throw const _PhotoSaveCancelled();
   }
 
   @override
@@ -182,6 +293,7 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
                 child: PantryItemForm(
                   initialItem: widget.item,
                   isSaving: _isSaving,
+                  savingMessage: _savingMessage,
                   onSubmit: _handleSubmit,
                 ),
               ),
@@ -191,4 +303,8 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
       ),
     );
   }
+}
+
+class _PhotoSaveCancelled implements Exception {
+  const _PhotoSaveCancelled();
 }

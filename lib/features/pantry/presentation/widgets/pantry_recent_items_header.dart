@@ -16,7 +16,7 @@ class PantryRecentItemsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Row(
         children: [
           Expanded(
@@ -36,12 +36,14 @@ class PantryRecentItemsHeader extends StatelessWidget {
             Semantics(
               button: true,
               label: 'View all $matchingCount pantry items',
-              child: TextButton(
+              child: FilledButton.tonal(
                 onPressed: () => context.push(AppRoutes.pantryItems),
-                style: TextButton.styleFrom(
-                  foregroundColor: colorScheme.primary,
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.primaryContainer,
+                  foregroundColor: colorScheme.onPrimaryContainer,
                   minimumSize: const Size(48, 48),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
+                  shape: const StadiumBorder(),
                   tapTargetSize: MaterialTapTargetSize.padded,
                 ),
                 child: Row(
@@ -50,16 +52,16 @@ class PantryRecentItemsHeader extends StatelessWidget {
                     Text(
                       'View All ($matchingCount)',
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.primary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onPrimaryContainer,
                       ),
                     ),
-                    const SizedBox(width: 2),
+                    const SizedBox(width: 4),
                     Icon(
                       Icons.arrow_forward_rounded,
                       size: 18,
-                      color: colorScheme.primary,
+                      color: colorScheme.onPrimaryContainer,
                     ),
                   ],
                 ),
