@@ -44,6 +44,60 @@ final currentLowStockSuggestionExpandedProvider = Provider<bool>((ref) {
   return ref.watch(lowStockSuggestionExpansionProvider)[uid] ?? true;
 });
 
+final shoppingCategoryExpansionProvider =
+    NotifierProvider<
+      ShoppingCategoryExpansionNotifier,
+      Map<String, Map<String, bool>>
+    >(ShoppingCategoryExpansionNotifier.new);
+
+class ShoppingCategoryExpansionNotifier
+    extends Notifier<Map<String, Map<String, bool>>> {
+  @override
+  Map<String, Map<String, bool>> build() => const {};
+
+  void toggle({required String uid, required String category}) {
+    _requireCurrentUser(uid);
+    final categories = state[uid] ?? const <String, bool>{};
+    state = {
+      ...state,
+      uid: {...categories, category: !(categories[category] ?? true)},
+    };
+  }
+
+  void setExpanded({
+    required String uid,
+    required String category,
+    required bool expanded,
+  }) {
+    _requireCurrentUser(uid);
+    final categories = state[uid] ?? const <String, bool>{};
+    state = {
+      ...state,
+      uid: {...categories, category: expanded},
+    };
+  }
+
+  void forgetCategory({required String uid, required String category}) {
+    _requireCurrentUser(uid);
+    final categories = {...?state[uid]}..remove(category);
+    state = {...state, uid: categories};
+  }
+
+  void _requireCurrentUser(String uid) {
+    if (ref.read(shoppingAuthUidProvider).asData?.value != uid) {
+      throw StateError('Your account changed. Please try again.');
+    }
+  }
+}
+
+final currentShoppingCategoryExpansionProvider = Provider<Map<String, bool>>((
+  ref,
+) {
+  final uid = ref.watch(shoppingAuthUidProvider).asData?.value;
+  if (uid == null) return const {};
+  return ref.watch(shoppingCategoryExpansionProvider)[uid] ?? const {};
+});
+
 class LowStockDismissalsNotifier extends Notifier<Map<String, Set<String>>> {
   @override
   Map<String, Set<String>> build() => const {};

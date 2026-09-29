@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 class ShoppingCategorySection extends StatelessWidget {
   const ShoppingCategorySection({
@@ -7,6 +8,7 @@ class ShoppingCategorySection extends StatelessWidget {
     required this.count,
     required this.expanded,
     required this.onToggle,
+    required this.onLongPress,
     required this.children,
   });
 
@@ -14,6 +16,7 @@ class ShoppingCategorySection extends StatelessWidget {
   final int count;
   final bool expanded;
   final VoidCallback? onToggle;
+  final VoidCallback? onLongPress;
   final List<Widget> children;
 
   IconData get _icon => switch (category) {
@@ -34,7 +37,7 @@ class ShoppingCategorySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final title = category == 'Rice, Grains and Cereals' ? 'Grains' : category;
+    final title = shoppingCategoryTitle(category);
     return Material(
       color: colors.surfaceContainerHighest,
       clipBehavior: Clip.antiAlias,
@@ -45,9 +48,20 @@ class ShoppingCategorySection extends StatelessWidget {
       child: Column(
         children: [
           Semantics(
+            button: true,
             expanded: expanded,
+            label: expanded
+                ? 'Collapse $title category'
+                : 'Expand $title category',
+            customSemanticsActions: onLongPress == null
+                ? const {}
+                : {
+                    CustomSemanticsAction(label: 'Category actions for $title'):
+                        onLongPress!,
+                  },
             child: InkWell(
               onTap: onToggle,
+              onLongPress: onLongPress,
               child: Container(
                 constraints: const BoxConstraints(minHeight: 56),
                 color: colors.secondaryContainer.withValues(alpha: 0.3),
@@ -90,3 +104,6 @@ class ShoppingCategorySection extends StatelessWidget {
     );
   }
 }
+
+String shoppingCategoryTitle(String category) =>
+    category == 'Rice, Grains and Cereals' ? 'Grains' : category;

@@ -532,6 +532,151 @@ void main() {
   });
 
   testWidgets(
+    'category delete uses the full category despite filters and preserves Pantry',
+    (tester) async {
+      session.store.seed('alice', 'apple', 'Apple');
+      session.store.seed('alice', 'banana', 'Banana');
+      session.store.seed('alice', 'orange', 'Orange', purchased: true);
+      session.store.seed('alice', 'milk', 'Milk');
+      final pantryItems = [
+        lowStockItem('pantry-apple', 'Apple', category: PantryCategory.fruits),
+        lowStockItem(
+          'pantry-orange',
+          'Orange',
+          category: PantryCategory.fruits,
+        ),
+      ];
+      await openScreen(tester, seed: false, pantryItems: pantryItems);
+
+      final categorySemantics = tester.getSemantics(
+        find.bySemanticsLabel(RegExp('Collapse Fruits category')),
+      );
+      expect(
+        categorySemantics.getSemanticsData().customSemanticsActionIds,
+        isNotEmpty,
+      );
+
+      await tester.longPress(find.text('Fruits (3)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete all items in Fruits'), findsOneWidget);
+      await tester.tap(find.text('Delete all items in Fruits'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete Fruits items?'), findsOneWidget);
+      expect(
+        find.text(
+          'This will remove all 3 items in the Fruits category from your Shopping List.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('TO BUY (3)'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('shopping-search')),
+        'apple',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Fruits (1)'), findsOneWidget);
+
+      await tester.longPress(find.text('Fruits (1)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete all items in Fruits'), findsOneWidget);
+      await tester.tap(find.text('Delete all items in Fruits'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete Fruits items?'), findsOneWidget);
+      expect(
+        find.text(
+          'This will remove all 3 items in the Fruits category from your Shopping List.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(session.store.commitCalls, 0);
+      expect(session.store.documents.length, 4);
+
+      await tester.tap(find.byTooltip('Clear search'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('BOUGHT (1)'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('shopping-search')),
+        'orange',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Fruits (1)'), findsOneWidget);
+      await tester.longPress(find.text('Fruits (1)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete all items in Fruits'));
+      await tester.pumpAndSettle();
+      await confirmDelete(tester);
+
+      expect(session.store.documents.keys, ['users/alice/shopping_items/milk']);
+      expect(find.text('Fruits (1)'), findsNothing);
+      expect(find.text('3 items removed from Fruits.'), findsOneWidget);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(ShoppingListScreen)),
+      );
+      expect(
+        container.read(shoppingPantryItemsProvider).requireValue,
+        same(pantryItems),
+      );
+    },
+  );
+
+  testWidgets(
+    'collapsed category supports singular delete and resets stale expansion state',
+    (tester) async {
+      session.store.seed('alice', 'milk', 'Milk');
+      await openScreen(tester, seed: false, dark: true);
+      await tester.tap(find.text('Dairy (1)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Milk'), findsNothing);
+      expect(
+        find.bySemanticsLabel(RegExp('Expand Dairy category')),
+        findsOneWidget,
+      );
+
+      await tester.longPress(find.text('Dairy (1)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete all items in Dairy'), findsOneWidget);
+      await tester.tap(find.text('Delete all items in Dairy'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'This will remove 1 item in the Dairy category from your Shopping List.',
+        ),
+        findsOneWidget,
+      );
+      await confirmDelete(tester);
+
+      expect(session.store.documents, isEmpty);
+      expect(find.text('1 item removed from Dairy.'), findsOneWidget);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(ShoppingListScreen)),
+      );
+      expect(
+        container
+            .read(currentShoppingCategoryExpansionProvider)
+            .containsKey('Dairy'),
+        isFalse,
+      );
+
+      session.store.seed('alice', 'fresh-milk', 'Fresh Milk');
+      await pullRefresh(tester);
+      expect(find.text('Dairy (1)'), findsOneWidget);
+      expect(find.text('Fresh Milk'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp('Collapse Dairy category')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'tabs use whole-list counts; search is trimmed and case insensitive',
     (tester) async {
       await openScreen(tester);
@@ -587,6 +732,75 @@ void main() {
     expect(session.store.addCalls, 0);
     expect(session.store.commitCalls, 0);
   });
+
+  testWidgets(
+    'category expansion is independent and survives filters search and refresh',
+    (tester) async {
+      session.store.seed('alice', 'apple', 'Apple');
+      await openScreen(tester);
+
+      expect(find.text('Milk'), findsOneWidget);
+      expect(find.text('Apple'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp('Collapse Dairy category')),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(RegExp('Collapse Fruits category')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Dairy (1)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fruits (1)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Dairy (1)'), findsOneWidget);
+      expect(find.text('Fruits (1)'), findsOneWidget);
+      expect(find.text('Milk'), findsNothing);
+      expect(find.text('Apple'), findsNothing);
+      expect(
+        find.bySemanticsLabel(RegExp('Expand Dairy category')),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(RegExp('Expand Fruits category')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Dairy (1)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Milk'), findsOneWidget);
+      expect(find.text('Apple'), findsNothing);
+
+      await tester.tap(find.text('BOUGHT (1)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Fruits (1)'), findsNothing);
+      await tester.tap(find.text('ALL (4)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Fruits (1)'), findsOneWidget);
+      expect(find.text('Apple'), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('shopping-search')),
+        'apple',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Fruits (1)'), findsOneWidget);
+      expect(find.text('Apple'), findsNothing);
+      await tester.tap(find.byTooltip('Clear search'));
+      await tester.pumpAndSettle();
+      expect(find.text('Fruits (1)'), findsOneWidget);
+      expect(find.text('Apple'), findsNothing);
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(ShoppingListScreen)),
+      );
+      container.invalidate(shoppingListProvider);
+      await tester.pumpAndSettle();
+      expect(find.text('Milk'), findsOneWidget);
+      expect(find.text('Apple'), findsNothing);
+    },
+  );
 
   testWidgets(
     'quantity controls persist 1-100 and preserve IDs and purchased state',
@@ -697,7 +911,7 @@ void main() {
   );
 
   testWidgets(
-    'account switch resets query and collapse state; stale row menu cannot delete',
+    'account switch resets query and isolates UI state; stale menu cannot delete',
     (tester) async {
       await openScreen(tester);
       await tester.enterText(
@@ -742,6 +956,13 @@ void main() {
         'Bread',
       );
       expect(session.store.commitCalls, 0);
+      await tester.tap(find.byTooltip('Cancel selection'));
+      await tester.pumpAndSettle();
+      expect(find.text('Milk'), findsNothing);
+      expect(
+        find.bySemanticsLabel(RegExp('Expand Dairy category')),
+        findsOneWidget,
+      );
     },
   );
 
@@ -1633,6 +1854,7 @@ void main() {
   testWidgets(
     'suggestion expansion survives bottom-tab navigation and provider refreshes',
     (tester) async {
+      session.store.seed('alice', 'bread', 'Bread');
       tester.view.physicalSize = const Size(430, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -1680,10 +1902,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Add All'), findsOneWidget);
+      expect(find.text('Bread'), findsOneWidget);
       await tester.tap(find.text('Low-stock suggestions (2)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bakery (1)'));
       await tester.pumpAndSettle();
       expect(find.text('Add All'), findsNothing);
       expect(find.text('Low-stock suggestions (2)'), findsOneWidget);
+      expect(find.text('Bakery (1)'), findsOneWidget);
+      expect(find.text('Bread'), findsNothing);
 
       final container = ProviderScope.containerOf(
         tester.element(find.byType(ShoppingListScreen)),
@@ -1699,15 +1926,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Low-stock suggestions (2)'), findsOneWidget);
       expect(find.text('Add All'), findsNothing);
+      expect(find.text('Bread'), findsNothing);
 
       await tester.tap(find.text('Low-stock suggestions (2)'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Bakery (1)'));
+      await tester.pumpAndSettle();
       expect(find.text('Add All'), findsOneWidget);
+      expect(find.text('Bread'), findsOneWidget);
       await tester.tap(find.byIcon(Icons.home_outlined));
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
       await tester.pumpAndSettle();
       expect(find.text('Add All'), findsOneWidget);
+      expect(find.text('Bread'), findsOneWidget);
 
       await tester.tap(find.text('Add All'));
       await tester.pumpAndSettle();
@@ -1716,9 +1948,11 @@ void main() {
     },
   );
 
-  testWidgets('suggestion expansion is isolated by account for the session', (
+  testWidgets('suggestion and category expansion are isolated by account', (
     tester,
   ) async {
+    session.store.seed('alice', 'bread', 'Bread');
+    session.store.seed('bob', 'bread', 'Bread');
     await openScreen(
       tester,
       seed: false,
@@ -1726,16 +1960,21 @@ void main() {
     );
     await tester.tap(find.text('Low-stock suggestions (1)'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Bakery (1)'));
+    await tester.pumpAndSettle();
     expect(find.text('Add All'), findsNothing);
+    expect(find.text('Bread'), findsNothing);
 
     session.changeUser('bob');
     await tester.pumpAndSettle();
     expect(find.text('Add All'), findsOneWidget);
+    expect(find.text('Bread'), findsOneWidget);
 
     session.changeUser('alice');
     await tester.pumpAndSettle();
     expect(find.text('Low-stock suggestions (1)'), findsOneWidget);
     expect(find.text('Add All'), findsNothing);
+    expect(find.text('Bread'), findsNothing);
   });
 
   testWidgets(

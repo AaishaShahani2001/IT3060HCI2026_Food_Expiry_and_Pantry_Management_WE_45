@@ -31,7 +31,6 @@ class ShoppingListScreen extends ConsumerStatefulWidget {
 
 class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   final Set<String> _selectedIds = {};
-  final Set<String> _collapsedCategories = {};
   final TextEditingController _searchController = TextEditingController();
   _ShoppingFilter _filter = _ShoppingFilter.all;
   bool _selectionMode = false;
@@ -94,8 +93,14 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       setState(() {
         _filter = _ShoppingFilter.all;
         _searchController.clear();
-        _collapsedCategories.remove(resolvedShoppingCategory(item));
       });
+      ref
+          .read(shoppingCategoryExpansionProvider.notifier)
+          .setExpanded(
+            uid: uid!,
+            category: resolvedShoppingCategory(item),
+            expanded: true,
+          );
     } finally {
       if (mounted && token == _operationToken) setState(() => _isBusy = false);
     }
@@ -359,8 +364,6 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       if (enter) {
         FocusScope.of(context).unfocus();
         _selectionMode = true;
-        // Selection shows every match, including previously collapsed groups.
-        _collapsedCategories.clear();
         _selectedIds.add(item.id!);
       } else if (!_selectedIds.remove(item.id)) {
         _selectedIds.add(item.id!);
@@ -388,22 +391,89 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     });
   }
 
-  Future<void> _confirmDelete(List<String> ids, {bool single = false}) async {
+  Future<void> _showCategoryActions(String category) async {
+    if (_isBusy || _selectionMode || _uid == null) return;
+    final uid = _uid;
+    final title = shoppingCategoryTitle(category);
+    final delete = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: Icon(
+              Icons.delete_outline_rounded,
+              color: Theme.of(sheetContext).colorScheme.error,
+            ),
+            title: Text('Delete all items in $title'),
+            textColor: Theme.of(sheetContext).colorScheme.error,
+            onTap: () => Navigator.pop(sheetContext, true),
+          ),
+        ),
+      ),
+    );
+    if (delete != true || !mounted || uid != _uid) return;
+    await _confirmCategoryDelete(category, uid!);
+  }
+
+  Future<void> _confirmCategoryDelete(String category, String uid) async {
+    if (_isBusy || uid != _uid) return;
+    final items = ref.read(shoppingListProvider).asData?.value ?? const [];
+    final categoryItems = items
+        .where((item) => resolvedShoppingCategory(item) == category)
+        .toList();
+    final ids = categoryItems
+        .map((item) => item.id)
+        .whereType<String>()
+        .toList();
+    if (ids.length != categoryItems.length || ids.isEmpty) {
+      _showError(
+        StateError('The category changed.'),
+        message: 'This category changed. Refresh your list and try again.',
+      );
+      return;
+    }
+    final title = shoppingCategoryTitle(category);
+    final count = ids.length;
+    await _confirmDelete(
+      ids,
+      titleOverride: 'Delete $title items?',
+      messageOverride:
+          'This will remove ${count == 1 ? '1 item' : 'all $count items'} in the $title category from your Shopping List.',
+      successMessage:
+          '$count ${count == 1 ? 'item' : 'items'} removed from $title.',
+      categoryToForget: category,
+    );
+  }
+
+  Future<void> _confirmDelete(
+    List<String> ids, {
+    bool single = false,
+    String? titleOverride,
+    String? messageOverride,
+    String? successMessage,
+    String? categoryToForget,
+  }) async {
     if (_isBusy || ids.isEmpty || _uid == null) return;
     final uid = _uid;
     final token = ++_operationToken;
     final items = ref.read(shoppingListProvider).asData?.value ?? [];
     final all = !single && ids.length == _visibleItems(items).length;
-    final title = single || ids.length == 1
-        ? 'Delete item?'
-        : all
-        ? 'Delete all selected items?'
-        : 'Delete selected items?';
-    final message = single || ids.length == 1
-        ? 'Are you sure you want to delete this item?'
-        : ids.length == items.length
-        ? 'Are you sure you want to delete all items from your shopping list?'
-        : 'Are you sure you want to delete ${ids.length} selected items?';
+    final title =
+        titleOverride ??
+        (single || ids.length == 1
+            ? 'Delete item?'
+            : all
+            ? 'Delete all selected items?'
+            : 'Delete selected items?');
+    final message =
+        messageOverride ??
+        (single || ids.length == 1
+            ? 'Are you sure you want to delete this item?'
+            : ids.length == items.length
+            ? 'Are you sure you want to delete all items from your shopping list?'
+            : 'Are you sure you want to delete ${ids.length} selected items?');
     setState(() => _isBusy = true);
     try {
       final confirmed = await showDialog<bool>(
@@ -431,10 +501,19 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       setState(() => _showProgress = true);
       await ref.read(shoppingListProvider.notifier).deleteItems(ids);
       if (_sameSession(uid, token)) {
+        if (categoryToForget != null) {
+          ref
+              .read(shoppingCategoryExpansionProvider.notifier)
+              .forgetCategory(uid: uid!, category: categoryToForget);
+        }
         setState(() {
           _selectionMode = false;
           _selectedIds.clear();
         });
+        if (successMessage != null) {
+          if (!mounted) return;
+          ShoppingSnackBar.show(context, message: successMessage);
+        }
       }
     } catch (error) {
       if (_sameSession(uid, token)) _showError(error);
@@ -672,6 +751,9 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     final lowStockSuggestionsExpanded = ref.watch(
       currentLowStockSuggestionExpandedProvider,
     );
+    final categoryExpansion = ref.watch(
+      currentShoppingCategoryExpansionProvider,
+    );
     final visible = _visibleItems(items);
     final allSelected =
         visible.isNotEmpty &&
@@ -803,18 +885,24 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                               key: ValueKey(category),
                               category: category,
                               count: groups[category]!.length,
-                              expanded: !_collapsedCategories.contains(
-                                category,
-                              ),
+                              expanded:
+                                  _selectionMode ||
+                                  (categoryExpansion[category] ?? true),
                               onToggle: _isBusy || _selectionMode
                                   ? null
-                                  : () => setState(() {
-                                      if (!_collapsedCategories.remove(
-                                        category,
-                                      )) {
-                                        _collapsedCategories.add(category);
-                                      }
-                                    }),
+                                  : () {
+                                      final uid = _uid;
+                                      if (uid == null) return;
+                                      ref
+                                          .read(
+                                            shoppingCategoryExpansionProvider
+                                                .notifier,
+                                          )
+                                          .toggle(uid: uid, category: category);
+                                    },
+                              onLongPress: _isBusy || _selectionMode
+                                  ? null
+                                  : () => _showCategoryActions(category),
                               children: groups[category]!
                                   .map(_buildItemRow)
                                   .toList(),
@@ -864,7 +952,6 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
           _selectedIds.clear();
           _filter = _ShoppingFilter.all;
           _searchController.clear();
-          _collapsedCategories.clear();
         });
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
       }
