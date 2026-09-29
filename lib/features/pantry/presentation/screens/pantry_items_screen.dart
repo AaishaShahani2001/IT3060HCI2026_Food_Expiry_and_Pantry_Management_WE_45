@@ -100,9 +100,7 @@ class _PantryItemsScreenState extends ConsumerState<PantryItemsScreen> {
         // Info action moved here from the count toolbar under the chips.
         // AppBar keeps the title in place and centers this action with it.
         actionsPadding: const EdgeInsets.only(right: 4),
-        actions: const [
-          ExpiryStatusLegendButton(),
-        ],
+        actions: const [ExpiryStatusLegendButton()],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => openPantryAddItem(context),

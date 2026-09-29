@@ -4,6 +4,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/pantry_item.dart';
 import 'expiry_status_indicator.dart';
 import 'pantry_item_actions_sheet.dart';
+import 'pantry_item_image.dart';
 import 'pantry_quantity_stepper.dart';
 
 /// Image-focused 2-column grid card for All Pantry Items card view.
@@ -36,11 +37,15 @@ class PantryItemCard extends StatelessWidget {
     final canDecrement = !isUpdating;
 
     final cardBg = isDark ? FreshPalette.darkCard : FreshPalette.card;
-    final borderColor = isDark ? FreshPalette.darkOutline : FreshPalette.outline;
+    final borderColor = isDark
+        ? FreshPalette.darkOutline
+        : FreshPalette.outline;
     final imageBg = isDark
         ? FreshPalette.darkAccentSurface
         : colorScheme.secondaryContainer.withValues(alpha: 0.6);
-    final primaryText = isDark ? FreshPalette.darkHeading : FreshPalette.heading;
+    final primaryText = isDark
+        ? FreshPalette.darkHeading
+        : FreshPalette.heading;
     final secondaryText = isDark
         ? FreshPalette.darkSecondaryText
         : FreshPalette.secondaryText;
@@ -75,24 +80,22 @@ class PantryItemCard extends StatelessWidget {
                   height: 92,
                   width: double.infinity,
                   color: imageBg,
-                  child: Center(
-                    child: Icon(
-                      item.category.icon,
-                      size: 42,
-                      color: isDark
-                          ? FreshPalette.highlight
-                          : FreshPalette.primaryButton,
-                    ),
+                  child: PantryItemImage(
+                    item: item,
+                    width: double.infinity,
+                    height: 92,
+                    iconSize: 42,
+                    backgroundColor: imageBg,
+                    iconColor: isDark
+                        ? FreshPalette.highlight
+                        : FreshPalette.primaryButton,
                   ),
                 ),
                 // Expiry status indicator dot (top right)
                 Positioned(
                   top: 8,
                   right: 8,
-                  child: ExpiryStatusIndicator(
-                    status: status,
-                    size: 13,
-                  ),
+                  child: ExpiryStatusIndicator(status: status, size: 13),
                 ),
                 // Stock status badge (top left)
                 if (item.isOutOfStock)
@@ -190,8 +193,7 @@ class PantryItemCard extends StatelessWidget {
                               iconSize: 18,
                               tooltip: 'Actions for ${item.name}',
                               onPressed: () async {
-                                final action =
-                                    await showPantryItemActionsSheet(
+                                final action = await showPantryItemActionsSheet(
                                   context: context,
                                   item: item,
                                 );
@@ -219,10 +221,7 @@ class PantryItemCard extends StatelessWidget {
                       '${item.category.label} • ${item.location.label}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: secondaryText,
-                      ),
+                      style: TextStyle(fontSize: 11, color: secondaryText),
                     ),
                     const SizedBox(height: 4),
                     // Quantity & Expiry indicator row
@@ -263,4 +262,3 @@ class PantryItemCard extends StatelessWidget {
     );
   }
 }
-

@@ -239,4 +239,3 @@ class HomeWasteSummaryCard extends ConsumerWidget {
     );
   }
 }
-

@@ -161,6 +161,9 @@ class PantryFirestoreService {
   }
 
   /// Creates a new document and returns the item with [PantryItem.firestoreId] set.
+  ///
+  /// Uses a pre-assigned ID when [item] already has one so a photo can be
+  /// uploaded to the matching Storage path before this write.
   Future<PantryItem> addItem(PantryItem item) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -169,14 +172,17 @@ class PantryFirestoreService {
 
     final now = DateTime.now();
     final itemData = item.toFirestore(userId: user.uid);
+    final providedId = (item.firestoreId ?? item.id).trim();
+    final itemId = providedId.isNotEmpty
+        ? providedId
+        : newItemDocumentId(user.uid);
 
     try {
-      // Let Firestore generate the document ID. Never use the item name.
-      final document = await _itemsCollection(user.uid).add(itemData);
+      await _itemDoc(userId: user.uid, itemId: itemId).set(itemData);
 
       return item.copyWith(
-        id: document.id,
-        firestoreId: document.id,
+        id: itemId,
+        firestoreId: itemId,
         createdAt: item.createdAt ?? now,
         updatedAt: now,
       );
@@ -186,8 +192,18 @@ class PantryFirestoreService {
     }
   }
 
+  /// Firestore document ID generated before a Storage upload, so both use
+  /// the same users/{uid}/pantryItems/{itemId} identifier.
+  String newItemDocumentId(String userId) {
+    return _itemsCollection(userId).doc().id;
+  }
+
   /// Removes [item] because it was consumed. The Firestore document is deleted
   /// using its current ID so Undo can recreate the same document.
+  ///
+  /// Storage photos are left in place during Used Up so Undo can restore the
+  /// same photoUrl/photoStoragePath. There is no delayed cleanup after the
+  /// Undo window; deleting Storage here would break Undo.
   Future<RemovedPantryItem> markAsUsedUp({
     required String userId,
     required PantryItem item,
@@ -257,7 +273,8 @@ class PantryFirestoreService {
   /// Updates an existing pantry document. Does not change [createdAt].
   ///
   /// Field names match [PantryItem]: location (not storageLocation),
-  /// nullable expiryDate, no purchaseDate/barcode/image on this model.
+  /// nullable expiryDate. Photo fields are optional; missing photos are
+  /// deleted from the document rather than stored as empty strings.
   Future<void> updatePantryItem({
     required String userId,
     required String itemId,
@@ -274,6 +291,10 @@ class PantryFirestoreService {
         'expiryDate': item.expiryDate == null
             ? null
             : Timestamp.fromDate(item.expiryDate!),
+        'photoUrl': item.hasUserPhoto ? item.photoUrl : FieldValue.delete(),
+        'photoStoragePath': item.hasUserPhoto
+            ? item.photoStoragePath
+            : FieldValue.delete(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } on FirebaseException catch (error) {

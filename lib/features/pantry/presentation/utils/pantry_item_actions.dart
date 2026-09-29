@@ -60,6 +60,7 @@ void _showUsedUpSnackBar(
   PantrySnackBar.showOn(
     messenger,
     message: '${removed.name} marked as used up.',
+    duration: PantrySnackBar.usedUpUndo,
     action: SnackBarAction(
       label: 'UNDO',
       onPressed: () {
@@ -76,7 +77,11 @@ Future<void> _restoreUsedUp(
 ) async {
   try {
     await notifier.restoreUsedUpItem(removed);
-    PantrySnackBar.showOn(messenger, message: '${removed.name} restored.');
+    PantrySnackBar.showOn(
+      messenger,
+      message: '${removed.name} restored.',
+      duration: PantrySnackBar.confirmation,
+    );
   } catch (error) {
     debugPrint('Pantry Used Up undo UI failed: $error');
     PantrySnackBar.showOn(
@@ -142,6 +147,7 @@ Future<void> handlePantryQuantityDelta({
           messenger,
           message:
               '${writeResult.itemName} quantity updated to ${writeResult.quantityLabel}.',
+          duration: PantrySnackBar.quantityUndo,
           action: SnackBarAction(
             label: 'UNDO',
             onPressed: () {
@@ -186,6 +192,7 @@ Future<void> _undoQuantity(
     PantrySnackBar.showOn(
       messenger,
       message: '${writeResult.itemName} quantity restored.',
+      duration: PantrySnackBar.confirmation,
     );
   } catch (error) {
     debugPrint('Pantry quantity undo UI failed: $error');

@@ -71,17 +71,14 @@ class PantryItemsSliver extends ConsumerWidget {
           crossAxisSpacing: 12,
           mainAxisExtent: 224,
         ),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final item = items[index];
-            return _BoundPantryItem(
-              item: item,
-              index: index,
-              viewMode: PantryViewMode.cards,
-            );
-          },
-          childCount: items.length,
-        ),
+        delegate: SliverChildBuilderDelegate((context, index) {
+          final item = items[index];
+          return _BoundPantryItem(
+            item: item,
+            index: index,
+            viewMode: PantryViewMode.cards,
+          );
+        }, childCount: items.length),
       ),
     );
   }

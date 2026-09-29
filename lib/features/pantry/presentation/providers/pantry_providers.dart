@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../data/services/pantry_firestore_service.dart';
+import '../../data/services/pantry_photo_storage_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../../domain/models/removed_pantry_item.dart';
 import '../../domain/utils/pantry_duplicate_lookup.dart';
@@ -14,6 +16,12 @@ const Duration _quantityDebounce = Duration(milliseconds: 550);
 
 final pantryFirestoreServiceProvider = Provider<PantryFirestoreService>((ref) {
   return PantryFirestoreService();
+});
+
+final pantryPhotoStorageServiceProvider = Provider<PantryPhotoStorageService>((
+  ref,
+) {
+  return PantryPhotoStorageService();
 });
 
 /// Item IDs with Used Up or Delete in progress.
@@ -210,6 +218,26 @@ class PantryItemsNotifier extends StreamNotifier<List<PantryItem>> {
     await ref.read(pantryFirestoreServiceProvider).addItem(item);
   }
 
+  String generateNewItemId(String userId) {
+    return ref.read(pantryFirestoreServiceProvider).newItemDocumentId(userId);
+  }
+
+  Future<PantryPhotoUpload> uploadItemPhoto({
+    required String userId,
+    required String itemId,
+    required XFile photo,
+  }) {
+    return ref
+        .read(pantryPhotoStorageServiceProvider)
+        .uploadItemPhoto(userId: userId, itemId: itemId, photo: photo);
+  }
+
+  Future<void> deleteItemPhoto({required String storagePath}) {
+    return ref
+        .read(pantryPhotoStorageServiceProvider)
+        .deleteItemPhoto(storagePath: storagePath);
+  }
+
   /// Returns the first current pantry item whose name matches [name]
   /// (trimmed, case-insensitive). Pass [excludeItemId] when editing so the
   /// item being saved is not treated as its own duplicate.
@@ -251,6 +279,10 @@ class PantryItemsNotifier extends StreamNotifier<List<PantryItem>> {
     busyNotifier.start(item.id);
     try {
       await deleteItem(item);
+      final storagePath = item.photoStoragePath;
+      if (storagePath != null && storagePath.trim().isNotEmpty) {
+        await deleteItemPhoto(storagePath: storagePath);
+      }
     } on PantryFirestoreException {
       rethrow;
     } catch (error, stackTrace) {

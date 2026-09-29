@@ -18,7 +18,9 @@ class PantryViewModeToggle extends ConsumerWidget {
     final containerBg = isDark
         ? FreshPalette.darkAccentSurface
         : colorScheme.surfaceContainerHighest.withValues(alpha: 0.7);
-    final borderColor = isDark ? FreshPalette.darkOutline : FreshPalette.outline;
+    final borderColor = isDark
+        ? FreshPalette.darkOutline
+        : FreshPalette.outline;
 
     return Container(
       height: 38,
@@ -69,7 +71,9 @@ class _ToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeBg = isDark ? FreshPalette.selected : FreshPalette.primaryButton;
+    final activeBg = isDark
+        ? FreshPalette.selected
+        : FreshPalette.primaryButton;
     final activeIconColor = FreshPalette.highlight;
     final inactiveIconColor = isDark
         ? FreshPalette.darkSecondaryText
@@ -102,4 +106,3 @@ class _ToggleButton extends StatelessWidget {
     );
   }
 }
-

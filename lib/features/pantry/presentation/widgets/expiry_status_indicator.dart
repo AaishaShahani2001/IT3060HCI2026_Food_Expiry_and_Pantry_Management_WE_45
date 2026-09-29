@@ -74,10 +74,7 @@ class ExpiryStatusLegendButton extends StatelessWidget {
       onPressed: () => show(context),
       tooltip: 'Expiry indicators',
       // Header uses the same outlined icon and tap target as Search/Filter.
-      icon: Icon(
-        Icons.info_outline_rounded,
-        size: forHeader ? null : 20,
-      ),
+      icon: Icon(Icons.info_outline_rounded, size: forHeader ? null : 20),
       color: forHeader ? null : colorScheme.onSurfaceVariant,
       visualDensity: forHeader ? null : VisualDensity.compact,
       constraints: forHeader
