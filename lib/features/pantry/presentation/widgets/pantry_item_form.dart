@@ -172,7 +172,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
           const SizedBox(height: 16),
           _buildLabel('Category'),
           DropdownButtonFormField<PantryCategory>(
-            value: _category,
+            initialValue: _category,
             decoration: _inputDecoration(prefixIcon: Icons.category_outlined),
             items: PantryCategory.values
                 .map(
@@ -197,7 +197,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
           const SizedBox(height: 16),
           _buildLabel('Location'),
           DropdownButtonFormField<PantryLocation>(
-            value: _location,
+            initialValue: _location,
             decoration: _inputDecoration(prefixIcon: Icons.place_outlined),
             items: PantryLocation.values
                 .map(
@@ -269,7 +269,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
                   children: [
                     _buildLabel('Unit'),
                     DropdownButtonFormField<PantryUnit>(
-                      value: _unit,
+                      initialValue: _unit,
                       isExpanded: true,
                       decoration: _inputDecoration().copyWith(
                         contentPadding: const EdgeInsets.symmetric(

@@ -5,6 +5,7 @@ import '../../../pantry/presentation/providers/pantry_providers.dart';
 import '../../data/repositories/firestore_expiry_repository.dart';
 import '../../domain/repositories/expiry_repository.dart';
 import '../../domain/services/expiry_alert_service.dart';
+import '../../domain/services/expiry_notification_provider.dart';
 import '../../domain/services/expiry_service.dart';
 
 final expiryServiceProvider = Provider<ExpiryService>((ref) {
@@ -19,6 +20,7 @@ final expiryAlertServiceProvider = Provider<ExpiryAlertService>((ref) {
   return ExpiryAlertService(
     expiryService: ref.read(expiryServiceProvider),
     repository: ref.read(expiryRepositoryProvider),
+    notificationService: ref.read(expiryNotificationServiceProvider),
   );
 });
 

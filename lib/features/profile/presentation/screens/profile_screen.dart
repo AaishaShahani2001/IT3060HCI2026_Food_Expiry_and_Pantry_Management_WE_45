@@ -1655,16 +1655,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            Radio<String>(
-              value: value,
+            RadioGroup<String>(
               groupValue:
               _pantryType,
-              activeColor:
-              primaryGreen,
               onChanged:
-              _isSaving
-                  ? null
-                  : (newValue) {
+              (newValue) {
+                if (_isSaving) return;
                 if (newValue ==
                     null) {
                   return;
@@ -1675,6 +1671,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       newValue;
                 });
               },
+              child: Radio<String>(
+                value: value,
+                activeColor:
+                primaryGreen,
+              ),
             ),
           ],
         ),

@@ -76,22 +76,56 @@ class ExpiryAlert {
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'userId': userId,
-      'itemId': itemId,
-      'itemName': itemName,
-      'expiryDate': expiryDate.toIso8601String(),
-      'daysUntilExpiry': daysUntilExpiry,
-      'status': status,
-      'priority': priority,
-      'message': message,
-      'isRead': isRead,
-      'createdAt': createdAt.toIso8601String(),
-      'reminderDays': reminderDays,
-      'notificationEnabled': notificationEnabled,
-    };
-  }
+ Map<String,dynamic> toMap(){
+
+return {
+
+
+'userId':userId,
+
+'itemId':itemId,
+
+'itemName':itemName,
+
+'expiryDate':
+expiryDate.toIso8601String(),
+
+
+'daysUntilExpiry':
+daysUntilExpiry,
+
+
+'status':
+status,
+
+
+'priority':
+priority,
+
+
+'message':
+message,
+
+
+'isRead':
+isRead,
+
+
+'createdAt':
+createdAt.toIso8601String(),
+
+
+'reminderDays':
+reminderDays,
+
+
+'notificationEnabled':
+notificationEnabled,
+
+
+};
+
+}
 
   factory ExpiryAlert.fromMap(String id, Map<String, dynamic> data) {
     return ExpiryAlert(
