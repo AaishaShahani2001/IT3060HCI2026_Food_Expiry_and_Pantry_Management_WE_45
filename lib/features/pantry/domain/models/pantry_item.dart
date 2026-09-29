@@ -200,6 +200,8 @@ class PantryItem {
     this.createdAt,
     this.updatedAt,
     this.firestoreId,
+    this.photoUrl,
+    this.photoStoragePath,
   }) : price = price ?? 0.0;
 
   final String id;
@@ -219,9 +221,22 @@ class PantryItem {
   /// Null until the item has been written to Firestore.
   final String? firestoreId;
 
+  /// Firebase Storage download URL. Never image bytes or a local file path.
+  final String? photoUrl;
+
+  /// Storage object path: users/{uid}/pantryItems/{itemId}/photo.jpg.
+  final String? photoStoragePath;
+
   /// True when this item can be updated or deleted in Cloud Firestore.
   bool get isConnectedToFirestore =>
       firestoreId != null && firestoreId!.trim().isNotEmpty;
+
+  /// True when a user-uploaded Storage photo should be shown instead of the
+  /// category icon. Empty strings from older documents are treated as absent.
+  bool get hasUserPhoto {
+    final url = photoUrl;
+    return url != null && url.trim().isNotEmpty;
+  }
 
   double get unitPrice {
     try {
@@ -304,6 +319,9 @@ class PantryItem {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? firestoreId,
+    String? photoUrl,
+    String? photoStoragePath,
+    bool clearPhoto = false,
   }) {
     return PantryItem(
       id: id ?? this.id,
@@ -318,6 +336,10 @@ class PantryItem {
       updatedAt: updatedAt ?? this.updatedAt,
       // Always keep the Firestore document ID unless a new one is provided.
       firestoreId: firestoreId ?? this.firestoreId,
+      photoUrl: clearPhoto ? null : (photoUrl ?? this.photoUrl),
+      photoStoragePath: clearPhoto
+          ? null
+          : (photoStoragePath ?? this.photoStoragePath),
     );
   }
 
@@ -332,6 +354,8 @@ class PantryItem {
       'expiryDate': expiryDate?.toIso8601String(),
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'photoUrl': photoUrl,
+      'photoStoragePath': photoStoragePath,
     };
   }
 
@@ -343,7 +367,7 @@ class PantryItem {
     required String userId,
     bool preserveCreatedAt = false,
   }) {
-    return {
+    final data = <String, dynamic>{
       'name': name,
       'category': category.name,
       'location': location.name,
@@ -357,6 +381,12 @@ class PantryItem {
           : FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
+    // Download URL only — Used Up Undo restores the same Storage object.
+    if (hasUserPhoto) {
+      data['photoUrl'] = photoUrl;
+      data['photoStoragePath'] = photoStoragePath;
+    }
+    return data;
   }
 
   factory PantryItem.fromMap(String id, Map<String, dynamic> data) {
@@ -373,6 +403,8 @@ class PantryItem {
       expiryDate: _parseDate(data['expiryDate']),
       createdAt: _parseDate(data['createdAt']),
       updatedAt: _parseDate(data['updatedAt']),
+      photoUrl: _optionalString(data['photoUrl']),
+      photoStoragePath: _optionalString(data['photoStoragePath']),
     );
   }
 
@@ -387,6 +419,12 @@ class PantryItem {
   static String _stringField(dynamic value) {
     if (value is String) return value;
     return '';
+  }
+
+  static String? _optionalString(dynamic value) {
+    if (value is! String) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   static double _numField(dynamic value) {

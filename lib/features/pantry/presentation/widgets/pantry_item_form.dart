@@ -1,8 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
-import '../../../../core/constants/app_colors.dart';
+import '../../data/local/pantry_food_catalog.dart';
+import '../../data/services/pantry_photo_storage_service.dart';
+import '../../domain/models/pantry_food_suggestion.dart';
 import '../../domain/models/pantry_item.dart';
+import '../utils/pantry_snackbar.dart';
+import 'pantry_item_autocomplete_field.dart';
+import 'pantry_item_photo_field.dart';
 
 class PantryItemFormData {
   const PantryItemFormData({
@@ -13,6 +20,8 @@ class PantryItemFormData {
     required this.unit,
     required this.price,
     this.expiryDate,
+    this.selectedPhoto,
+    this.removeExistingPhoto = false,
   });
 
   final String name;
@@ -22,18 +31,31 @@ class PantryItemFormData {
   final PantryUnit unit;
   final double price;
   final DateTime? expiryDate;
+
+  /// Local file chosen in this session. Not uploaded until Save.
+  final XFile? selectedPhoto;
+
+  /// True when the user removed an existing Storage photo and did not pick a
+  /// replacement. Save then clears Firestore photo fields.
+  final bool removeExistingPhoto;
 }
 
 class PantryItemForm extends StatefulWidget {
   const PantryItemForm({
     required this.onSubmit,
     this.initialItem,
+    this.existingItems = const [],
     this.isSaving = false,
+    this.savingMessage,
     super.key,
   });
 
   final PantryItem? initialItem;
+
+  /// Pantry rows already loaded for this user. Used only to suggest names.
+  final List<PantryItem> existingItems;
   final bool isSaving;
+  final String? savingMessage;
   final Future<void> Function(PantryItemFormData data) onSubmit;
 
   @override
@@ -46,10 +68,20 @@ class _PantryItemFormState extends State<PantryItemForm> {
   late final TextEditingController _quantityController;
   late final TextEditingController _priceController;
 
-  late PantryCategory _category;
+  PantryCategory? _category;
   late PantryLocation _location;
   late PantryUnit _unit;
+
+  /// True after the user picks a category from the dropdown. Later edits to
+  /// the same name must not replace that choice. Selecting a suggestion may.
+  bool _categoryWasManuallyChanged = false;
+
+  /// True when the current category came from a suggestion or exact name.
+  bool _categorySuggested = false;
   DateTime? _expiryDate;
+  XFile? _selectedPhoto;
+  Uint8List? _previewBytes;
+  bool _removeExistingPhoto = false;
 
   @override
   void initState() {
@@ -62,7 +94,10 @@ class _PantryItemFormState extends State<PantryItemForm> {
     _priceController = TextEditingController(
       text: item != null ? _decimalFieldText(item.unitPrice) : '',
     );
-    _category = item?.category ?? PantryCategory.other;
+    // Edit and barcode prefill keep the loaded category. A new item stays
+    // unselected until the user chooses one or an exact name is known.
+    // Suggestions stay hidden until the name field actually changes.
+    _category = item?.category;
     _location = item?.location ?? PantryLocation.pantry;
     _unit = item?.unit ?? PantryUnit.items;
     _expiryDate = item?.expiryDate;
@@ -103,11 +138,9 @@ class _PantryItemFormState extends State<PantryItemForm> {
       helpText: 'Select expiry date',
       builder: (context, child) {
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(
-              context,
-            ).colorScheme.copyWith(primary: FreshPalette.selected),
-          ),
+          data: Theme.of(
+            context,
+          ).copyWith(colorScheme: Theme.of(context).colorScheme),
           child: child!,
         );
       },
@@ -118,14 +151,49 @@ class _PantryItemFormState extends State<PantryItemForm> {
     }
   }
 
+  /// Fills the category only for a selected suggestion or an exact catalogue
+  /// name. A partial value such as "ch" is ignored because it could be
+  /// Cheese, Chicken or Chickpeas.
+  void _handleNameEdited(String rawName) {
+    if (_categoryWasManuallyChanged) return;
+
+    final match = exactPantryFoodMatch(rawName);
+    if (match == null) {
+      if (_categorySuggested) {
+        setState(() => _categorySuggested = false);
+      }
+      return;
+    }
+    if (_category == match.category && _categorySuggested) return;
+
+    setState(() {
+      _category = match.category;
+      _categorySuggested = true;
+    });
+  }
+
+  void _handleSuggestionSelected(PantryFoodSuggestion suggestion) {
+    // A deliberate pick may replace a category the user chose earlier.
+    _categoryWasManuallyChanged = false;
+    setState(() {
+      _category = suggestion.category;
+      _categorySuggested = true;
+    });
+  }
+
   Future<void> _handleSubmit() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
     FocusScope.of(context).unfocus();
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final quantity = double.tryParse(_quantityController.text.trim());
     final price = _parsePrice(_priceController.text);
+    final category = _category;
 
-    if (quantity == null || quantity <= 0 || price == null || price < 0) {
+    if (category == null ||
+        quantity == null ||
+        quantity <= 0 ||
+        price == null ||
+        price < 0) {
       _formKey.currentState?.validate();
       return;
     }
@@ -133,14 +201,124 @@ class _PantryItemFormState extends State<PantryItemForm> {
     await widget.onSubmit(
       PantryItemFormData(
         name: _nameController.text.trim(),
-        category: _category,
+        category: category,
         location: _location,
         quantity: quantity,
         unit: _unit,
         price: price,
         expiryDate: _expiryDate,
+        selectedPhoto: _selectedPhoto,
+        removeExistingPhoto: _removeExistingPhoto,
       ),
     );
+  }
+
+  bool get _hasPhotoPreview {
+    if (_previewBytes != null) return true;
+    final existingUrl = widget.initialItem?.photoUrl;
+    return !_removeExistingPhoto &&
+        existingUrl != null &&
+        existingUrl.trim().isNotEmpty;
+  }
+
+  Widget? get _photoPreview {
+    final fallbackCategory = _category ?? PantryCategory.other;
+    if (_previewBytes != null) {
+      return Image.memory(
+        _previewBytes!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        semanticLabel: 'Selected item photo',
+      );
+    }
+    final existingUrl = widget.initialItem?.photoUrl;
+    if (!_removeExistingPhoto &&
+        existingUrl != null &&
+        existingUrl.trim().isNotEmpty) {
+      return Image.network(
+        existingUrl,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        semanticLabel: 'Selected item photo',
+        errorBuilder: (context, error, stackTrace) {
+          return ColoredBox(
+            color: Theme.of(context).colorScheme.secondaryContainer,
+            child: Icon(
+              fallbackCategory.icon,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          );
+        },
+      );
+    }
+    return null;
+  }
+
+  Future<void> _pickPhoto() async {
+    if (widget.isSaving) return;
+    final source = await showPantryPhotoSourceSheet(context);
+    if (source == null || !mounted) return;
+
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 75,
+      );
+      if (picked == null || !mounted) return;
+
+      final name = picked.name.toLowerCase();
+      final path = picked.path.toLowerCase();
+      const allowed = {'jpg', 'jpeg', 'png', 'webp'};
+      final extension = _fileExtension(name.isNotEmpty ? name : path);
+      if (extension != null && !allowed.contains(extension)) {
+        PantrySnackBar.error(
+          context,
+          'Please choose a JPEG, PNG, or WebP image.',
+        );
+        return;
+      }
+
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
+      if (bytes.length > PantryPhotoStorageService.maxBytes) {
+        PantrySnackBar.error(
+          context,
+          'This photo is too large. Choose an image under 5 MB.',
+        );
+        return;
+      }
+
+      setState(() {
+        _selectedPhoto = picked;
+        _previewBytes = bytes;
+        _removeExistingPhoto = false;
+      });
+    } catch (error) {
+      debugPrint('Pantry photo pick failed: $error');
+      if (!mounted) return;
+      PantrySnackBar.error(
+        context,
+        'Unable to open that photo. Please try another image.',
+      );
+    }
+  }
+
+  void _removePhoto() {
+    setState(() {
+      _selectedPhoto = null;
+      _previewBytes = null;
+      _removeExistingPhoto = widget.initialItem?.hasUserPhoto == true;
+    });
+  }
+
+  static String? _fileExtension(String value) {
+    final dot = value.lastIndexOf('.');
+    if (dot < 0 || dot == value.length - 1) return null;
+    return value.substring(dot + 1);
   }
 
   @override
@@ -150,11 +328,23 @@ class _PantryItemFormState extends State<PantryItemForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          PantryItemPhotoField(
+            category: _category ?? PantryCategory.other,
+            hasPreview: _hasPhotoPreview,
+            preview: _photoPreview,
+            enabled: !widget.isSaving,
+            onAddPhoto: _pickPhoto,
+            onChangePhoto: _pickPhoto,
+            onRemovePhoto: _removePhoto,
+          ),
+          const SizedBox(height: 20),
           _buildLabel('Item name'),
-          TextFormField(
+          PantryItemAutocompleteField(
             controller: _nameController,
             enabled: !widget.isSaving,
-            textCapitalization: TextCapitalization.sentences,
+            existingItems: widget.existingItems,
+            onSuggestionSelected: _handleSuggestionSelected,
+            onNameEdited: _handleNameEdited,
             decoration: _inputDecoration(
               hint: 'e.g. Milk, Rice, Apples',
               prefixIcon: Icons.inventory_2_outlined,
@@ -173,6 +363,17 @@ class _PantryItemFormState extends State<PantryItemForm> {
           _buildLabel('Category'),
           DropdownButtonFormField<PantryCategory>(
             initialValue: _category,
+            isExpanded: true,
+            hint: Text(
+              'Select category',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            dropdownColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
             decoration: _inputDecoration(prefixIcon: Icons.category_outlined),
             items: PantryCategory.values
                 .map(
@@ -182,22 +383,62 @@ class _PantryItemFormState extends State<PantryItemForm> {
                       children: [
                         Icon(category.icon, size: 18),
                         const SizedBox(width: 8),
-                        Text(category.label),
+                        Flexible(
+                          child: Text(
+                            category.label,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 )
                 .toList(),
+            validator: (value) {
+              if (value == null) return 'Category is required.';
+              return null;
+            },
             onChanged: widget.isSaving
                 ? null
                 : (value) {
-                    if (value != null) setState(() => _category = value);
+                    if (value == null) return;
+                    setState(() {
+                      _category = value;
+                      _categoryWasManuallyChanged = true;
+                      _categorySuggested = false;
+                    });
                   },
           ),
+          if (_categorySuggested) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(
+                  Icons.auto_awesome,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Category suggested from item name',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
           _buildLabel('Location'),
           DropdownButtonFormField<PantryLocation>(
             initialValue: _location,
+            isExpanded: true,
+            dropdownColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
             decoration: _inputDecoration(prefixIcon: Icons.place_outlined),
             items: PantryLocation.values
                 .map(
@@ -207,7 +448,12 @@ class _PantryItemFormState extends State<PantryItemForm> {
                       children: [
                         Icon(location.icon, size: 18),
                         const SizedBox(width: 8),
-                        Text(location.label),
+                        Flexible(
+                          child: Text(
+                            location.label,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -271,6 +517,9 @@ class _PantryItemFormState extends State<PantryItemForm> {
                     DropdownButtonFormField<PantryUnit>(
                       initialValue: _unit,
                       isExpanded: true,
+                      dropdownColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                       decoration: _inputDecoration().copyWith(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -347,8 +596,10 @@ class _PantryItemFormState extends State<PantryItemForm> {
                     : 'No expiry date set',
                 style: TextStyle(
                   color: _expiryDate != null
-                      ? FreshPalette.heading
-                      : FreshPalette.secondaryText.withValues(alpha: 0.7),
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Theme.of(
+                          context,
+                        ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                 ),
               ),
             ),
@@ -357,17 +608,31 @@ class _PantryItemFormState extends State<PantryItemForm> {
           FilledButton(
             onPressed: widget.isSaving ? null : _handleSubmit,
             style: FilledButton.styleFrom(
-              backgroundColor: FreshPalette.primaryButton,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             child: widget.isSaving
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
-                    ),
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                        ),
+                      ),
+                      if (widget.savingMessage != null) ...[
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: Text(
+                            widget.savingMessage!,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ],
                   )
                 : Text(
                     widget.initialItem == null ? 'Save item' : 'Update item',
@@ -383,10 +648,10 @@ class _PantryItemFormState extends State<PantryItemForm> {
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: FreshPalette.heading,
+          color: Theme.of(context).colorScheme.onSurface,
         ),
       ),
     );
@@ -399,46 +664,47 @@ class _PantryItemFormState extends State<PantryItemForm> {
     String? prefixText,
     Widget? suffixIcon,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(
-        color: FreshPalette.secondaryText.withValues(alpha: 0.6),
+        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
       ),
       prefix: prefix,
       prefixText: prefixText,
       prefixStyle: prefixText != null
-          ? const TextStyle(
+          ? TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: FreshPalette.heading,
+              color: colorScheme.onSurface,
             )
           : null,
       prefixIcon: prefixIcon != null
-          ? Icon(prefixIcon, color: FreshPalette.selected, size: 22)
+          ? Icon(prefixIcon, color: colorScheme.primary, size: 22)
           : null,
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: FreshPalette.card,
+      fillColor: colorScheme.surfaceContainerHighest,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.cardBorder),
+        borderSide: BorderSide(color: colorScheme.outline),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.cardBorder),
+        borderSide: BorderSide(color: colorScheme.outline),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: FreshPalette.selected, width: 1.8),
+        borderSide: BorderSide(color: colorScheme.primary, width: 1.8),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.statusRed),
+        borderSide: BorderSide(color: colorScheme.error),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.statusRed, width: 1.8),
+        borderSide: BorderSide(color: colorScheme.error, width: 1.8),
       ),
     );
   }

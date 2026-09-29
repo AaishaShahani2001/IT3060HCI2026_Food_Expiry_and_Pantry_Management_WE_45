@@ -20,7 +20,9 @@ class PantryEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final config = _configForType(type);
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final config = _configForType(colorScheme, isDark, type);
 
     return Center(
       child: Padding(
@@ -44,7 +46,7 @@ class PantryEmptyState extends StatelessWidget {
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: FreshPalette.heading,
+                color: colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
@@ -52,29 +54,20 @@ class PantryEmptyState extends StatelessWidget {
               message ?? config.message,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: FreshPalette.secondaryText,
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
-            if (config.primaryLabel != null && onPrimaryAction != null) ...[
+            if (config.primaryLabel != null &&
+                (onPrimaryAction != null || onRetry != null)) ...[
               const SizedBox(height: 24),
               FilledButton(
-                onPressed: onPrimaryAction,
+                onPressed: onPrimaryAction ?? onRetry,
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(220, 48),
-                  backgroundColor: FreshPalette.primaryButton,
-                  foregroundColor: Colors.white,
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
                 ),
                 child: Text(config.primaryLabel!),
-              ),
-            ],
-            if (config.showRetry && onRetry != null) ...[
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: onRetry,
-                style: TextButton.styleFrom(
-                  foregroundColor: FreshPalette.selected,
-                ),
-                child: const Text('Try again'),
               ),
             ],
           ],
@@ -83,37 +76,42 @@ class PantryEmptyState extends StatelessWidget {
     );
   }
 
-  _EmptyStateConfig _configForType(PantryEmptyStateType type) {
+  _EmptyStateConfig _configForType(
+    ColorScheme colorScheme,
+    bool isDark,
+    PantryEmptyStateType type,
+  ) {
     switch (type) {
       case PantryEmptyStateType.noItems:
-        return const _EmptyStateConfig(
+        return _EmptyStateConfig(
           icon: Icons.kitchen_outlined,
-          iconColor: FreshPalette.selected,
-          backgroundColor: FreshPalette.highlight,
+          iconColor: colorScheme.primary,
+          backgroundColor: colorScheme.secondaryContainer,
           title: 'Your pantry is empty',
-          message:
-              'Start by adding your first food item to keep track of what you have at home.',
+          message: 'Add your first item to start organizing your food.',
           primaryLabel: 'Add Your First Item',
         );
       case PantryEmptyStateType.noResults:
-        return const _EmptyStateConfig(
+        return _EmptyStateConfig(
           icon: Icons.search_off_rounded,
           iconColor: AppColors.statusAmber,
-          backgroundColor: AppColors.statusAmberBg,
-          title: 'No matching items',
-          message:
-              'Try adjusting your search or filters to find what you are looking for.',
-          primaryLabel: 'Clear filters',
+          backgroundColor: isDark
+              ? AppColors.statusAmber.withValues(alpha: 0.2)
+              : AppColors.statusAmberBg,
+          title: 'No matching pantry items',
+          message: 'Try changing your search or filters.',
+          primaryLabel: 'Clear Filters',
         );
       case PantryEmptyStateType.error:
-        return const _EmptyStateConfig(
+        return _EmptyStateConfig(
           icon: Icons.error_outline_rounded,
           iconColor: AppColors.statusRed,
-          backgroundColor: AppColors.statusRedBg,
-          title: 'Unable to load pantry',
-          message:
-              'Something went wrong while loading your items. Please try again.',
-          showRetry: true,
+          backgroundColor: isDark
+              ? AppColors.statusRed.withValues(alpha: 0.2)
+              : AppColors.statusRedBg,
+          title: 'Unable to load your pantry',
+          message: 'Check your connection and try again.',
+          primaryLabel: 'Retry',
         );
     }
   }
@@ -127,7 +125,6 @@ class _EmptyStateConfig {
     required this.title,
     required this.message,
     this.primaryLabel,
-    this.showRetry = false,
   });
 
   final IconData icon;
@@ -136,7 +133,6 @@ class _EmptyStateConfig {
   final String title;
   final String message;
   final String? primaryLabel;
-  final bool showRetry;
 }
 
 class PantryLoadingState extends StatelessWidget {
@@ -144,18 +140,19 @@ class PantryLoadingState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    final colorScheme = Theme.of(context).colorScheme;
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(32),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: FreshPalette.selected),
-            SizedBox(height: 16),
+            CircularProgressIndicator(color: colorScheme.primary),
+            const SizedBox(height: 16),
             Text(
               'Loading your pantry...',
               style: TextStyle(
-                color: FreshPalette.secondaryText,
+                color: colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),

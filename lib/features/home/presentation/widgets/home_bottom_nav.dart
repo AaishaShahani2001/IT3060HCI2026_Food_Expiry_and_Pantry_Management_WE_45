@@ -65,7 +65,7 @@ class HomeBottomNav extends StatelessWidget {
           onTap: (index) => _onItemTapped(context, index),
           type: BottomNavigationBarType.fixed,
           backgroundColor: barColor,
-          selectedItemColor: colorScheme.primary,
+          selectedItemColor: colorScheme.secondary,
           unselectedItemColor: colorScheme.onSurfaceVariant,
           selectedFontSize: 11,
           unselectedFontSize: 10,
@@ -81,24 +81,24 @@ class HomeBottomNav extends StatelessWidget {
           items: [
             BottomNavigationBarItem(
               icon: const Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home, color: colorScheme.primary),
+              activeIcon: Icon(Icons.home, color: colorScheme.secondary),
               label: AppStrings.navHome,
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.kitchen_outlined),
-              activeIcon: Icon(Icons.kitchen, color: colorScheme.primary),
+              activeIcon: Icon(Icons.kitchen, color: colorScheme.secondary),
               label: AppStrings.navPantry,
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.event_busy_outlined),
-              activeIcon: Icon(Icons.event_busy, color: colorScheme.primary),
+              activeIcon: Icon(Icons.event_busy, color: colorScheme.secondary),
               label: AppStrings.navExpiry,
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.shopping_cart_outlined),
               activeIcon: Icon(
                 Icons.shopping_cart,
-                color: colorScheme.primary,
+                color: colorScheme.secondary,
               ),
               label: AppStrings.navShopping,
             ),
@@ -106,13 +106,13 @@ class HomeBottomNav extends StatelessWidget {
               icon: const Icon(Icons.restaurant_menu_outlined),
               activeIcon: Icon(
                 Icons.restaurant_menu,
-                color: colorScheme.primary,
+                color: colorScheme.secondary,
               ),
               label: AppStrings.navRecipes,
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.settings_outlined),
-              activeIcon: Icon(Icons.settings, color: colorScheme.primary),
+              activeIcon: Icon(Icons.settings, color: colorScheme.secondary),
               label: AppStrings.navSettings,
             ),
           ],

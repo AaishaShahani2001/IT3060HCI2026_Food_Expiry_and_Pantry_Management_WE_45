@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/pantry_item.dart';
 
 class PantryLocationSelector extends StatefulWidget {
@@ -123,10 +122,13 @@ class _LocationChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = isSelected ? Colors.white : FreshPalette.heading;
+    final colorScheme = Theme.of(context).colorScheme;
+    final foreground = isSelected
+        ? colorScheme.onPrimary
+        : colorScheme.onSurface;
     final muted = isSelected
-        ? Colors.white.withValues(alpha: 0.9)
-        : FreshPalette.secondaryText;
+        ? colorScheme.onPrimary.withValues(alpha: 0.9)
+        : colorScheme.onSurfaceVariant;
 
     return Material(
       color: Colors.transparent,
@@ -139,16 +141,18 @@ class _LocationChip extends StatelessWidget {
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: isSelected ? FreshPalette.selected : FreshPalette.card,
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: isSelected ? FreshPalette.selected : AppColors.cardBorder,
+              color: isSelected ? colorScheme.primary : colorScheme.outline,
               width: 1,
             ),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: FreshPalette.selected.withValues(alpha: 0.28),
+                      color: colorScheme.primary.withValues(alpha: 0.28),
                       blurRadius: 10,
                       offset: const Offset(0, 3),
                     ),
