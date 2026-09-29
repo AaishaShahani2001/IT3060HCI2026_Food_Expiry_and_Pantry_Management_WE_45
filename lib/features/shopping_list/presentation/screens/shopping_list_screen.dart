@@ -368,6 +368,31 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       } else if (!_selectedIds.remove(item.id)) {
         _selectedIds.add(item.id!);
       }
+      if (_selectedIds.isEmpty) _selectionMode = false;
+    });
+  }
+
+  void _selectCategory(String category, {bool enter = false}) {
+    if (_isBusy) return;
+    final items = ref.read(shoppingListProvider).asData?.value ?? const [];
+    final ids = items
+        .where((item) => resolvedShoppingCategory(item) == category)
+        .map((item) => item.id)
+        .whereType<String>()
+        .toSet();
+    if (ids.isEmpty) return;
+    setState(() {
+      if (enter) {
+        FocusScope.of(context).unfocus();
+        _selectionMode = true;
+        _selectedIds.addAll(ids);
+      } else if (ids.every(_selectedIds.contains)) {
+        _selectedIds.removeAll(ids);
+      } else {
+        _selectionMode = true;
+        _selectedIds.addAll(ids);
+      }
+      if (_selectedIds.isEmpty) _selectionMode = false;
     });
   }
 
@@ -384,66 +409,25 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     final ids = items.map((item) => item.id).whereType<String>().toSet();
     setState(() {
       if (ids.every(_selectedIds.contains)) {
-        _selectedIds.clear();
+        _selectedIds.removeAll(ids);
       } else {
         _selectedIds.addAll(ids);
       }
+      if (_selectedIds.isEmpty) _selectionMode = false;
     });
   }
 
-  Future<void> _showCategoryActions(String category) async {
-    if (_isBusy || _selectionMode || _uid == null) return;
-    final uid = _uid;
-    final title = shoppingCategoryTitle(category);
-    final delete = await showModalBottomSheet<bool>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: Icon(
-              Icons.delete_outline_rounded,
-              color: Theme.of(sheetContext).colorScheme.error,
-            ),
-            title: Text('Delete all items in $title'),
-            textColor: Theme.of(sheetContext).colorScheme.error,
-            onTap: () => Navigator.pop(sheetContext, true),
-          ),
-        ),
-      ),
-    );
-    if (delete != true || !mounted || uid != _uid) return;
-    await _confirmCategoryDelete(category, uid!);
-  }
-
-  Future<void> _confirmCategoryDelete(String category, String uid) async {
-    if (_isBusy || uid != _uid) return;
-    final items = ref.read(shoppingListProvider).asData?.value ?? const [];
-    final categoryItems = items
-        .where((item) => resolvedShoppingCategory(item) == category)
-        .toList();
-    final ids = categoryItems
-        .map((item) => item.id)
-        .whereType<String>()
-        .toList();
-    if (ids.length != categoryItems.length || ids.isEmpty) {
-      _showError(
-        StateError('The category changed.'),
-        message: 'This category changed. Refresh your list and try again.',
-      );
-      return;
-    }
-    final title = shoppingCategoryTitle(category);
-    final count = ids.length;
+  Future<void> _confirmSelectionDelete() async {
+    final count = _selectedIds.length;
+    if (count == 0) return;
     await _confirmDelete(
-      ids,
-      titleOverride: 'Delete $title items?',
+      _selectedIds.toList(),
+      titleOverride: count == 1
+          ? 'Delete selected item?'
+          : 'Delete selected items?',
       messageOverride:
-          'This will remove ${count == 1 ? '1 item' : 'all $count items'} in the $title category from your Shopping List.',
-      successMessage:
-          '$count ${count == 1 ? 'item' : 'items'} removed from $title.',
-      categoryToForget: category,
+          'This will remove $count ${count == 1 ? 'item' : 'items'} from your Shopping List.',
+      successMessage: '$count ${count == 1 ? 'item' : 'items'} deleted.',
     );
   }
 
@@ -453,12 +437,21 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     String? titleOverride,
     String? messageOverride,
     String? successMessage,
-    String? categoryToForget,
   }) async {
     if (_isBusy || ids.isEmpty || _uid == null) return;
     final uid = _uid;
     final token = ++_operationToken;
     final items = ref.read(shoppingListProvider).asData?.value ?? [];
+    final idSet = ids.toSet();
+    final categoriesToForget = items
+        .map(resolvedShoppingCategory)
+        .toSet()
+        .where(
+          (category) => items
+              .where((item) => resolvedShoppingCategory(item) == category)
+              .every((item) => item.id != null && idSet.contains(item.id)),
+        )
+        .toSet();
     final all = !single && ids.length == _visibleItems(items).length;
     final title =
         titleOverride ??
@@ -501,10 +494,10 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       setState(() => _showProgress = true);
       await ref.read(shoppingListProvider.notifier).deleteItems(ids);
       if (_sameSession(uid, token)) {
-        if (categoryToForget != null) {
+        for (final category in categoriesToForget) {
           ref
               .read(shoppingCategoryExpansionProvider.notifier)
-              .forgetCategory(uid: uid!, category: categoryToForget);
+              .forgetCategory(uid: uid!, category: category);
         }
         setState(() {
           _selectionMode = false;
@@ -548,6 +541,100 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     } finally {
       if (mounted && token == _operationToken) setState(() => _isBusy = false);
     }
+  }
+
+  Future<void> _showHelp() async {
+    if (_selectionMode) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline),
+            SizedBox(width: 12),
+            Expanded(child: Text('Shopping List Help')),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ShoppingHelpPoint(
+                icon: Icons.add_circle_outline,
+                text: 'Add items and use search to find them quickly.',
+              ),
+              _ShoppingHelpPoint(
+                icon: Icons.category_outlined,
+                text: 'Items are organized into categories.',
+              ),
+              _ShoppingHelpPoint(
+                icon: Icons.exposure_outlined,
+                text: 'Adjust quantities and units, then mark items as bought.',
+              ),
+              _ShoppingHelpPoint(
+                icon: Icons.inventory_2_outlined,
+                text:
+                    'Low-stock suggestions help you add Pantry items that are running low.',
+              ),
+              _ShoppingHelpPoint(
+                icon: Icons.touch_app_outlined,
+                text:
+                    'Touch and hold items or categories to select them for deletion.',
+              ),
+              _ShoppingHelpPoint(
+                icon: Icons.delete_sweep_outlined,
+                text:
+                    'Selecting a category includes every Shopping List item in that category.',
+              ),
+              _ShoppingHelpPoint(
+                icon: Icons.settings_outlined,
+                text: 'Use Settings to control low-stock suggestions.',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeletionHint() {
+    final colors = Theme.of(context).colorScheme;
+    const hint =
+        'Tip: Touch and hold an item or category to select and delete.';
+    return Semantics(
+      label: hint,
+      excludeSemantics: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerHighest.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.touch_app_outlined, size: 18, color: colors.primary),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                hint,
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildEmptyState(BuildContext context) {
@@ -598,6 +685,8 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                 icon: const Icon(Icons.add),
                 label: const Text('Add your first item'),
               ),
+              const SizedBox(height: 16),
+              _buildDeletionHint(),
             ],
           ),
         ),
@@ -807,13 +896,18 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         spacing: 12,
                         children: [
-                          const Text('Select matching items to delete'),
+                          const Text(
+                            'Category selection includes its full category',
+                            textAlign: TextAlign.center,
+                          ),
                           TextButton(
                             onPressed: _isBusy
                                 ? null
                                 : () => _selectAll(visible),
                             child: Text(
-                              allSelected ? 'Deselect All' : 'Select All',
+                              allSelected
+                                  ? 'Deselect visible'
+                                  : 'Select all visible',
                             ),
                           ),
                         ],
@@ -881,6 +975,18 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                           ) {
                             if (index.isOdd) return const SizedBox(height: 12);
                             final category = categories[index ~/ 2];
+                            final categoryIds = items
+                                .where(
+                                  (item) =>
+                                      resolvedShoppingCategory(item) ==
+                                      category,
+                                )
+                                .map((item) => item.id)
+                                .whereType<String>()
+                                .toSet();
+                            final selectedInCategory = categoryIds
+                                .where(_selectedIds.contains)
+                                .length;
                             return ShoppingCategorySection(
                               key: ValueKey(category),
                               category: category,
@@ -888,8 +994,10 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                               expanded:
                                   _selectionMode ||
                                   (categoryExpansion[category] ?? true),
-                              onToggle: _isBusy || _selectionMode
+                              onToggle: _isBusy
                                   ? null
+                                  : _selectionMode
+                                  ? () => _selectCategory(category)
                                   : () {
                                       final uid = _uid;
                                       if (uid == null) return;
@@ -900,15 +1008,30 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                                           )
                                           .toggle(uid: uid, category: category);
                                     },
-                              onLongPress: _isBusy || _selectionMode
+                              onLongPress: _isBusy
                                   ? null
-                                  : () => _showCategoryActions(category),
+                                  : () => _selectCategory(
+                                      category,
+                                      enter: !_selectionMode,
+                                    ),
+                              selectionMode: _selectionMode,
+                              isSelected:
+                                  categoryIds.isNotEmpty &&
+                                  selectedInCategory == categoryIds.length,
+                              isPartiallySelected:
+                                  selectedInCategory > 0 &&
+                                  selectedInCategory < categoryIds.length,
                               children: groups[category]!
                                   .map(_buildItemRow)
                                   .toList(),
                             );
                           }, childCount: categories.length * 2 - 1),
                         ),
+                      ),
+                    if (items.isNotEmpty && !_selectionMode)
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        sliver: SliverToBoxAdapter(child: _buildDeletionHint()),
                       ),
                   ],
                 ),
@@ -1013,13 +1136,19 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                   IconButton(
                     onPressed: _isBusy || _selectedIds.isEmpty
                         ? null
-                        : () => _confirmDelete(_selectedIds.toList()),
+                        : _confirmSelectionDelete,
                     icon: const Icon(Icons.delete_outline),
                     color: Theme.of(context).colorScheme.error,
                     tooltip: 'Delete selected items',
                   ),
                 ]
-              : null,
+              : [
+                  IconButton(
+                    onPressed: _showHelp,
+                    icon: const Icon(Icons.help_outline),
+                    tooltip: 'Shopping List help',
+                  ),
+                ],
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           elevation: 0,
           centerTitle: true,
@@ -1035,4 +1164,24 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       ),
     );
   }
+}
+
+class _ShoppingHelpPoint extends StatelessWidget {
+  const _ShoppingHelpPoint({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 21, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 12),
+        Expanded(child: Text(text)),
+      ],
+    ),
+  );
 }

@@ -142,7 +142,11 @@ class ShoppingItemTile extends StatelessWidget {
     );
 
     return Semantics(
+      container: true,
       selected: selectionMode ? isSelected : null,
+      label: selectionMode
+          ? '${isSelected ? 'Selected' : 'Not selected'} ${item.name} for deletion'
+          : null,
       child: Material(
         color: isSelected
             ? colors.secondaryContainer
