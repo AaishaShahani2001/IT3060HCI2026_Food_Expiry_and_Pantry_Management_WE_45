@@ -5,13 +5,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:food_expiry_and_pantry_management/core/theme/app_theme.dart';
+import 'package:food_expiry_and_pantry_management/core/providers/theme_mode_provider.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/presentation/screens/pantry_item_form_screen.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/low_stock_suggestion_settings_provider.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_pantry_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/screens/add_shopping_item_screen.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/screens/shopping_list_screen.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/fake_firestore.dart';
+
+PantryItem lowStockItem(
+  String id,
+  String name, {
+  double quantity = 1,
+  PantryUnit unit = PantryUnit.items,
+  PantryCategory category = PantryCategory.other,
+}) => PantryItem(
+  id: id,
+  firestoreId: id,
+  name: name,
+  category: category,
+  location: PantryLocation.pantry,
+  quantity: quantity,
+  unit: unit,
+);
 
 void main() {
   late ShoppingTestSession session;
@@ -28,6 +50,8 @@ void main() {
     Size size = const Size(430, 900),
     double textScale = 1,
     bool dark = false,
+    List<PantryItem> pantryItems = const [],
+    SharedPreferences? preferences,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -57,14 +81,18 @@ void main() {
         overrides: [
           shoppingListRepositoryProvider.overrideWithValue(session.repository),
           shoppingAuthUidProvider.overrideWith((ref) => session.auth()),
+          shoppingPantryItemsProvider.overrideWithValue(AsyncData(pantryItems)),
+          if (preferences != null)
+            sharedPreferencesProvider.overrideWithValue(preferences),
         ],
         child: MaterialApp.router(
           theme: dark ? AppTheme.dark : AppTheme.light,
           routerConfig: router,
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: TextScaler.linear(textScale)),
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(textScale),
+              accessibleNavigation: false,
+            ),
             child: child!,
           ),
         ),
@@ -371,7 +399,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Sri Lankan Red Rice'), findsOneWidget);
       expect(visibleState(tester).single.quantity, 9);
-      expect(find.text('9'), findsOneWidget);
+      expect(find.text('9 pcs'), findsOneWidget);
       expect(session.store.addCalls, 1);
       expect(session.store.documents.values.single['quantity'], 9);
       await pullRefresh(tester);
@@ -785,7 +813,7 @@ void main() {
       await tester.tap(find.text('Bakery (1)'));
       await tester.pumpAndSettle();
       expect(find.text('Bread'), findsOneWidget);
-      expect(find.text('7'), findsOneWidget);
+      expect(find.text('7 pcs'), findsOneWidget);
     },
   );
 
@@ -1159,6 +1187,8 @@ void main() {
         'name': 'Milk',
         'quantity': 2,
         'isPurchased': true,
+        'unit': 'items',
+        'category': 'Other',
       });
       expect(
         session
@@ -1350,6 +1380,7 @@ void main() {
       await tester.enterText(find.byType(TextFormField).at(1), '2');
       final add = find.widgetWithText(FilledButton, 'Add Item');
       await tester.ensureVisible(add);
+      expect(tester.widget<FilledButton>(add).onPressed, isNotNull);
       await tester.tap(add);
       await tester.pumpAndSettle();
       expect(find.text('Already on your list'), findsOneWidget);
@@ -1361,6 +1392,417 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'pantry match warns, Cancel preserves draft, and Add Anyway persists metadata',
+    (tester) async {
+      final pantryMilk = PantryItem(
+        id: 'pantry-milk',
+        firestoreId: 'pantry-milk',
+        name: 'Milk',
+        category: PantryCategory.dairy,
+        location: PantryLocation.refrigerator,
+        quantity: 2,
+        unit: PantryUnit.liters,
+      );
+      await openScreen(tester, seed: false, pantryItems: [pantryMilk]);
+      await tester.tap(find.byTooltip('Add shopping item'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ActionChip, 'Milk'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(1), '2');
+      await tester.pumpAndSettle();
+      expect(find.text('2 L remaining in pantry'), findsOneWidget);
+      expect(
+        tester
+            .widget<DropdownButtonFormField<PantryUnit>>(
+              find.byType(DropdownButtonFormField<PantryUnit>),
+            )
+            .initialValue,
+        PantryUnit.liters,
+      );
+      expect(
+        tester
+            .widget<DropdownButtonFormField<String>>(
+              find.byType(DropdownButtonFormField<String>),
+            )
+            .initialValue,
+        'Dairy',
+      );
+      final add = find.widgetWithText(FilledButton, 'Add Item');
+      await tester.ensureVisible(add);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(session.store.addCalls, 0);
+      expect(find.text('Already in your pantry'), findsOneWidget);
+      expect(find.textContaining('Current quantity: 2 L'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(session.store.addCalls, 0);
+      expect(find.byType(AddShoppingItemScreen), findsOneWidget);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add Anyway'));
+      await tester.pumpAndSettle();
+      final saved = session.store.documents.values.single;
+      expect(saved['unit'], 'liters');
+      expect(saved['category'], 'Dairy');
+      expect(saved['quantity'], 2);
+    },
+  );
+
+  testWidgets('low-stock suggestion adds once and carries pantry metadata', (
+    tester,
+  ) async {
+    final pantryMilk = PantryItem(
+      id: 'pantry-milk',
+      firestoreId: 'pantry-milk',
+      name: 'Milk',
+      category: PantryCategory.dairy,
+      location: PantryLocation.refrigerator,
+      quantity: 1,
+      unit: PantryUnit.liters,
+    );
+    await openScreen(tester, seed: false, pantryItems: [pantryMilk]);
+    expect(find.text('Low-stock suggestions (1)'), findsOneWidget);
+    expect(find.text('Milk — only 1 L left'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Add'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Low-stock suggestions'), findsNothing);
+    expect(
+      tester.widget<SnackBar>(find.byType(SnackBar)).duration,
+      const Duration(seconds: 2),
+    );
+    expect(session.store.addCalls, 1);
+    final saved = session.store.documents.values.single;
+    expect(saved['source'], 'low_stock');
+    expect(saved['sourcePantryItemId'], 'pantry-milk');
+    expect(saved['unit'], 'liters');
+    expect(saved['category'], 'Dairy');
+  });
+
+  testWidgets('dismiss only hides the suggestion and Undo restores it', (
+    tester,
+  ) async {
+    final pantryMilk = lowStockItem(
+      'pantry-milk',
+      'Milk',
+      unit: PantryUnit.bottles,
+      category: PantryCategory.dairy,
+    );
+    final pantrySnapshot = pantryMilk.toMap();
+    await openScreen(tester, seed: false, pantryItems: [pantryMilk]);
+
+    await tester.tap(find.byTooltip('Dismiss Milk suggestion'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Low-stock suggestions'), findsNothing);
+    expect(find.text('Milk suggestion dismissed.'), findsOneWidget);
+    expect(session.store.addCalls, 0);
+    expect(session.store.updateCalls, 0);
+    expect(pantryMilk.toMap(), pantrySnapshot);
+
+    await tester.tap(find.text('UNDO'));
+    await tester.pumpAndSettle();
+    expect(find.text('Low-stock suggestions (1)'), findsOneWidget);
+    expect(find.text('Milk — only 1 bottle left'), findsOneWidget);
+  });
+
+  testWidgets(
+    'more than three suggestions are accessible and Add All adds all',
+    (tester) async {
+      final pantryItems = [
+        lowStockItem('apples', 'Apples', quantity: 0),
+        lowStockItem('eggs', 'Eggs'),
+        lowStockItem(
+          'milk',
+          'Milk',
+          unit: PantryUnit.liters,
+          category: PantryCategory.dairy,
+        ),
+        lowStockItem('oranges', 'Oranges'),
+      ];
+      await openScreen(tester, seed: false, pantryItems: pantryItems);
+
+      expect(find.byTooltip('Dismiss Apples suggestion'), findsOneWidget);
+      expect(find.byTooltip('Dismiss Eggs suggestion'), findsOneWidget);
+      expect(find.byTooltip('Dismiss Milk suggestion'), findsOneWidget);
+      expect(find.byTooltip('Dismiss Oranges suggestion'), findsOneWidget);
+      expect(find.text('Low-stock suggestions (4)'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Add All'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('4 items added to your Shopping List.'), findsOneWidget);
+      expect(visibleState(tester).map((item) => item.name), [
+        'Apples',
+        'Eggs',
+        'Milk',
+        'Oranges',
+      ]);
+      expect(session.store.addCalls, 4);
+      expect(find.textContaining('Low-stock suggestions'), findsNothing);
+      final milk = visibleState(
+        tester,
+      ).singleWhere((item) => item.name == 'Milk');
+      expect(milk.quantity, 1);
+      expect(milk.unit, PantryUnit.liters);
+      expect(milk.category, 'Dairy');
+    },
+  );
+
+  testWidgets(
+    'Add All skips dismissed and existing items then hides an empty card',
+    (tester) async {
+      session.store.seed('alice', 'saved-milk', 'Milk');
+      final pantryItems = [
+        lowStockItem('milk', 'Milk'),
+        lowStockItem('eggs', 'Eggs'),
+        lowStockItem('oranges', 'Oranges'),
+      ];
+      await openScreen(tester, seed: false, pantryItems: pantryItems);
+
+      expect(find.byTooltip('Dismiss Milk suggestion'), findsNothing);
+      await tester.tap(find.byTooltip('Dismiss Eggs suggestion'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Add All'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Low-stock suggestions'), findsNothing);
+      expect(visibleState(tester).map((item) => item.name), [
+        'Milk',
+        'Oranges',
+      ]);
+      expect(session.store.addCalls, 1);
+      expect(
+        visibleState(tester).where((item) => item.name == 'Milk'),
+        hasLength(1),
+      );
+    },
+  );
+
+  for (final dark in [false, true]) {
+    testWidgets(
+      'low-stock suggestion card renders in ${dark ? 'dark' : 'light'} theme',
+      (tester) async {
+        await openScreen(
+          tester,
+          seed: false,
+          dark: dark,
+          pantryItems: [lowStockItem('milk', 'Milk')],
+        );
+        expect(find.text('Low-stock suggestions (1)'), findsOneWidget);
+        expect(find.text('Add All'), findsOneWidget);
+        expect(find.byTooltip('Dismiss Milk suggestion'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('suggestions collapse to a count-only header and expand again', (
+    tester,
+  ) async {
+    await openScreen(
+      tester,
+      seed: false,
+      pantryItems: [lowStockItem('milk', 'Milk'), lowStockItem('eggs', 'Eggs')],
+    );
+
+    expect(find.text('Low-stock suggestions (2)'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('Collapse low-stock suggestions')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Low-stock suggestions (2)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add All'), findsNothing);
+    expect(find.byTooltip('Dismiss Milk suggestion'), findsNothing);
+    expect(find.text('Low-stock suggestions (2)'), findsOneWidget);
+
+    expect(
+      find.bySemanticsLabel(RegExp('Expand low-stock suggestions')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Low-stock suggestions (2)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add All'), findsOneWidget);
+    expect(find.byTooltip('Dismiss Milk suggestion'), findsOneWidget);
+  });
+
+  testWidgets(
+    'master setting hides suggestions and threshold updates show them',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'low_stock_suggestions.alice.enabled': false,
+      });
+      final preferences = await SharedPreferences.getInstance();
+      final milk = lowStockItem(
+        'milk',
+        'Milk',
+        quantity: 2,
+        category: PantryCategory.dairy,
+      );
+      await openScreen(
+        tester,
+        seed: false,
+        pantryItems: [milk],
+        preferences: preferences,
+      );
+      expect(find.textContaining('Low-stock suggestions'), findsNothing);
+
+      final providerContainer = ProviderScope.containerOf(
+        tester.element(find.byType(ShoppingListScreen)),
+      );
+      final notifier = providerContainer.read(
+        lowStockSuggestionSettingsProvider.notifier,
+      );
+      notifier.setEnabled(true);
+      await tester.pump();
+      expect(find.textContaining('Low-stock suggestions'), findsNothing);
+      notifier.setThreshold(PantryCategory.dairy, 2);
+      await tester.pump();
+      expect(find.text('Low-stock suggestions (1)'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Dismiss All confirms, hides all, and Undo restores only its set',
+    (tester) async {
+      await openScreen(
+        tester,
+        seed: false,
+        pantryItems: [
+          lowStockItem('milk', 'Milk'),
+          lowStockItem('eggs', 'Eggs'),
+          lowStockItem('oranges', 'Oranges'),
+        ],
+      );
+      await tester.tap(find.byTooltip('Dismiss Milk suggestion'));
+      await tester.pump();
+      await tester.tap(find.text('Dismiss All'));
+      await tester.pumpAndSettle();
+      expect(find.text('Dismiss all suggestions?'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Low-stock suggestions (2)'), findsOneWidget);
+
+      await tester.tap(find.text('Dismiss All'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Dismiss All'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Low-stock suggestions'), findsNothing);
+      expect(find.text('2 low-stock suggestions dismissed.'), findsOneWidget);
+      expect(session.store.addCalls, 0);
+      expect(session.store.updateCalls, 0);
+      await tester.tap(find.text('UNDO'));
+      await tester.pumpAndSettle();
+      expect(find.text('Low-stock suggestions (2)'), findsOneWidget);
+      expect(find.byTooltip('Dismiss Milk suggestion'), findsNothing);
+    },
+  );
+
+  testWidgets('transient SnackBars replace each other and auto-dismiss', (
+    tester,
+  ) async {
+    await openScreen(
+      tester,
+      seed: false,
+      pantryItems: [lowStockItem('milk', 'Milk'), lowStockItem('eggs', 'Eggs')],
+    );
+    await tester.tap(find.byTooltip('Dismiss Eggs suggestion'));
+    await tester.pump();
+    expect(find.text('Eggs suggestion dismissed.'), findsOneWidget);
+    expect(
+      tester.widget<SnackBar>(find.byType(SnackBar)).duration,
+      const Duration(seconds: 3),
+    );
+
+    await tester.tap(find.byTooltip('Dismiss Milk suggestion'));
+    await tester.pump();
+    expect(find.text('Eggs suggestion dismissed.'), findsNothing);
+    expect(find.text('Milk suggestion dismissed.'), findsOneWidget);
+    for (var second = 0; second < 10; second++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+    expect(find.text('Milk suggestion dismissed.'), findsNothing);
+  });
+
+  testWidgets('Add All confirms before adding more than five suggestions', (
+    tester,
+  ) async {
+    final pantryItems = List.generate(
+      6,
+      (index) => lowStockItem('item-$index', 'Item $index'),
+    );
+    await openScreen(tester, seed: false, pantryItems: pantryItems);
+    await tester.tap(find.text('Add All'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Add 6 suggested items to your Shopping List?'),
+      findsOneWidget,
+    );
+    expect(session.store.addCalls, 0);
+    await tester.tap(find.widgetWithText(FilledButton, 'Add All'));
+    await tester.pumpAndSettle();
+    expect(session.store.addCalls, 6);
+    expect(find.text('6 items added to your Shopping List.'), findsOneWidget);
+  });
+
+  testWidgets('Bought item opens a prefilled Pantry add flow', (tester) async {
+    session.store.seed('alice', 'milk', 'Milk');
+    await openScreen(tester, seed: false);
+    await tester.tap(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Add it to Pantry?'), findsOneWidget);
+    await tester.tap(find.text('Add to Pantry'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PantryItemFormScreen), findsOneWidget);
+    expect(find.text('Add Item'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextFormField>(find.byType(TextFormField).at(0))
+          .controller!
+          .text,
+      'Milk',
+    );
+    expect(
+      tester
+          .widget<TextFormField>(find.byType(TextFormField).at(1))
+          .controller!
+          .text,
+      '2',
+    );
+    expect(find.text('Dairy'), findsOneWidget);
+  });
+
+  testWidgets('Bought pantry match opens existing quantity editor', (
+    tester,
+  ) async {
+    session.store.seed('alice', 'milk', 'Milk');
+    final pantryMilk = PantryItem(
+      id: 'pantry-milk',
+      firestoreId: 'pantry-milk',
+      name: 'Milk',
+      category: PantryCategory.dairy,
+      location: PantryLocation.refrigerator,
+      quantity: 1,
+      unit: PantryUnit.liters,
+    );
+    await openScreen(tester, seed: false, pantryItems: [pantryMilk]);
+    await tester.tap(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Update its Pantry quantity?'), findsOneWidget);
+    await tester.tap(find.text('Update Pantry'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PantryItemFormScreen), findsOneWidget);
+    expect(find.text('Edit Item'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextFormField>(find.byType(TextFormField).at(1))
+          .controller!
+          .text,
+      '1',
+    );
+  });
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_item_metadata.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
 
 enum _ItemAction { edit, delete }
@@ -49,12 +50,12 @@ class ShoppingItemTile extends StatelessWidget {
             constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           ),
           Semantics(
-            label: 'Quantity: ${item.quantity}',
+            label: 'Quantity: ${item.quantity} ${shoppingUnitLabel(item.unit)}',
             excludeSemantics: true,
             child: ConstrainedBox(
               constraints: const BoxConstraints(minWidth: 30),
               child: Text(
-                '${item.quantity}',
+                '${item.quantity} ${shoppingUnitLabel(item.unit)}',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   fontWeight: FontWeight.w600,

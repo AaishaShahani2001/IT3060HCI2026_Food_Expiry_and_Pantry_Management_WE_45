@@ -6,26 +6,25 @@ import 'package:food_expiry_and_pantry_management/features/shopping_list/models/
 import 'support/fake_firestore.dart';
 
 void main() {
-  test(
-    'model round-trip persists only the three fields and restores document ID',
-    () {
-      const item = ShoppingItem(name: 'Milk', quantity: 2, isPurchased: true);
-      expect(item.id, isNull);
-      expect(item.toMap(), {
-        'name': 'Milk',
-        'quantity': 2,
-        'isPurchased': true,
-      });
-      final loaded = ShoppingItem.fromMap('milk-id', item.toMap());
-      expect(loaded.id, 'milk-id');
-      expect(
-        loaded.copyWith(name: 'Fresh Milk', quantity: 3).isPurchased,
-        isTrue,
-      );
-      expect(loaded.copyWith(isPurchased: false).id, 'milk-id');
-      expect(loaded.copyWith(isPurchased: false).quantity, 2);
-    },
-  );
+  test('model round-trip persists metadata and restores document ID', () {
+    const item = ShoppingItem(name: 'Milk', quantity: 2, isPurchased: true);
+    expect(item.id, isNull);
+    expect(item.toMap(), {
+      'name': 'Milk',
+      'quantity': 2,
+      'isPurchased': true,
+      'unit': 'items',
+      'category': 'Other',
+    });
+    final loaded = ShoppingItem.fromMap('milk-id', item.toMap());
+    expect(loaded.id, 'milk-id');
+    expect(
+      loaded.copyWith(name: 'Fresh Milk', quantity: 3).isPurchased,
+      isTrue,
+    );
+    expect(loaded.copyWith(isPurchased: false).id, 'milk-id');
+    expect(loaded.copyWith(isPurchased: false).quantity, 2);
+  });
 
   test(
     'model handles absent purchased field and rejects malformed quantities',
@@ -60,7 +59,13 @@ void main() {
       expect(saved.name, 'Milk');
       expect(
         session.store.documents['users/alice/shopping_items/${saved.id}'],
-        {'name': 'Milk', 'quantity': 2, 'isPurchased': false},
+        {
+          'name': 'Milk',
+          'quantity': 2,
+          'isPurchased': false,
+          'unit': 'items',
+          'category': 'Other',
+        },
       );
       final reloadedRepository = ShoppingListRepository(
         firestore: session.store,
@@ -269,6 +274,8 @@ void main() {
         'name': 'Fresh Milk',
         'quantity': 100,
         'isPurchased': true,
+        'unit': 'items',
+        'category': 'Other',
       });
       expect(session.store.documents.length, 3);
       expect(session.store.documents['users/alice'], {'name': 'Alice'});

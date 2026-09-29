@@ -37,16 +37,32 @@ class PantryItemFormData {
   final bool removeExistingPhoto;
 }
 
+class PantryItemFormPrefill {
+  const PantryItemFormPrefill({
+    required this.name,
+    required this.quantity,
+    required this.unit,
+    required this.category,
+  });
+
+  final String name;
+  final double quantity;
+  final PantryUnit unit;
+  final PantryCategory category;
+}
+
 class PantryItemForm extends StatefulWidget {
   const PantryItemForm({
     required this.onSubmit,
     this.initialItem,
+    this.prefill,
     this.isSaving = false,
     this.savingMessage,
     super.key,
   });
 
   final PantryItem? initialItem;
+  final PantryItemFormPrefill? prefill;
   final bool isSaving;
   final String? savingMessage;
   final Future<void> Function(PantryItemFormData data) onSubmit;
@@ -73,16 +89,23 @@ class _PantryItemFormState extends State<PantryItemForm> {
   void initState() {
     super.initState();
     final item = widget.initialItem;
-    _nameController = TextEditingController(text: item?.name ?? '');
+    final prefill = widget.prefill;
+    _nameController = TextEditingController(
+      text: item?.name ?? prefill?.name ?? '',
+    );
     _quantityController = TextEditingController(
-      text: item != null ? _decimalFieldText(item.quantity) : '',
+      text: item != null
+          ? _decimalFieldText(item.quantity)
+          : prefill != null
+          ? _decimalFieldText(prefill.quantity)
+          : '',
     );
     _priceController = TextEditingController(
       text: item != null ? _decimalFieldText(item.unitPrice) : '',
     );
-    _category = item?.category ?? PantryCategory.other;
+    _category = item?.category ?? prefill?.category ?? PantryCategory.other;
     _location = item?.location ?? PantryLocation.pantry;
-    _unit = item?.unit ?? PantryUnit.items;
+    _unit = item?.unit ?? prefill?.unit ?? PantryUnit.items;
     _expiryDate = item?.expiryDate;
   }
 

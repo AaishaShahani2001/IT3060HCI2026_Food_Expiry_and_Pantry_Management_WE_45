@@ -1,11 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
 import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/presentation/utils/pantry_item_actions.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/presentation/widgets/pantry_item_form.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/food_item_suggestions.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_item_metadata.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/shopping_error_message.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/shopping_snackbar.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/low_stock_suggestion_settings_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_pantry_provider.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/widgets/low_stock_suggestions_card.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/widgets/shopping_item_tile.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/widgets/shopping_category_section.dart';
 import 'package:go_router/go_router.dart';
@@ -27,6 +37,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   bool _selectionMode = false;
   bool _isBusy = false;
   bool _showProgress = false;
+  bool _lowStockSuggestionsExpanded = true;
   int _operationToken = 0;
 
   @override
@@ -57,14 +68,13 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   void _showError(Object error, {VoidCallback? retry, String? message}) {
     if (!mounted) return;
     debugPrint('Shopping List error: $error');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message ?? _errorMessage(error)),
-        duration: const Duration(seconds: 8),
-        action: retry == null
-            ? null
-            : SnackBarAction(label: 'Retry', onPressed: retry),
-      ),
+    ShoppingSnackBar.show(
+      context,
+      message: message ?? _errorMessage(error),
+      duration: ShoppingSnackBar.error,
+      snackBarAction: retry == null
+          ? null
+          : SnackBarAction(label: 'Retry', onPressed: retry),
     );
   }
 
@@ -85,14 +95,14 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       setState(() {
         _filter = _ShoppingFilter.all;
         _searchController.clear();
-        _collapsedCategories.remove(foodItemCategoryFor(item.name));
+        _collapsedCategories.remove(resolvedShoppingCategory(item));
       });
     } finally {
       if (mounted && token == _operationToken) setState(() => _isBusy = false);
     }
   }
 
-  Future<void> _persistChange(Future<void> Function() save) async {
+  Future<bool> _persistChange(Future<void> Function() save) async {
     final uid = _uid;
     final token = ++_operationToken;
     setState(() {
@@ -101,8 +111,10 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     });
     try {
       await save();
+      return _sameSession(uid, token);
     } catch (error) {
       if (_sameSession(uid, token)) _showError(error);
+      return false;
     } finally {
       if (mounted && token == _operationToken) {
         setState(() {
@@ -118,10 +130,188 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     bool isPurchased,
   ) async {
     if (_isBusy || _selectionMode || item.id == null) return;
-    await _persistChange(
+    final saved = await _persistChange(
       () => ref
           .read(shoppingListProvider.notifier)
           .togglePurchased(item.id!, isPurchased),
+    );
+    if (saved && isPurchased && mounted) _offerPantryQuickAdd(item);
+  }
+
+  void _offerPantryQuickAdd(ShoppingItem item) {
+    final pantryItems =
+        ref.read(shoppingPantryItemsProvider).asData?.value ?? const [];
+    final existing = pantryItems
+        .where(
+          (pantryItem) =>
+              pantryItem.name.trim().toLowerCase() ==
+              item.name.trim().toLowerCase(),
+        )
+        .firstOrNull;
+    ShoppingSnackBar.show(
+      context,
+      message: existing == null
+          ? '${item.name} marked Bought. Add it to Pantry?'
+          : '${item.name} marked Bought. Update its Pantry quantity?',
+      duration: ShoppingSnackBar.action,
+      snackBarAction: SnackBarAction(
+        label: existing == null ? 'Add to Pantry' : 'Update Pantry',
+        onPressed: () {
+          if (!mounted) return;
+          if (existing != null) {
+            unawaited(openPantryItemEditor(context, existing));
+            return;
+          }
+          unawaited(
+            openPantryAddItem(
+              context,
+              prefill: PantryItemFormPrefill(
+                name: item.name,
+                quantity: item.quantity.toDouble(),
+                unit: item.unit,
+                category: pantryCategoryForShoppingCategory(
+                  resolvedShoppingCategory(item),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _addLowStockSuggestion(PantryItem item) async {
+    if (_isBusy || _selectionMode) return;
+    ShoppingItem? added;
+    final threshold = ref
+        .read(lowStockSuggestionSettingsProvider)
+        .effectiveThresholdFor(item);
+    final saved = await _persistChange(() async {
+      added = await ref
+          .read(shoppingListProvider.notifier)
+          .addLowStockSuggestion(item, threshold: threshold);
+    });
+    if (!saved || !mounted) return;
+    ShoppingSnackBar.show(
+      context,
+      message: added == null
+          ? '${item.name} is already in your Shopping List.'
+          : '${item.name} added to your Shopping List.',
+    );
+  }
+
+  void _dismissLowStockSuggestion(PantryItem item) {
+    if (_isBusy || _selectionMode) return;
+    final uid = _uid;
+    final pantryItemId = item.firestoreId;
+    if (uid == null || pantryItemId == null) return;
+    ref
+        .read(lowStockDismissalsProvider.notifier)
+        .dismiss(uid: uid, pantryItemId: pantryItemId);
+    ShoppingSnackBar.show(
+      context,
+      message: '${item.name} suggestion dismissed.',
+      duration: ShoppingSnackBar.action,
+      snackBarAction: SnackBarAction(
+        label: 'UNDO',
+        onPressed: () {
+          if (!mounted || uid != _uid) return;
+          ref
+              .read(lowStockDismissalsProvider.notifier)
+              .restore(uid: uid, pantryItemId: pantryItemId);
+        },
+      ),
+    );
+  }
+
+  Future<void> _dismissAllLowStockSuggestions(List<PantryItem> items) async {
+    if (_isBusy || _selectionMode || items.isEmpty) return;
+    final uid = _uid;
+    if (uid == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Dismiss all suggestions?'),
+        content: const Text(
+          'This will hide all current low-stock suggestions for this session.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Dismiss All'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || uid != _uid) return;
+    final newlyDismissed = ref
+        .read(lowStockDismissalsProvider.notifier)
+        .dismissAll(
+          uid: uid,
+          pantryItemIds: items.map((item) => item.firestoreId).whereType(),
+        );
+    if (newlyDismissed.isEmpty) return;
+    ShoppingSnackBar.show(
+      context,
+      message:
+          '${newlyDismissed.length} low-stock ${newlyDismissed.length == 1 ? 'suggestion' : 'suggestions'} dismissed.',
+      duration: ShoppingSnackBar.action,
+      snackBarAction: SnackBarAction(
+        label: 'UNDO',
+        onPressed: () {
+          if (!mounted || uid != _uid) return;
+          ref
+              .read(lowStockDismissalsProvider.notifier)
+              .restoreAll(uid: uid, pantryItemIds: newlyDismissed);
+        },
+      ),
+    );
+  }
+
+  Future<void> _addAllLowStockSuggestions(List<PantryItem> items) async {
+    if (_isBusy || _selectionMode || items.isEmpty) return;
+    final uid = _uid;
+    if (uid == null) return;
+    if (items.length > 5) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Add all suggestions?'),
+          content: Text(
+            'Add ${items.length} suggested items to your Shopping List?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Add All'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted || uid != _uid) return;
+    }
+
+    var addedCount = 0;
+    final thresholds = ref.read(lowStockSuggestionSettingsProvider).thresholds;
+    final saved = await _persistChange(() async {
+      addedCount = await ref
+          .read(shoppingListProvider.notifier)
+          .addLowStockSuggestions(items, categoryThresholds: thresholds);
+    });
+    if (!saved || !mounted) return;
+    ShoppingSnackBar.show(
+      context,
+      message: addedCount == 0
+          ? 'All suggested items are already in your Shopping List.'
+          : '$addedCount ${addedCount == 1 ? 'item' : 'items'} added to your Shopping List.',
     );
   }
 
@@ -479,18 +669,20 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   }
 
   Widget _buildItemList(List<ShoppingItem> items) {
+    final suggestions = ref.watch(lowStockShoppingSuggestionsProvider);
     final visible = _visibleItems(items);
     final allSelected =
         visible.isNotEmpty &&
         visible.every((item) => _selectedIds.contains(item.id));
     final groups = <String, List<ShoppingItem>>{};
     for (final item in visible) {
-      groups.putIfAbsent(foodItemCategoryFor(item.name), () => []).add(item);
+      groups.putIfAbsent(resolvedShoppingCategory(item), () => []).add(item);
     }
+    final categoryOrder = [...foodItemSuggestionCategories.keys, 'Other'];
     final categories = [
-      ...foodItemSuggestionCategories.keys,
-      'Other',
-    ].where(groups.containsKey).toList();
+      ...categoryOrder.where(groups.containsKey),
+      ...groups.keys.where((category) => !categoryOrder.contains(category)),
+    ];
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 600),
@@ -500,6 +692,23 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Column(
                 children: [
+                  if (!_selectionMode && suggestions.isNotEmpty) ...[
+                    LowStockSuggestionsCard(
+                      items: suggestions,
+                      enabled: !_isBusy,
+                      onAdd: _addLowStockSuggestion,
+                      onDismiss: _dismissLowStockSuggestion,
+                      onAddAll: () => _addAllLowStockSuggestions(suggestions),
+                      onDismissAll: () =>
+                          _dismissAllLowStockSuggestions(suggestions),
+                      expanded: _lowStockSuggestionsExpanded,
+                      onToggleExpanded: () => setState(
+                        () => _lowStockSuggestionsExpanded =
+                            !_lowStockSuggestionsExpanded,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   _buildFilters(items),
                   const SizedBox(height: 12),
                   _buildSearch(),
@@ -651,6 +860,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
           _filter = _ShoppingFilter.all;
           _searchController.clear();
           _collapsedCategories.clear();
+          _lowStockSuggestionsExpanded = true;
         });
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
       }

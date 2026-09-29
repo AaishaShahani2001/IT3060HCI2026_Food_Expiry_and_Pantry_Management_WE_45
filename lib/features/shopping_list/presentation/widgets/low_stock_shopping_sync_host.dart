@@ -36,11 +36,13 @@ class _SyncHostState extends ConsumerState<LowStockShoppingSyncHost> {
             )) {
           return;
         }
-        _notice?.close();
-        _notice = ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        messenger?.hideCurrentSnackBar();
+        _notice = messenger?.showSnackBar(
           SnackBar(
             content: Text(event.message),
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
           ),
         );
         final notice = _notice;
