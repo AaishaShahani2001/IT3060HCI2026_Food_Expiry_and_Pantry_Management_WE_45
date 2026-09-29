@@ -11,6 +11,8 @@ abstract final class AppRoutes {
   static const String pantry = '/pantry';
   static const String expiry = '/expiry';
   static const String expiryNotifications = '/expiry/notifications';
+  static const String addExpiryTracking ='/add-expiry-tracking';
+  static const String editExpiryTracking ='/edit-expiry-tracking';
   static const String shopping = '/shopping';
   static const String recipes = '/recipes';
   static const String settings = '/settings';

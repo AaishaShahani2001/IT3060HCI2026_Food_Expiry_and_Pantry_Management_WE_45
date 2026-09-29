@@ -130,11 +130,32 @@ final markExpiryAlertAsReadProvider =
       };
     });
 
+/// Stops tracking a Firestore expiry alert.
+final stopTrackingProvider = Provider<Future<void> Function(String alertId)>((
+  ref,
+) {
+  return (String alertId) async {
+    await ref.read(expiryRepositoryProvider).deleteAlert(alertId);
+
+    ref.invalidate(expiryAlertsProvider);
+  };
+});
+
 /// Deletes a Firestore expiry alert.
 final deleteExpiryAlertProvider =
     Provider<Future<void> Function(String alertId)>((ref) {
       return (String alertId) async {
         await ref.read(expiryRepositoryProvider).deleteAlert(alertId);
+
+        ref.invalidate(expiryAlertsProvider);
+      };
+    });
+
+/// Saves a new expiry alert
+final saveExpiryAlertProvider =
+    Provider<Future<void> Function(ExpiryAlert alert)>((ref) {
+      return (ExpiryAlert alert) async {
+        await ref.read(expiryRepositoryProvider).saveAlert(alert);
 
         ref.invalidate(expiryAlertsProvider);
       };
