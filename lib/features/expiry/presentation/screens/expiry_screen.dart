@@ -4,77 +4,24 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/app_routes.dart';
-import '../../../pantry/domain/models/pantry_item.dart';
-import '../../../pantry/presentation/providers/pantry_providers.dart';
+
+import '../../domain/repositories/expiry_repository.dart';
+
 import '../providers/expiry_provider.dart';
 
-class ExpiryScreen extends ConsumerStatefulWidget {
+import '../widgets/expiry_summary_card.dart';
+import '../widgets/expiry_alert_card.dart';
+import '../widgets/stop_tracking_dialog.dart';
+import '../widgets/empty_expiry_state.dart';
+
+class ExpiryScreen extends ConsumerWidget {
   const ExpiryScreen({super.key});
 
   @override
-  ConsumerState<ExpiryScreen> createState() => _ExpiryScreenState();
-}
-
-class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
-  bool _isSyncingAlerts = false;
-
-  @override
-  void initState() {
-    super.initState();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _synchronizeAlerts();
-    });
-  }
-
-  Future<void> _synchronizeAlerts() async {
-    if (_isSyncingAlerts) return;
-
-    final itemsAsync = ref.read(pantryItemsProvider);
-
-    final items = itemsAsync.maybeWhen(
-      data: (items) => items,
-      orElse: () => const <PantryItem>[],
-    );
-
-    if (items.isEmpty) return;
-
-    setState(() {
-      _isSyncingAlerts = true;
-    });
-
-    try {
-      await ref.read(synchronizeExpiryAlertsProvider)(items);
-
-      if (mounted) {
-        ref.invalidate(expiryAlertsProvider);
-      }
-    } catch (error) {
-      debugPrint('Failed to synchronize expiry alerts: $error');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSyncingAlerts = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _refresh() async {
-    await ref.read(pantryItemsProvider.notifier).refreshItems();
-
-    await _synchronizeAlerts();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(expirySummaryProvider);
 
-    // All pantry products sorted by expiry urgency.
-    final allItems = ref.watch(expiryItemsProvider);
-
-    // Only products requiring expiry attention.
-    final smartAlertItems = ref.watch(smartAlertItemsProvider);
+    final smartItems = ref.watch(smartAlertItemsProvider);
 
     final expiryService = ref.read(expiryServiceProvider);
 
@@ -86,10 +33,12 @@ class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
       // --------------------------------------------------
       appBar: AppBar(
         elevation: 0,
+
         title: const Text(
           'Expiry Monitoring',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+
         actions: [
           IconButton(
             tooltip: 'Expiry Notifications',
@@ -98,7 +47,6 @@ class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
             },
             icon: const Icon(Icons.notifications_active_outlined, size: 26),
           ),
-          const SizedBox(width: 8),
         ],
       ),
 
@@ -293,64 +241,37 @@ class _ExpiryScreenState extends ConsumerState<ExpiryScreen> {
               }),
           ],
         ),
+
+        onPressed: () {
+          context.push(AppRoutes.addExpiryTracking);
+        },
       ),
-    );
-  }
-}
 
-// ============================================================
-// SUMMARY CARD
-// ============================================================
+      body: ListView(
+        padding: const EdgeInsets.all(20),
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.backgroundColor,
-  });
-
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final Color backgroundColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.18)),
-      ),
-      child: Row(
         children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 21),
+          const Text(
+            "Monitor your products and take action before food expires.",
+
+            style: TextStyle(color: AppColors.textSecondary),
           ),
 
-          const SizedBox(width: 10),
+          const SizedBox(height: 20),
 
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+          Row(
+            children: [
+              Expanded(
+                child: ExpirySummaryCard(
+                  title: "Expired",
+
+                  value: summary.expired.toString(),
+
+                  icon: Icons.error_outline,
+
+                  color: AppColors.statusRed,
+
+                  backgroundColor: AppColors.statusRedBg,
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -362,33 +283,11 @@ class _SummaryCard extends StatelessWidget {
                     fontSize: 11,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-}
 
-// ============================================================
-// SMART ALERT CARD
-// ============================================================
-
-class _ExpiryAlertCard extends StatelessWidget {
-  const _ExpiryAlertCard({
-    required this.productName,
-    required this.quantity,
-    required this.message,
-    required this.priority,
-    required this.daysUntilExpiry,
-  });
-
-  final String productName;
-  final String quantity;
-  final String message;
-  final String priority;
-  final int? daysUntilExpiry;
+          const SizedBox(height: 10),
 
   @override
   Widget build(BuildContext context) {
@@ -465,8 +364,15 @@ class _ExpiryAlertCard extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
 
-                const SizedBox(height: 5),
+              const SizedBox(width: 10),
+
+              Expanded(
+                child: ExpirySummaryCard(
+                  title: "No Expiry",
+
+                  value: summary.unknown.toString(),
 
                 Text(
                   quantity,
@@ -475,17 +381,27 @@ class _ExpiryAlertCard extends StatelessWidget {
                     fontSize: 12,
                   ),
                 ),
+              ),
+            ],
+          ),
 
-                const SizedBox(height: 7),
+          const SizedBox(height: 30),
 
-                Text(
-                  message,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+            children: [
+              const Text(
+                "SMART ALERTS",
+
+                style: TextStyle(
+                  color: AppColors.darkGreen,
+
+                  fontSize: 18,
+
+                  fontWeight: FontWeight.bold,
                 ),
+              ),
 
                 if (daysUntilExpiry != null) ...[
                   const SizedBox(height: 4),
@@ -502,69 +418,21 @@ class _ExpiryAlertCard extends StatelessWidget {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
 
-// ============================================================
-// PRIORITY BADGE
-// ============================================================
+          const SizedBox(height: 15),
 
-class _PriorityBadge extends StatelessWidget {
-  const _PriorityBadge({
-    required this.priority,
-    required this.color,
-    required this.backgroundColor,
-  });
+          if (smartItems.isEmpty)
+            const EmptyExpiryState(message: "No expiry alerts currently")
+          else
+            ...smartItems.map((item) {
+              final alert = ExpiryAlert(
+                id: item.id,
 
-  final String priority;
-  final Color color;
-  final Color backgroundColor;
+                userId: "",
 
-  @override
-  Widget build(BuildContext context) {
-    if (priority == 'none') {
-      return const SizedBox.shrink();
-    }
+                itemId: item.id,
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        priority.toUpperCase(),
-        style: TextStyle(
-          color: color,
-          fontSize: 9,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// PRODUCT EXPIRY CARD
-// ============================================================
-
-class _ProductExpiryCard extends StatelessWidget {
-  const _ProductExpiryCard({
-    required this.productName,
-    required this.quantity,
-    required this.expiryMessage,
-    required this.status,
-    required this.daysUntilExpiry,
-  });
-
-  final String productName;
-  final String quantity;
-  final String expiryMessage;
-  final String status;
-  final int? daysUntilExpiry;
+                itemName: item.name,
 
   @override
   Widget build(BuildContext context) {
@@ -627,7 +495,7 @@ class _ProductExpiryCard extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 3),
+                status: "active",
 
                 Text(
                   quantity,
@@ -637,49 +505,19 @@ class _ProductExpiryCard extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 5),
+                message: expiryService.expiryMessage(item),
 
-                Text(
-                  expiryMessage,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
+                isRead: false,
 
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              status,
-              style: TextStyle(
-                color: color,
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+                createdAt: DateTime.now(),
+              );
 
-// ============================================================
-// EMPTY STATE
-// ============================================================
+              return ExpiryAlertCard(
+                name: item.name,
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.message});
+                quantity: item.quantityLabel,
 
-  final String message;
+                message: expiryService.expiryMessage(item),
 
   @override
   Widget build(BuildContext context) {
@@ -700,7 +538,9 @@ class _EmptyState extends StatelessWidget {
             size: 40,
           ),
 
-          const SizedBox(height: 10),
+                onUpdate: () {
+                  context.push(AppRoutes.editExpiryTracking, extra: alert);
+                },
 
           Text(
             message,
