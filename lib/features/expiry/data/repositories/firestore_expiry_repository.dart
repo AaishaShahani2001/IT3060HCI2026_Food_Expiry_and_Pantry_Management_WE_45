@@ -11,84 +11,132 @@ class FirestoreExpiryRepository implements ExpiryRepository {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
 
+  final Map<String, ExpiryAlert> _localAlerts = {};
+
   CollectionReference<Map<String, dynamic>> get _alertsCollection =>
       _firestore.collection('expiry_alerts');
 
-  String get _currentUserId {
-    final user = _auth.currentUser;
-
-    if (user == null) {
-      throw StateError('No authenticated user found.');
-    }
-
-    return user.uid;
-  }
+  String? get _currentUserId => _auth.currentUser?.uid;
 
   @override
   Future<List<ExpiryAlert>> fetchAlerts() async {
     final userId = _currentUserId;
 
-    final snapshot = await _alertsCollection
-        .where('userId', isEqualTo: userId)
-        .get();
+    if (userId == null) {
+      return _localAlerts.values.toList();
+    }
 
-    return snapshot.docs
-        .map((document) => ExpiryAlert.fromMap(document.id, document.data()))
-        .toList();
+    try {
+      final snapshot = await _alertsCollection
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      final firestoreAlerts = snapshot.docs
+          .map((document) => ExpiryAlert.fromMap(document.id, document.data()))
+          .toList();
+
+      final map = <String, ExpiryAlert>{};
+      for (final a in firestoreAlerts) {
+        map[a.itemId] = a;
+        map[a.id] = a;
+      }
+      for (final a in _localAlerts.values) {
+        map[a.itemId] = a;
+        map[a.id] = a;
+      }
+
+      return map.values.toList();
+    } catch (e) {
+      return _localAlerts.values.toList();
+    }
   }
 
   @override
   Future<void> saveAlert(ExpiryAlert alert) async {
+    _localAlerts[alert.itemId] = alert;
+    _localAlerts[alert.id] = alert;
+
     final userId = _currentUserId;
 
-    if (alert.userId != userId) {
-      throw StateError('Expiry alert does not belong to the current user.');
+    if (userId == null) {
+      return;
     }
 
-    await _alertsCollection
-        .doc(alert.id)
-        .set(alert.toMap(), SetOptions(merge: true));
+    final alertToSave = alert.userId.isEmpty ? alert.copyWith(userId: userId) : alert;
+
+    try {
+      await _alertsCollection
+          .doc(alertToSave.id)
+          .set(alertToSave.toMap(), SetOptions(merge: true));
+    } catch (e) {
+      // Ignore or log error gracefully
+    }
   }
 
   @override
   Future<void> markAlertAsRead(String alertId) async {
+    final existing = _localAlerts[alertId];
+    if (existing != null) {
+      _localAlerts[alertId] = existing.copyWith(isRead: true);
+      _localAlerts[existing.itemId] = existing.copyWith(isRead: true);
+    }
+
     final userId = _currentUserId;
 
-    final document = _alertsCollection.doc(alertId);
-
-    final snapshot = await document.get();
-
-    if (!snapshot.exists) {
-      throw StateError('Expiry alert not found.');
+    if (userId == null) {
+      return;
     }
 
-    final data = snapshot.data();
+    try {
+      final document = _alertsCollection.doc(alertId);
+      final snapshot = await document.get();
 
-    if (data == null || data['userId'] != userId) {
-      throw StateError('You do not have permission to update this alert.');
+      if (!snapshot.exists) {
+        return;
+      }
+
+      final data = snapshot.data();
+
+      if (data == null || data['userId'] != userId) {
+        return;
+      }
+
+      await document.update({'isRead': true});
+    } catch (e) {
+      // Ignore or log error gracefully
     }
-
-    await document.update({'isRead': true});
   }
 
   @override
   Future<void> deleteAlert(String alertId) async {
+    final alert = _localAlerts.remove(alertId);
+    if (alert != null) {
+      _localAlerts.remove(alert.itemId);
+    }
+
     final userId = _currentUserId;
 
-    final document = _alertsCollection.doc(alertId);
-
-    final snapshot = await document.get();
-
-    if (!snapshot.exists) {
+    if (userId == null) {
       return;
     }
 
-    final data = snapshot.data();
+    try {
+      final document = _alertsCollection.doc(alertId);
+      final snapshot = await document.get();
 
-    if (data == null || data['userId'] != userId) {
-      throw StateError('You do not have permission to delete this alert.');
+      if (!snapshot.exists) {
+        return;
+      }
+
+      final data = snapshot.data();
+
+      if (data == null || data['userId'] != userId) {
+        return;
+      }
+
+      await document.delete();
+    } catch (e) {
+      // Ignore or log error gracefully
     }
-
-    await document.delete();
   }
 }

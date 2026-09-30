@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/app_routes.dart';
 
+import '../../../pantry/presentation/providers/pantry_providers.dart';
 import '../../domain/repositories/expiry_repository.dart';
 
 import '../providers/expiry_provider.dart';
@@ -22,6 +24,12 @@ class ExpiryScreen extends ConsumerWidget {
     final summary = ref.watch(expirySummaryProvider);
 
     final smartItems = ref.watch(smartAlertItemsProvider);
+
+    final savedAlertsAsync = ref.watch(expiryAlertsProvider);
+    final savedAlertsMap = savedAlertsAsync.maybeWhen(
+      data: (alerts) => {for (final a in alerts) a.itemId: a},
+      orElse: () => <String, ExpiryAlert>{},
+    );
 
     final expiryService = ref.read(expiryServiceProvider);
 
@@ -188,10 +196,12 @@ class ExpiryScreen extends ConsumerWidget {
             const EmptyExpiryState(message: "No expiry alerts currently")
           else
             ...smartItems.map((item) {
+              final user = FirebaseAuth.instance.currentUser;
+              final existing = savedAlertsMap[item.id];
               final alert = ExpiryAlert(
-                id: item.id,
+                id: existing?.id ?? item.id,
 
-                userId: "",
+                userId: user?.uid ?? existing?.userId ?? "",
 
                 itemId: item.id,
 
@@ -207,9 +217,13 @@ class ExpiryScreen extends ConsumerWidget {
 
                 message: expiryService.expiryMessage(item),
 
-                isRead: false,
+                isRead: existing?.isRead ?? false,
 
-                createdAt: DateTime.now(),
+                createdAt: existing?.createdAt ?? DateTime.now(),
+
+                reminderDays: existing?.reminderDays ?? 3,
+
+                notificationEnabled: existing?.notificationEnabled ?? true,
               );
 
               return ExpiryAlertCard(
@@ -229,7 +243,14 @@ class ExpiryScreen extends ConsumerWidget {
                   final confirm = await showStopTrackingDialog(context);
 
                   if (confirm == true) {
-                    await ref.read(stopTrackingProvider)(alert.id);
+                    final updatedItem = item.copyWith(clearExpiryDate: true);
+                    await ref
+                        .read(pantryItemsProvider.notifier)
+                        .updateItem(updatedItem);
+
+                    if (user != null) {
+                      await ref.read(stopTrackingProvider)(alert.id);
+                    }
                   }
                 },
               );

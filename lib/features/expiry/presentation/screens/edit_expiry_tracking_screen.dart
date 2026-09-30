@@ -1,7 +1,11 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../pantry/presentation/providers/pantry_providers.dart';
 import '../../domain/repositories/expiry_repository.dart';
+import '../../domain/services/expiry_notification_provider.dart';
 import '../providers/expiry_provider.dart';
 
 class EditExpiryTrackingScreen extends ConsumerStatefulWidget {
@@ -29,10 +33,15 @@ class _EditExpiryTrackingScreenState
   }
 
   Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final firstDate = _expiryDate.isBefore(now)
+        ? _expiryDate
+        : now.subtract(const Duration(days: 365));
+
     final picked = await showDatePicker(
       context: context,
       initialDate: _expiryDate,
-      firstDate: DateTime.now(),
+      firstDate: firstDate,
       lastDate: DateTime(2035),
     );
 
@@ -44,7 +53,11 @@ class _EditExpiryTrackingScreenState
   }
 
   Future<void> _saveChanges() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final userId = user?.uid ?? '';
+
     final updatedAlert = widget.alert.copyWith(
+      userId: widget.alert.userId.isEmpty ? userId : widget.alert.userId,
       expiryDate: _expiryDate,
       daysUntilExpiry: _expiryDate.difference(DateTime.now()).inDays,
       reminderDays: _reminderDays,
@@ -52,10 +65,36 @@ class _EditExpiryTrackingScreenState
       message: '${widget.alert.itemName} expiry reminder',
     );
 
-    await ref.read(saveExpiryAlertProvider)(updatedAlert);
+    final currentItems =
+        ref.read(pantryItemsProvider).asData?.value ?? const [];
+    final itemIndex = currentItems.indexWhere(
+      (e) => e.id == widget.alert.itemId || e.firestoreId == widget.alert.itemId,
+    );
+
+    if (itemIndex != -1) {
+      final updatedItem = currentItems[itemIndex].copyWith(
+        expiryDate: _expiryDate,
+      );
+      await ref.read(pantryItemsProvider.notifier).updateItem(updatedItem);
+    }
+
+    if (userId.isNotEmpty) {
+      try {
+        await ref.read(saveExpiryAlertProvider)(updatedAlert);
+      } catch (e) {
+        debugPrint('Error saving alert: $e');
+      }
+    }
+
+    final dateStr =
+        "${_expiryDate.day}/${_expiryDate.month}/${_expiryDate.year}";
+    await ref.read(expiryNotificationServiceProvider).showExpiryNotification(
+      title: "Expiry Tracking Updated",
+      body: "Updated tracking for ${widget.alert.itemName} (Expires: $dateStr)",
+    );
 
     if (mounted) {
-      Navigator.of(context).pop();
+      context.pop();
     }
   }
 
