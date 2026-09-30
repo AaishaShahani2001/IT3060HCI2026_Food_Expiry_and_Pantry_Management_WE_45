@@ -45,17 +45,8 @@ class ExpiryScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primaryGreen,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Track Item Expiry',
-          style: TextStyle(color: Colors.white),
-        ),
-        onPressed: () {
-          context.push(AppRoutes.addExpiryTracking);
-        },
-      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: const ExpiryTrackingActions(),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -164,6 +155,77 @@ class ExpiryScreen extends ConsumerWidget {
                 },
               );
             }),
+        ],
+      ),
+    );
+  }
+}
+
+class ExpiryTrackingActions extends StatelessWidget {
+  const ExpiryTrackingActions({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: MediaQuery.sizeOf(context).width - 32,
+      child: Row(
+        children: [
+          Expanded(
+            flex: 5,
+            child: OutlinedButton(
+              key: const ValueKey('track-waste-button'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryGreen,
+                minimumSize: const Size(0, 56),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              onPressed: () {
+                context.push(AppRoutes.wasteTracker);
+              },
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.delete_outline_rounded, size: 20),
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Track Waste'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 6,
+            child: FilledButton(
+              key: const ValueKey('track-item-expiry-button'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 56),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              onPressed: () {
+                context.push(AppRoutes.addExpiryTracking);
+              },
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add, size: 20),
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Track Item Expiry'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
