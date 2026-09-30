@@ -26,6 +26,8 @@ class ExpiryAlert {
     required this.message,
     required this.isRead,
     required this.createdAt,
+    this.reminderDays = 3,
+    this.notificationEnabled = true,
   });
 
   final String id;
@@ -39,21 +41,91 @@ class ExpiryAlert {
   final String message;
   final bool isRead;
   final DateTime createdAt;
+  final int reminderDays;
+  final bool notificationEnabled;
 
-  Map<String, dynamic> toMap() {
-    return {
-      'userId': userId,
-      'itemId': itemId,
-      'itemName': itemName,
-      'expiryDate': expiryDate.toIso8601String(),
-      'daysUntilExpiry': daysUntilExpiry,
-      'status': status,
-      'priority': priority,
-      'message': message,
-      'isRead': isRead,
-      'createdAt': createdAt.toIso8601String(),
-    };
+  ExpiryAlert copyWith({
+    String? id,
+    String? userId,
+    String? itemId,
+    String? itemName,
+    DateTime? expiryDate,
+    int? daysUntilExpiry,
+    String? status,
+    String? priority,
+    String? message,
+    bool? isRead,
+    DateTime? createdAt,
+    int? reminderDays,
+    bool? notificationEnabled,
+  }) {
+    return ExpiryAlert(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      itemId: itemId ?? this.itemId,
+      itemName: itemName ?? this.itemName,
+      expiryDate: expiryDate ?? this.expiryDate,
+      daysUntilExpiry: daysUntilExpiry ?? this.daysUntilExpiry,
+      status: status ?? this.status,
+      priority: priority ?? this.priority,
+      message: message ?? this.message,
+      isRead: isRead ?? this.isRead,
+      createdAt: createdAt ?? this.createdAt,
+      reminderDays: reminderDays ?? this.reminderDays,
+      notificationEnabled: notificationEnabled ?? this.notificationEnabled,
+    );
   }
+
+ Map<String,dynamic> toMap(){
+
+return {
+
+
+'userId':userId,
+
+'itemId':itemId,
+
+'itemName':itemName,
+
+'expiryDate':
+expiryDate.toIso8601String(),
+
+
+'daysUntilExpiry':
+daysUntilExpiry,
+
+
+'status':
+status,
+
+
+'priority':
+priority,
+
+
+'message':
+message,
+
+
+'isRead':
+isRead,
+
+
+'createdAt':
+createdAt.toIso8601String(),
+
+
+'reminderDays':
+reminderDays,
+
+
+'notificationEnabled':
+notificationEnabled,
+
+
+};
+
+}
 
   factory ExpiryAlert.fromMap(String id, Map<String, dynamic> data) {
     return ExpiryAlert(
@@ -68,6 +140,8 @@ class ExpiryAlert {
       message: data['message'] as String? ?? '',
       isRead: data['isRead'] as bool? ?? false,
       createdAt: _parseDate(data['createdAt']) ?? DateTime.now(),
+      reminderDays: (data['reminderDays'] as num?)?.toInt() ?? 3,
+      notificationEnabled: data['notificationEnabled'] as bool? ?? true,
     );
   }
 

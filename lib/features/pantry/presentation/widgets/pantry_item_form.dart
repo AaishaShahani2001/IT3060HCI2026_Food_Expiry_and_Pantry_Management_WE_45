@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../data/local/pantry_food_catalog.dart';
 import '../../data/services/pantry_photo_storage_service.dart';
+import '../../domain/models/pantry_food_suggestion.dart';
 import '../../domain/models/pantry_item.dart';
 import '../utils/pantry_snackbar.dart';
+import 'pantry_item_autocomplete_field.dart';
 import 'pantry_item_photo_field.dart';
 
 class PantryItemFormData {
@@ -56,6 +59,7 @@ class PantryItemForm extends StatefulWidget {
     required this.onSubmit,
     this.initialItem,
     this.prefill,
+    this.existingItems = const [],
     this.isSaving = false,
     this.savingMessage,
     super.key,
@@ -63,6 +67,9 @@ class PantryItemForm extends StatefulWidget {
 
   final PantryItem? initialItem;
   final PantryItemFormPrefill? prefill;
+
+  /// Pantry rows already loaded for this user. Used only to suggest names.
+  final List<PantryItem> existingItems;
   final bool isSaving;
   final String? savingMessage;
   final Future<void> Function(PantryItemFormData data) onSubmit;
@@ -77,9 +84,16 @@ class _PantryItemFormState extends State<PantryItemForm> {
   late final TextEditingController _quantityController;
   late final TextEditingController _priceController;
 
-  late PantryCategory _category;
+  PantryCategory? _category;
   late PantryLocation _location;
   late PantryUnit _unit;
+
+  /// True after the user picks a category from the dropdown. Later edits to
+  /// the same name must not replace that choice. Selecting a suggestion may.
+  bool _categoryWasManuallyChanged = false;
+
+  /// True when the current category came from a suggestion or exact name.
+  bool _categorySuggested = false;
   DateTime? _expiryDate;
   XFile? _selectedPhoto;
   Uint8List? _previewBytes;
@@ -103,7 +117,14 @@ class _PantryItemFormState extends State<PantryItemForm> {
     _priceController = TextEditingController(
       text: item != null ? _decimalFieldText(item.unitPrice) : '',
     );
-    _category = item?.category ?? prefill?.category ?? PantryCategory.other;
+    // Existing and Shopping List-prefilled items retain their valid category.
+    // A normal new item stays unselected until the user chooses a category or
+    // an exact food-name match supplies one.
+    _category = item?.category ?? prefill?.category;
+    // Treat a Shopping List category as an intentional initial value so name
+    // edits do not replace it. Explicitly selecting an autocomplete suggestion
+    // can still replace it through _handleSuggestionSelected.
+    _categoryWasManuallyChanged = item == null && prefill != null;
     _location = item?.location ?? PantryLocation.pantry;
     _unit = item?.unit ?? prefill?.unit ?? PantryUnit.items;
     _expiryDate = item?.expiryDate;
@@ -157,14 +178,49 @@ class _PantryItemFormState extends State<PantryItemForm> {
     }
   }
 
+  /// Fills the category only for a selected suggestion or an exact catalogue
+  /// name. A partial value such as "ch" is ignored because it could be
+  /// Cheese, Chicken or Chickpeas.
+  void _handleNameEdited(String rawName) {
+    if (_categoryWasManuallyChanged) return;
+
+    final match = exactPantryFoodMatch(rawName);
+    if (match == null) {
+      if (_categorySuggested) {
+        setState(() => _categorySuggested = false);
+      }
+      return;
+    }
+    if (_category == match.category && _categorySuggested) return;
+
+    setState(() {
+      _category = match.category;
+      _categorySuggested = true;
+    });
+  }
+
+  void _handleSuggestionSelected(PantryFoodSuggestion suggestion) {
+    // A deliberate pick may replace a category the user chose earlier.
+    _categoryWasManuallyChanged = false;
+    setState(() {
+      _category = suggestion.category;
+      _categorySuggested = true;
+    });
+  }
+
   Future<void> _handleSubmit() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
     FocusScope.of(context).unfocus();
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final quantity = double.tryParse(_quantityController.text.trim());
     final price = _parsePrice(_priceController.text);
+    final category = _category;
 
-    if (quantity == null || quantity <= 0 || price == null || price < 0) {
+    if (category == null ||
+        quantity == null ||
+        quantity <= 0 ||
+        price == null ||
+        price < 0) {
       _formKey.currentState?.validate();
       return;
     }
@@ -172,7 +228,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
     await widget.onSubmit(
       PantryItemFormData(
         name: _nameController.text.trim(),
-        category: _category,
+        category: category,
         location: _location,
         quantity: quantity,
         unit: _unit,
@@ -193,6 +249,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
   }
 
   Widget? get _photoPreview {
+    final fallbackCategory = _category ?? PantryCategory.other;
     if (_previewBytes != null) {
       return Image.memory(
         _previewBytes!,
@@ -216,7 +273,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
           return ColoredBox(
             color: Theme.of(context).colorScheme.secondaryContainer,
             child: Icon(
-              _category.icon,
+              fallbackCategory.icon,
               color: Theme.of(context).colorScheme.primary,
             ),
           );
@@ -299,7 +356,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PantryItemPhotoField(
-            category: _category,
+            category: _category ?? PantryCategory.other,
             hasPreview: _hasPhotoPreview,
             preview: _photoPreview,
             enabled: !widget.isSaving,
@@ -309,10 +366,12 @@ class _PantryItemFormState extends State<PantryItemForm> {
           ),
           const SizedBox(height: 20),
           _buildLabel('Item name'),
-          TextFormField(
+          PantryItemAutocompleteField(
             controller: _nameController,
             enabled: !widget.isSaving,
-            textCapitalization: TextCapitalization.sentences,
+            existingItems: widget.existingItems,
+            onSuggestionSelected: _handleSuggestionSelected,
+            onNameEdited: _handleNameEdited,
             decoration: _inputDecoration(
               hint: 'e.g. Milk, Rice, Apples',
               prefixIcon: Icons.inventory_2_outlined,
@@ -330,7 +389,15 @@ class _PantryItemFormState extends State<PantryItemForm> {
           const SizedBox(height: 16),
           _buildLabel('Category'),
           DropdownButtonFormField<PantryCategory>(
-            value: _category,
+            initialValue: _category,
+            isExpanded: true,
+            hint: Text(
+              'Select category',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
             dropdownColor: Theme.of(
               context,
             ).colorScheme.surfaceContainerHighest,
@@ -343,22 +410,59 @@ class _PantryItemFormState extends State<PantryItemForm> {
                       children: [
                         Icon(category.icon, size: 18),
                         const SizedBox(width: 8),
-                        Text(category.label),
+                        Flexible(
+                          child: Text(
+                            category.label,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 )
                 .toList(),
+            validator: (value) {
+              if (value == null) return 'Category is required.';
+              return null;
+            },
             onChanged: widget.isSaving
                 ? null
                 : (value) {
-                    if (value != null) setState(() => _category = value);
+                    if (value == null) return;
+                    setState(() {
+                      _category = value;
+                      _categoryWasManuallyChanged = true;
+                      _categorySuggested = false;
+                    });
                   },
           ),
+          if (_categorySuggested) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(
+                  Icons.auto_awesome,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Category suggested from item name',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
           _buildLabel('Location'),
           DropdownButtonFormField<PantryLocation>(
-            value: _location,
+            initialValue: _location,
+            isExpanded: true,
             dropdownColor: Theme.of(
               context,
             ).colorScheme.surfaceContainerHighest,
@@ -371,7 +475,12 @@ class _PantryItemFormState extends State<PantryItemForm> {
                       children: [
                         Icon(location.icon, size: 18),
                         const SizedBox(width: 8),
-                        Text(location.label),
+                        Flexible(
+                          child: Text(
+                            location.label,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -433,7 +542,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
                   children: [
                     _buildLabel('Unit'),
                     DropdownButtonFormField<PantryUnit>(
-                      value: _unit,
+                      initialValue: _unit,
                       isExpanded: true,
                       dropdownColor: Theme.of(
                         context,

@@ -3,8 +3,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/Authentication/Screens/login_screen.dart';
 import '../../features/Authentication/Screens/signup_screen.dart';
+import '../../features/expiry/presentation/screens/add_expiry_tracking_screen.dart';
+import '../../features/expiry/presentation/screens/edit_expiry_tracking_screen.dart';
 import '../../features/expiry/presentation/screens/expiry_notification_settings_screen.dart';
 import '../../features/expiry/presentation/screens/expiry_screen.dart';
+import '../../features/expiry/domain/repositories/expiry_repository.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/home/presentation/widgets/home_shell.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
@@ -64,6 +67,19 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.sharedPantry,
       builder: (context, state) => const SharedPantryScreen(),
     ),
+    GoRoute(
+      path: AppRoutes.addExpiryTracking,
+      builder: (context, state) => const AddExpiryTrackingScreen(),
+    ),
+
+    GoRoute(
+      path: AppRoutes.editExpiryTracking,
+      builder: (context, state) {
+        final alert = state.extra as ExpiryAlert;
+
+        return EditExpiryTrackingScreen(alert: alert);
+      },
+    ),
 
     GoRoute(
       path: AppRoutes.sharedPantryMembers,
@@ -71,11 +87,7 @@ final GoRouter appRouter = GoRouter(
         final pantryId = state.uri.queryParameters['pantryId'];
 
         if (pantryId == null || pantryId.isEmpty) {
-          return const Scaffold(
-            body: Center(
-              child: Text('Pantry not found.'),
-            ),
-          );
+          return const Scaffold(body: Center(child: Text('Pantry not found.')));
         }
 
         return SharedPantryMembersScreen(pantryId: pantryId);
@@ -123,8 +135,7 @@ final GoRouter appRouter = GoRouter(
 
         GoRoute(
           path: AppRoutes.expiryNotifications,
-          builder: (context, state) =>
-          const ExpiryNotificationSettingsScreen(),
+          builder: (context, state) => const ExpiryNotificationSettingsScreen(),
         ),
 
         GoRoute(
