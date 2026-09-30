@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:food_expiry_and_pantry_management/features/expiry/presentation/screens/expiry_notification_settings_screen.dart';
 
@@ -8,13 +9,15 @@ void main() {
       'notification list controls use a Material surface in ${brightness.name} mode',
       (tester) async {
         await tester.pumpWidget(
-          MaterialApp(
-            theme: ThemeData(
-              brightness: brightness,
-              useMaterial3: true,
-              colorSchemeSeed: Colors.green,
+          ProviderScope(
+            child: MaterialApp(
+              theme: ThemeData(
+                brightness: brightness,
+                useMaterial3: true,
+                colorSchemeSeed: Colors.green,
+              ),
+              home: const ExpiryNotificationSettingsScreen(),
             ),
-            home: const ExpiryNotificationSettingsScreen(),
           ),
         );
 

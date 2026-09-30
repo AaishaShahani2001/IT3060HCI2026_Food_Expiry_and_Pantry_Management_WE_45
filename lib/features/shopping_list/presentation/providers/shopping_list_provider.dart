@@ -37,6 +37,7 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
   int _generation = 0;
   Completer<void> _idle = Completer<void>()..complete();
   bool get _mutationInProgress => !_idle.isCompleted;
+  bool get mutationInProgress => _mutationInProgress;
   set _mutationInProgress(bool busy) {
     if (busy) {
       _idle = Completer<void>();

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -10,12 +11,16 @@ import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
 import 'package:food_expiry_and_pantry_management/features/home/presentation/widgets/home_shell.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/presentation/screens/pantry_item_form_screen.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/domain/models/shopping_reminder.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/domain/services/shopping_reminder_notification_service.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/low_stock_suggestion_settings_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_pantry_provider.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_reminder_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/screens/add_shopping_item_screen.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/screens/shopping_list_screen.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/widgets/shopping_item_tile.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -37,11 +42,98 @@ PantryItem lowStockItem(
   unit: unit,
 );
 
+class FakeShoppingReminderScheduler implements ShoppingReminderScheduler {
+  final Map<String, ShoppingReminder> active = {};
+  final List<String> scheduledUids = [];
+  final List<String> cancelledUids = [];
+  final List<int> cancelledIds = [];
+
+  @override
+  Future<void> schedule({
+    required String uid,
+    required ShoppingReminder reminder,
+  }) async {
+    scheduledUids.add(uid);
+    active[uid] = reminder;
+  }
+
+  @override
+  Future<void> cancelPending({
+    required String uid,
+    required ShoppingReminder reminder,
+    required DateTime now,
+  }) async {
+    cancelledUids.add(uid);
+    cancelledIds.addAll(
+      pendingShoppingReminderNotificationIds(
+        uid: uid,
+        reminder: reminder,
+        now: now,
+      ),
+    );
+    active.remove(uid);
+  }
+
+  @override
+  Future<void> cancelAll({required String uid}) async {
+    cancelledUids.add(uid);
+    cancelledIds.addAll([
+      for (var slot = 0; slot < shoppingReminderMaximumCount; slot++)
+        shoppingReminderNotificationId(uid, slot),
+    ]);
+    active.remove(uid);
+  }
+}
+
+class _ManualReminderExpiryTimer implements Timer {
+  _ManualReminderExpiryTimer(this.callback);
+
+  final void Function() callback;
+  bool _isActive = true;
+
+  void fire() {
+    if (!_isActive) return;
+    _isActive = false;
+    callback();
+  }
+
+  @override
+  void cancel() => _isActive = false;
+
+  @override
+  bool get isActive => _isActive;
+
+  @override
+  int get tick => _isActive ? 0 : 1;
+}
+
+class _ManualReminderExpiryTimers {
+  final List<_ManualReminderExpiryTimer> timers = [];
+
+  Timer create(Duration duration, void Function() callback) {
+    final timer = _ManualReminderExpiryTimer(callback);
+    timers.add(timer);
+    return timer;
+  }
+
+  void fireActive() {
+    final active = timers.where((timer) => timer.isActive).toList();
+    expect(active, hasLength(1));
+    active.single.fire();
+  }
+}
+
 void main() {
   late ShoppingTestSession session;
+  late FakeShoppingReminderScheduler reminderScheduler;
+  late _ManualReminderExpiryTimers reminderExpiryTimers;
+  var reminderNow = DateTime(2026, 10, 1, 10);
 
   setUp(() {
     session = ShoppingTestSession();
+    reminderScheduler = FakeShoppingReminderScheduler();
+    reminderExpiryTimers = _ManualReminderExpiryTimers();
+    reminderNow = DateTime(2026, 10, 1, 10);
   });
   tearDown(() => session.changes.close());
 
@@ -84,6 +176,13 @@ void main() {
           shoppingListRepositoryProvider.overrideWithValue(session.repository),
           shoppingAuthUidProvider.overrideWith((ref) => session.auth()),
           shoppingPantryItemsProvider.overrideWithValue(AsyncData(pantryItems)),
+          shoppingReminderSchedulerProvider.overrideWithValue(
+            reminderScheduler,
+          ),
+          shoppingReminderClockProvider.overrideWithValue(() => reminderNow),
+          shoppingReminderExpiryTimerFactoryProvider.overrideWithValue(
+            reminderExpiryTimers.create,
+          ),
           if (preferences != null)
             sharedPreferencesProvider.overrideWithValue(preferences),
         ],
@@ -144,6 +243,8 @@ void main() {
       findsOneWidget,
     );
     expect(find.byTooltip('Shopping List help'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Help'), findsOneWidget);
+    expect(find.byIcon(Icons.help_outline), findsOneWidget);
     final before = visibleState(
       tester,
     ).map((item) => item.isPurchased).toList();
@@ -619,7 +720,7 @@ void main() {
     expect(session.store.documents.length, 3);
   });
 
-  testWidgets('empty and populated lists show a responsive accessible help UI', (
+  testWidgets('guided help supports Back, Skip, replay, and narrow dark UI', (
     tester,
   ) async {
     await openScreen(
@@ -637,34 +738,277 @@ void main() {
 
     await tester.tap(find.byTooltip('Shopping List help'));
     await tester.pumpAndSettle();
-    expect(find.text('Shopping List Help'), findsOneWidget);
-    expect(
-      find.text('Add items and use search to find them quickly.'),
-      findsOneWidget,
-    );
-    expect(
-      find.text(
-        'Touch and hold items or categories to select them for deletion.',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.text(
-        'Selecting a category includes every Shopping List item in that category.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('shopping-help-card')), findsOneWidget);
+    expect(find.text('Search Items'), findsOneWidget);
+    expect(find.text('1 of 4'), findsOneWidget);
     expect(tester.takeException(), isNull);
-    await tester.tap(find.text('Got it'));
-    await tester.pumpAndSettle();
 
-    session.store.seed('alice', 'milk', 'Milk');
-    await pullRefresh(tester);
-    expect(find.text('Milk'), findsOneWidget);
-    expect(find.byTooltip('Edit Milk'), findsOneWidget);
-    expect(find.text(hint), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Next'));
+    await tester.pumpAndSettle();
+    expect(find.text('Shopping Reminder'), findsOneWidget);
+    expect(reminderScheduler.scheduledUids, isEmpty);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Back'));
+    await tester.pumpAndSettle();
+    expect(find.text('Search Items'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Skip'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('shopping-help-card')), findsNothing);
+
+    await tester.tap(find.byTooltip('Shopping List help'));
+    await tester.pumpAndSettle();
+    expect(find.text('Search Items'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Skip'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('shopping-help-card')), findsNothing);
+    expect(reminderScheduler.scheduledUids, isEmpty);
+    expect(session.store.documents, isEmpty);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'guided help covers available controls, finishes, and can reopen',
+    (tester) async {
+      await openScreen(tester, pantryItems: [lowStockItem('orange', 'Orange')]);
+      await tester.tap(find.byTooltip('Shopping List help'));
+      await tester.pumpAndSettle();
+
+      const titles = [
+        'Search Items',
+        'Low Stock Suggestions',
+        'Shopping Reminder',
+        'Filter Your List',
+        'Organized by Category',
+        'Manage Items',
+        'Add Shopping Items',
+      ];
+      for (var index = 0; index < titles.length; index++) {
+        expect(find.text(titles[index]), findsOneWidget);
+        expect(find.text('${index + 1} of ${titles.length}'), findsOneWidget);
+        if (titles[index] == 'Shopping Reminder') {
+          expect(
+            find.text(
+              'Choose a shopping date and set up to 3 reminders for that day.',
+            ),
+            findsOneWidget,
+          );
+        }
+        expect(reminderScheduler.scheduledUids, isEmpty);
+        await tester.tap(
+          find.widgetWithText(
+            FilledButton,
+            index == titles.length - 1 ? 'Done' : 'Next',
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+      expect(find.byKey(const ValueKey('shopping-help-card')), findsNothing);
+      expect(session.store.documents.length, 3);
+
+      await tester.tap(find.byTooltip('Shopping List help'));
+      await tester.pumpAndSettle();
+      expect(find.text('Search Items'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Skip'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Add shopping item'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AddShoppingItemScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Bought-only list cannot open or schedule a reminder', (
+    tester,
+  ) async {
+    session.store.seed('alice', 'bread', 'Bread', purchased: true);
+    await openScreen(tester, seed: false);
+    expect(find.widgetWithText(OutlinedButton, 'Set Reminder'), findsOneWidget);
+    expect(find.byIcon(Icons.alarm_add_outlined), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Set Reminder'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Add items to your shopping list before setting a reminder.'),
+      findsOneWidget,
+    );
+    expect(find.byType(DatePickerDialog), findsNothing);
+    expect(reminderScheduler.scheduledUids, isEmpty);
+  });
+
+  testWidgets(
+    'future reminder can be set, changed without duplicates, and cancelled',
+    (tester) async {
+      await openScreen(tester);
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Set Reminder'));
+      await tester.pumpAndSettle();
+      expect(find.text('How many reminders?'), findsOneWidget);
+      expect(find.text('1 reminder on Oct 1, 2026\n11:00 AM'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('shopping-reminder-submit')));
+      await tester.pumpAndSettle();
+
+      expect(reminderScheduler.scheduledUids, ['alice']);
+      expect(reminderScheduler.active.length, 1);
+      expect(reminderScheduler.active['alice']?.times.length, 1);
+      expect(find.text('Today • 1 reminder'), findsOneWidget);
+
+      await tester.tap(
+        find.widgetWithText(OutlinedButton, 'Today • 1 reminder'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('11:00 AM'), findsOneWidget);
+      await tester.tap(find.text('Change Reminder'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const ValueKey('shopping-reminder-count')),
+          matching: find.text('2'),
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.text('2 reminders on Oct 1, 2026\n11:00 AM and 2:00 PM'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('shopping-reminder-submit')));
+      await tester.pumpAndSettle();
+      expect(reminderScheduler.scheduledUids, ['alice', 'alice']);
+      expect(reminderScheduler.active.length, 1);
+      expect(reminderScheduler.active['alice']?.times.length, 2);
+      expect(reminderScheduler.cancelledUids, ['alice']);
+      expect(find.text('Today • 2 reminders'), findsOneWidget);
+
+      await tester.tap(
+        find.widgetWithText(OutlinedButton, 'Today • 2 reminders'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('11:00 AM'), findsOneWidget);
+      expect(find.text('2:00 PM'), findsOneWidget);
+      await tester.tap(find.text('Cancel Reminder'));
+      await tester.pumpAndSettle();
+      expect(reminderScheduler.cancelledUids, ['alice', 'alice']);
+      expect(reminderScheduler.active, isEmpty);
+      expect(
+        find.widgetWithText(OutlinedButton, 'Set Reminder'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('top reminder action resets after the final time passes', (
+    tester,
+  ) async {
+    await openScreen(tester);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Set Reminder'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('shopping-reminder-submit')));
+    await tester.pumpAndSettle();
+    expect(find.text('Today • 1 reminder'), findsOneWidget);
+
+    reminderNow = reminderNow.add(const Duration(hours: 1, minutes: 1));
+    reminderExpiryTimers.fireActive();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Today • 1 reminder'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Set Reminder'), findsOneWidget);
+    expect(reminderScheduler.cancelledUids, isEmpty);
+    expect(reminderScheduler.cancelledIds, isEmpty);
+  });
+
+  testWidgets('completing all To Buy items cancels only future reminders', (
+    tester,
+  ) async {
+    final partlyCompleted = ShoppingReminder(
+      date: reminderNow,
+      times: [
+        reminderNow.subtract(const Duration(hours: 2)),
+        reminderNow.subtract(const Duration(hours: 1)),
+        reminderNow.add(const Duration(hours: 1)),
+      ],
+    );
+    SharedPreferences.setMockInitialValues({
+      shoppingReminderStorageKey('alice'): jsonEncode(partlyCompleted.toJson()),
+    });
+    final preferences = await SharedPreferences.getInstance();
+    await openScreen(tester, preferences: preferences);
+    expect(find.text('Today • 3 reminders'), findsOneWidget);
+    Future<void> markBought(String name) async {
+      final tile = find.ancestor(
+        of: find.text(name),
+        matching: find.byType(ShoppingItemTile),
+      );
+      await tester.tap(
+        find.descendant(of: tile, matching: find.byType(Checkbox)),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await markBought('Milk');
+    await markBought('Rice');
+    await tester.pumpAndSettle();
+
+    expect(reminderScheduler.cancelledUids, ['alice']);
+    expect(reminderScheduler.cancelledIds, [
+      shoppingReminderNotificationId('alice', 2),
+    ]);
+    expect(find.widgetWithText(OutlinedButton, 'Set Reminder'), findsOneWidget);
+    expect(visibleState(tester).length, 3);
+    expect(visibleState(tester).every((item) => item.isPurchased), isTrue);
+    expect(session.store.documents.length, 3);
+  });
+
+  testWidgets('failed final Bought update keeps the active reminder', (
+    tester,
+  ) async {
+    session.store.seed('alice', 'milk', 'Milk');
+    await openScreen(tester, seed: false);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Set Reminder'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('shopping-reminder-submit')));
+    await tester.pumpAndSettle();
+    session.store.updateError = FirebaseException(
+      plugin: 'cloud_firestore',
+      code: 'permission-denied',
+    );
+
+    await tester.tap(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+
+    expect(reminderScheduler.cancelledUids, isEmpty);
+    expect(find.text('Today • 1 reminder'), findsOneWidget);
+    expect(visibleState(tester).single.isPurchased, isFalse);
+    expect(
+      session
+          .store
+          .documents['users/alice/shopping_items/milk']!['isPurchased'],
+      isFalse,
+    );
+  });
+
+  for (final dark in [false, true]) {
+    testWidgets(
+      'reminder action does not overflow at 320px in ${dark ? 'dark' : 'light'} theme',
+      (tester) async {
+        await openScreen(tester, size: const Size(320, 640), dark: dark);
+        expect(
+          find.widgetWithText(OutlinedButton, 'Set Reminder'),
+          findsOneWidget,
+        );
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Set Reminder'));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(
+            of: find.byKey(const ValueKey('shopping-reminder-count')),
+            matching: find.text('3'),
+          ),
+        );
+        await tester.pump();
+        expect(
+          find.byKey(const ValueKey('shopping-reminder-time-2')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'category selection uses full category despite filters and search',
@@ -1123,6 +1467,55 @@ void main() {
       expect(session.store.readCalls, reads + 1);
       expect(find.text('Milk'), findsOneWidget);
       expect(find.text('Your shopping list is empty'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'short empty list with low-stock suggestions scrolls without overflow',
+    (tester) async {
+      await openScreen(
+        tester,
+        seed: false,
+        size: const Size(320, 700),
+        pantryItems: [lowStockItem('milk', 'Milk')],
+      );
+
+      expect(find.text('Low-stock suggestions (1)'), findsOneWidget);
+      expect(find.text('Add All'), findsOneWidget);
+      expect(find.text('Your shopping list is empty'), findsOneWidget);
+      expect(find.text('Add items you need to buy.'), findsOneWidget);
+      expect(find.text('Add your first item'), findsOneWidget);
+      expect(
+        find.text(
+          'Tip: Touch and hold an item or category to select and delete.',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.scrollUntilVisible(
+        find.text('Add your first item'),
+        -100,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Add your first item').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.ensureVisible(find.text('Low-stock suggestions (1)'));
+      await tester.tap(find.text('Low-stock suggestions (1)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add All'), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      await tester.scrollUntilVisible(
+        find.text('Add your first item'),
+        -100,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Add your first item').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 
