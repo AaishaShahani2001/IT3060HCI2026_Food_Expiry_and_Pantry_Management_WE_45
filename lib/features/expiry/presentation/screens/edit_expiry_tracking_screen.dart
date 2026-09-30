@@ -68,7 +68,8 @@ class _EditExpiryTrackingScreenState
     final currentItems =
         ref.read(pantryItemsProvider).asData?.value ?? const [];
     final itemIndex = currentItems.indexWhere(
-      (e) => e.id == widget.alert.itemId || e.firestoreId == widget.alert.itemId,
+      (e) =>
+          e.id == widget.alert.itemId || e.firestoreId == widget.alert.itemId,
     );
 
     if (itemIndex != -1) {
@@ -88,10 +89,13 @@ class _EditExpiryTrackingScreenState
 
     final dateStr =
         "${_expiryDate.day}/${_expiryDate.month}/${_expiryDate.year}";
-    await ref.read(expiryNotificationServiceProvider).showExpiryNotification(
-      title: "Expiry Tracking Updated",
-      body: "Updated tracking for ${widget.alert.itemName} (Expires: $dateStr)",
-    );
+    await ref
+        .read(expiryNotificationServiceProvider)
+        .showExpiryNotification(
+          title: "Expiry Tracking Updated",
+          body:
+              "Updated tracking for ${widget.alert.itemName} (Expires: $dateStr)",
+        );
 
     if (mounted) {
       context.pop();

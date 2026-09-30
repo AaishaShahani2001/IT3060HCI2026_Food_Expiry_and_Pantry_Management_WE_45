@@ -68,15 +68,10 @@ class ExpiryAlertService {
 
       await _repository.saveAlert(alert);
       await _notificationService.showExpiryNotification(
+        title: "${item.name} expiry alert",
 
-title:
-"${item.name} expiry alert",
-
-
-body:
-message,
-
-);
+        body: message,
+      );
     }
   }
 

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/Authentication/screens/login_screen.dart';
-import '../../features/Authentication/screens/signup_screen.dart';
+import '../../features/Authentication/Screens/login_screen.dart';
+import '../../features/Authentication/Screens/signup_screen.dart';
 import '../../features/expiry/domain/repositories/expiry_repository.dart';
 import '../../features/expiry/presentation/screens/expiry_notification_settings_screen.dart';
 import '../../features/expiry/presentation/screens/expiry_screen.dart';
@@ -11,6 +11,7 @@ import '../../features/expiry/presentation/screens/edit_expiry_tracking_screen.d
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/home/presentation/widgets/home_shell.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
+import '../../features/pantry/presentation/screens/pantry_items_screen.dart';
 import '../../features/pantry/presentation/screens/pantry_screen.dart';
 import '../../features/profile/presentation/screens/change_password_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
@@ -18,7 +19,10 @@ import '../../features/recipes/presentation/screens/recipes_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/shared_pantry/presentation/screens/shared_pantry_members_screen.dart';
 import '../../features/shared_pantry/presentation/screens/shared_pantry_screen.dart';
-import '../../features/shopping/presentation/screens/shopping_screen.dart';
+import '../../features/shopping_list/models/shopping_item.dart';
+import '../../features/shopping_list/presentation/screens/add_shopping_item_screen.dart';
+import '../../features/shopping_list/presentation/screens/shopping_list_screen.dart';
+import '../../features/food_waste_tracking/presentation/screens/waste_tracker_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
 
 import 'app_routes.dart';
@@ -82,11 +86,26 @@ final GoRouter appRouter = GoRouter(
         final pantryId = state.uri.queryParameters['pantryId'];
 
         if (pantryId == null || pantryId.isEmpty) {
-          return const Scaffold(body: Center(child: Text('Pantry not found.')));
+          return const Scaffold(
+            body: Center(
+              child: Text('Pantry not found.'),
+            ),
+          );
         }
 
         return SharedPantryMembersScreen(pantryId: pantryId);
       },
+    ),
+
+    GoRoute(
+      path: AppRoutes.addShoppingItem,
+      builder: (context, state) =>
+          AddShoppingItemScreen(initialItem: state.extra as ShoppingItem?),
+    ),
+
+    GoRoute(
+      path: AppRoutes.wasteTracker,
+      builder: (context, state) => const WasteTrackerScreen(),
     ),
 
     ShellRoute(
@@ -102,6 +121,14 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: AppRoutes.pantry,
           builder: (context, state) => const PantryScreen(),
+          routes: [
+            GoRoute(
+              // Child path is 'items', not '/items',
+              // so the location is /pantry/items.
+              path: 'items',
+              builder: (context, state) => const PantryItemsScreen(),
+            ),
+          ],
         ),
 
         GoRoute(
@@ -111,12 +138,13 @@ final GoRouter appRouter = GoRouter(
 
         GoRoute(
           path: AppRoutes.expiryNotifications,
-          builder: (context, state) => const ExpiryNotificationSettingsScreen(),
+          builder: (context, state) =>
+          const ExpiryNotificationSettingsScreen(),
         ),
 
         GoRoute(
           path: AppRoutes.shopping,
-          builder: (context, state) => const ShoppingScreen(),
+          builder: (context, state) => const ShoppingListScreen(),
         ),
 
         GoRoute(

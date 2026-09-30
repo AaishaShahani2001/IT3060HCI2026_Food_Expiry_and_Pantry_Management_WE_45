@@ -62,7 +62,9 @@ class FirestoreExpiryRepository implements ExpiryRepository {
       return;
     }
 
-    final alertToSave = alert.userId.isEmpty ? alert.copyWith(userId: userId) : alert;
+    final alertToSave = alert.userId.isEmpty
+        ? alert.copyWith(userId: userId)
+        : alert;
 
     try {
       await _alertsCollection

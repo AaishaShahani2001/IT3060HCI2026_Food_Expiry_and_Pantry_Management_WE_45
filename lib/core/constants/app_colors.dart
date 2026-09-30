@@ -47,4 +47,19 @@ class FreshPalette {
   static const Color pageBackground = Color(0xFFF5F7F2);
   static const Color heading = Color(0xFF17201B);
   static const Color secondaryText = Color(0xFF6B7280);
+
+  /// Green-grey border that sits between [pageBackground] and [heading].
+  static const Color outline = Color(0xFFD5DCD4);
+
+  /// Highlight-tinted surface for chips, icon wells, and selected rows.
+  static const Color accentSurface = Color(0xFFE7F0D8);
+
+  // Dark-theme equivalents — same green identity, lifted contrast.
+  static const Color darkPageBackground = Color(0xFF101714);
+  static const Color darkCard = Color(0xFF1C2621);
+  static const Color darkHeading = Color(0xFFF3F6F4);
+  static const Color darkSecondaryText = Color(0xFFB4BCC0);
+  static const Color darkOutline = Color(0xFF3D4C44);
+  static const Color darkAccentSurface = Color(0xFF24352C);
+  static const Color darkOnPrimary = Color(0xFFF4F7F5);
 }

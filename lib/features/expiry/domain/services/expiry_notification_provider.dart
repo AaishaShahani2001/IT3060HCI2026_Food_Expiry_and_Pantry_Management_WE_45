@@ -3,14 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/expiry_notification_service.dart';
 
-
-final expiryNotificationServiceProvider =
-Provider((ref){
-
-
-return ExpiryNotificationService(
-FlutterLocalNotificationsPlugin()
-);
-
-
+final expiryNotificationServiceProvider = Provider((ref) {
+  return ExpiryNotificationService(FlutterLocalNotificationsPlugin());
 });

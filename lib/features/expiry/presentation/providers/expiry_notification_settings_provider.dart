@@ -63,31 +63,29 @@ class ExpiryNotificationSettingsNotifier
     }
 
     return ExpiryNotificationSettingsState(
-      notificationsEnabled:
-          prefs.getBool(_keyNotificationsEnabled) ?? true,
-      expiringSoonEnabled:
-          prefs.getBool(_keyExpiringSoon) ?? true,
-      expiredItemsEnabled:
-          prefs.getBool(_keyExpiredItems) ?? true,
-      useFirstEnabled:
-          prefs.getBool(_keyUseFirst) ?? true,
-      daysBefore:
-          prefs.getInt(_keyDaysBefore) ?? 3,
+      notificationsEnabled: prefs.getBool(_keyNotificationsEnabled) ?? true,
+      expiringSoonEnabled: prefs.getBool(_keyExpiringSoon) ?? true,
+      expiredItemsEnabled: prefs.getBool(_keyExpiredItems) ?? true,
+      useFirstEnabled: prefs.getBool(_keyUseFirst) ?? true,
+      daysBefore: prefs.getInt(_keyDaysBefore) ?? 3,
       notificationTime: TimeOfDay(
         hour: prefs.getInt(_keyHour) ?? 9,
         minute: prefs.getInt(_keyMinute) ?? 0,
       ),
-      frequency:
-          prefs.getString(_keyFrequency) ?? 'Daily',
+      frequency: prefs.getString(_keyFrequency) ?? 'Daily',
     );
   }
 
   Future<void> saveSettings(ExpiryNotificationSettingsState newState) async {
     state = newState;
-    final prefs = ref.read(sharedPreferencesProvider) ??
+    final prefs =
+        ref.read(sharedPreferencesProvider) ??
         await SharedPreferences.getInstance();
 
-    await prefs.setBool(_keyNotificationsEnabled, newState.notificationsEnabled);
+    await prefs.setBool(
+      _keyNotificationsEnabled,
+      newState.notificationsEnabled,
+    );
     await prefs.setBool(_keyExpiringSoon, newState.expiringSoonEnabled);
     await prefs.setBool(_keyExpiredItems, newState.expiredItemsEnabled);
     await prefs.setBool(_keyUseFirst, newState.useFirstEnabled);
@@ -98,7 +96,8 @@ class ExpiryNotificationSettingsNotifier
   }
 }
 
-final expiryNotificationSettingsProvider = NotifierProvider<
-    ExpiryNotificationSettingsNotifier, ExpiryNotificationSettingsState>(
-  ExpiryNotificationSettingsNotifier.new,
-);
+final expiryNotificationSettingsProvider =
+    NotifierProvider<
+      ExpiryNotificationSettingsNotifier,
+      ExpiryNotificationSettingsState
+    >(ExpiryNotificationSettingsNotifier.new);

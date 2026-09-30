@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../providers/pantry_providers.dart';
@@ -29,7 +28,7 @@ class MarkConsumedBottomSheet extends ConsumerStatefulWidget {
     return showModalBottomSheet<MarkConsumedResult>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FreshPalette.card,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -114,7 +113,7 @@ class _MarkConsumedBottomSheetState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.statusRed,
+          backgroundColor: Theme.of(context).colorScheme.error,
           content: Text(mapPantryFirestoreError(error)),
         ),
       );
@@ -130,6 +129,7 @@ class _MarkConsumedBottomSheetState
     final unit = _item.unit.displayLabel(_available);
     final remainingLabel =
         '${_formatQuantity(_remaining)} ${_item.unit.displayLabel(_remaining)}';
+    final colorScheme = Theme.of(context).colorScheme;
 
     return SafeArea(
       child: Padding(
@@ -150,18 +150,18 @@ class _MarkConsumedBottomSheetState
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.cardBorder,
+                    color: colorScheme.outline,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Mark consumed',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: FreshPalette.heading,
+                  color: colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 6),
@@ -169,27 +169,27 @@ class _MarkConsumedBottomSheetState
                 _item.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: FreshPalette.heading,
+                  color: colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 16),
               Text(
                 'Available: ${_item.quantityLabel}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: FreshPalette.secondaryText,
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Consumed Quantity',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: FreshPalette.heading,
+                  color: colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 8),
@@ -220,27 +220,23 @@ class _MarkConsumedBottomSheetState
                         hintText: '0',
                         suffixText: unit,
                         filled: true,
-                        fillColor: FreshPalette.card,
+                        fillColor: colorScheme.surfaceContainerHighest,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 14,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: AppColors.cardBorder,
-                          ),
+                          borderSide: BorderSide(color: colorScheme.outline),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: AppColors.cardBorder,
-                          ),
+                          borderSide: BorderSide(color: colorScheme.outline),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: FreshPalette.selected,
+                          borderSide: BorderSide(
+                            color: colorScheme.primary,
                             width: 1.8,
                           ),
                         ),
@@ -281,8 +277,8 @@ class _MarkConsumedBottomSheetState
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: _consumed > _available
-                      ? AppColors.statusRed
-                      : FreshPalette.heading,
+                      ? colorScheme.error
+                      : colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 20),
@@ -294,9 +290,9 @@ class _MarkConsumedBottomSheetState
                           ? null
                           : () => Navigator.of(context).pop(),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: FreshPalette.secondaryText,
+                        foregroundColor: colorScheme.onSurfaceVariant,
                         minimumSize: const Size.fromHeight(48),
-                        side: const BorderSide(color: AppColors.cardBorder),
+                        side: BorderSide(color: colorScheme.outline),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -310,20 +306,20 @@ class _MarkConsumedBottomSheetState
                     child: FilledButton(
                       onPressed: _canConfirm ? _confirm : null,
                       style: FilledButton.styleFrom(
-                        backgroundColor: FreshPalette.primaryButton,
-                        foregroundColor: Colors.white,
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
                         minimumSize: const Size.fromHeight(48),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                       child: _isSubmitting
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 22,
                               height: 22,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.5,
-                                color: Colors.white,
+                                color: colorScheme.onPrimary,
                               ),
                             )
                           : const Text('Confirm Consumed'),
@@ -364,13 +360,14 @@ class _StepperButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: FreshPalette.card,
+        color: colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: AppColors.cardBorder),
+          side: BorderSide(color: colorScheme.outline),
         ),
         child: InkWell(
           onTap: enabled ? onPressed : null,
@@ -382,8 +379,8 @@ class _StepperButton extends StatelessWidget {
               icon,
               size: 20,
               color: enabled
-                  ? FreshPalette.selected
-                  : FreshPalette.secondaryText.withValues(alpha: 0.35),
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
             ),
           ),
         ),

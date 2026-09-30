@@ -15,6 +15,8 @@ PantryItem _milk({required String id, double quantity = 2}) {
     price: 450,
     expiryDate: DateTime(2026, 10, 1),
     createdAt: DateTime(2026, 9, 1),
+    photoUrl: 'https://example.com/milk.jpg',
+    photoStoragePath: 'users/uid/pantryItems/doc-milk/photo.jpg',
   );
 }
 
@@ -32,6 +34,11 @@ void main() {
       expect(removed.item.price, 450);
       expect(removed.item.expiryDate, DateTime(2026, 10, 1));
       expect(removed.item.createdAt, DateTime(2026, 9, 1));
+      expect(removed.item.photoUrl, 'https://example.com/milk.jpg');
+      expect(
+        removed.item.photoStoragePath,
+        'users/uid/pantryItems/doc-milk/photo.jpg',
+      );
       expect(removed.originalQuantity, 2);
 
       final remaining = await repository.fetchItems();
@@ -43,6 +50,11 @@ void main() {
       expect(restored.price, 450);
       expect(restored.quantity, 2);
       expect(restored.expiryDate, DateTime(2026, 10, 1));
+      expect(restored.photoUrl, 'https://example.com/milk.jpg');
+      expect(
+        restored.photoStoragePath,
+        'users/uid/pantryItems/doc-milk/photo.jpg',
+      );
 
       final afterRestore = await repository.fetchItems();
       expect(afterRestore.single.id, 'doc-milk');

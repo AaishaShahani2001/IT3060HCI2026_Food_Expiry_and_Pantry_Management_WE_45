@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/pantry_item.dart';
 
 /// Result of the duplicate-item confirmation dialog.
@@ -25,18 +24,19 @@ class DuplicateItemDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final message =
         '${existingItem.name} is already in your ${existingItem.location.label}. '
         'Would you like to update its quantity instead?';
 
     return AlertDialog(
-      backgroundColor: FreshPalette.card,
+      backgroundColor: colorScheme.surfaceContainerHighest,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text(
+      title: Text(
         'Item already exists',
         style: TextStyle(
-          color: FreshPalette.heading,
+          color: colorScheme.onSurface,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -47,8 +47,8 @@ class DuplicateItemDialog extends StatelessWidget {
           children: [
             Text(
               message,
-              style: const TextStyle(
-                color: FreshPalette.secondaryText,
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
                 height: 1.4,
               ),
             ),
@@ -57,8 +57,8 @@ class DuplicateItemDialog extends StatelessWidget {
               onPressed: () =>
                   Navigator.of(context).pop(DuplicateItemAction.updateExisting),
               style: FilledButton.styleFrom(
-                backgroundColor: FreshPalette.primaryButton,
-                foregroundColor: Colors.white,
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
                 minimumSize: const Size(48, 48),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -72,7 +72,7 @@ class DuplicateItemDialog extends StatelessWidget {
                   Navigator.of(context).pop(DuplicateItemAction.addAnyway),
               style: TextButton.styleFrom(
                 minimumSize: const Size(48, 48),
-                foregroundColor: FreshPalette.heading,
+                foregroundColor: colorScheme.onSurface,
               ),
               child: const Text('Add Anyway'),
             ),
@@ -81,7 +81,7 @@ class DuplicateItemDialog extends StatelessWidget {
                   Navigator.of(context).pop(DuplicateItemAction.cancel),
               style: TextButton.styleFrom(
                 minimumSize: const Size(48, 48),
-                foregroundColor: FreshPalette.secondaryText,
+                foregroundColor: colorScheme.onSurfaceVariant,
               ),
               child: const Text('Cancel'),
             ),

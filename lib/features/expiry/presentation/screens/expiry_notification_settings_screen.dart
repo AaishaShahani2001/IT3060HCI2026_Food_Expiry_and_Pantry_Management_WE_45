@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../domain/services/expiry_notification_provider.dart';
 import '../providers/expiry_notification_settings_provider.dart';
 
@@ -66,10 +65,13 @@ class _ExpiryNotificationSettingsScreenState
         .saveSettings(newState);
 
     if (_notificationsEnabled) {
-      await ref.read(expiryNotificationServiceProvider).showExpiryNotification(
-        title: "Expiry Notifications Enabled",
-        body: "You will receive alerts for expiring and expired pantry items.",
-      );
+      await ref
+          .read(expiryNotificationServiceProvider)
+          .showExpiryNotification(
+            title: "Expiry Notifications Enabled",
+            body:
+                "You will receive alerts for expiring and expired pantry items.",
+          );
     }
 
     if (!mounted) return;
@@ -81,25 +83,18 @@ class _ExpiryNotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.cream,
       appBar: AppBar(
-        backgroundColor: AppColors.cream,
         elevation: 0,
         leading: IconButton(
           onPressed: () => context.pop(),
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: AppColors.darkGreen,
-          ),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
         title: const Text(
           'Expiry Notifications',
-          style: TextStyle(
-            color: AppColors.darkGreen,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
@@ -126,9 +121,9 @@ class _ExpiryNotificationSettingsScreenState
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppColors.white,
+                  color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: AppColors.cardBorder),
+                  border: Border.all(color: colorScheme.outline),
                 ),
                 child: Column(
                   children: [
@@ -213,15 +208,15 @@ class _ExpiryNotificationSettingsScreenState
                     vertical: 15,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.white,
+                    color: colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.cardBorder),
+                    border: Border.all(color: colorScheme.outline),
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.access_time_rounded,
-                        color: AppColors.darkGreen,
+                        color: colorScheme.onSurface,
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -229,16 +224,16 @@ class _ExpiryNotificationSettingsScreenState
                           _notificationTime.format(context),
                           style: TextStyle(
                             color: _notificationsEnabled
-                                ? AppColors.darkGreen
-                                : AppColors.textSecondary,
+                                ? colorScheme.onSurface
+                                : colorScheme.onSurfaceVariant,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         Icons.keyboard_arrow_down_rounded,
-                        color: AppColors.primaryGreen,
+                        color: colorScheme.primary,
                       ),
                     ],
                   ),
@@ -279,8 +274,8 @@ class _ExpiryNotificationSettingsScreenState
                 child: ElevatedButton.icon(
                   onPressed: _saveChanges,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGreen,
-                    foregroundColor: Colors.white,
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -312,12 +307,14 @@ class _NotificationMasterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: colorScheme.outline),
       ),
       child: Row(
         children: [
@@ -325,45 +322,40 @@ class _NotificationMasterCard extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AppColors.statusFreshBg,
+              color: colorScheme.secondaryContainer,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.notifications_none_rounded,
-              color: AppColors.primaryGreen,
+              color: colorScheme.primary,
               size: 28,
             ),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Enable Expiry Notifications',
                   style: TextStyle(
-                    color: AppColors.darkGreen,
+                    color: colorScheme.onSurface,
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
                   ),
                 ),
-                SizedBox(height: 3),
+                const SizedBox(height: 3),
                 Text(
                   'Get notified about expiring and expired items',
                   style: TextStyle(
-                    color: AppColors.textSecondary,
+                    color: colorScheme.onSurfaceVariant,
                     fontSize: 12,
                   ),
                 ),
               ],
             ),
           ),
-          Switch(
-            value: enabled,
-            activeThumbColor: Colors.white,
-            activeTrackColor: AppColors.primaryGreen,
-            onChanged: onChanged,
-          ),
+          Switch(value: enabled, onChanged: onChanged),
         ],
       ),
     );
@@ -389,6 +381,8 @@ class _NotificationOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return CheckboxListTile(
       value: value,
       enabled: enabled,
@@ -396,23 +390,23 @@ class _NotificationOption extends StatelessWidget {
         if (checked == null) return;
         onChanged(checked);
       },
-      activeColor: AppColors.primaryGreen,
+      activeColor: colorScheme.primary,
       controlAffinity: ListTileControlAffinity.leading,
       secondary: Icon(
         icon,
-        color: enabled ? AppColors.primaryGreen : AppColors.textSecondary,
+        color: enabled ? colorScheme.primary : colorScheme.onSurfaceVariant,
       ),
       title: Text(
         title,
-        style: const TextStyle(
-          color: AppColors.darkGreen,
+        style: TextStyle(
+          color: colorScheme.onSurface,
           fontSize: 14,
           fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
       ),
     );
   }
@@ -427,8 +421,8 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: const TextStyle(
-        color: AppColors.darkGreen,
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurface,
         fontSize: 16,
         fontWeight: FontWeight.bold,
       ),
@@ -451,23 +445,26 @@ class _DropdownContainer<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: colorScheme.outline),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<T>(
           value: value,
           isExpanded: true,
-          icon: const Icon(
+          dropdownColor: colorScheme.surfaceContainerHighest,
+          icon: Icon(
             Icons.keyboard_arrow_down_rounded,
-            color: AppColors.primaryGreen,
+            color: colorScheme.primary,
           ),
-          style: const TextStyle(
-            color: AppColors.darkGreen,
+          style: TextStyle(
+            color: colorScheme.onSurface,
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),

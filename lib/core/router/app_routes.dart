@@ -9,11 +9,14 @@ abstract final class AppRoutes {
   // Main navigation
   static const String home = '/home';
   static const String pantry = '/pantry';
+  static const String pantryItems = '/pantry/items';
   static const String expiry = '/expiry';
   static const String expiryNotifications = '/expiry/notifications';
   static const String addExpiryTracking ='/add-expiry-tracking';
   static const String editExpiryTracking ='/edit-expiry-tracking';
   static const String shopping = '/shopping';
+  static const String addShoppingItem = '/shopping/add';
+  static const String wasteTracker = '/waste-tracker';
   static const String recipes = '/recipes';
   static const String settings = '/settings';
 

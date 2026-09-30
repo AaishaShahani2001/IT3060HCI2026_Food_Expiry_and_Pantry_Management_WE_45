@@ -88,10 +88,12 @@ class _AddExpiryTrackingScreenState
 
     final dateStr =
         "${expiryDate!.day}/${expiryDate!.month}/${expiryDate!.year}";
-    await ref.read(expiryNotificationServiceProvider).showExpiryNotification(
-      title: "Expiry Tracking Saved",
-      body: "Tracking enabled for ${item.name} (Expires: $dateStr)",
-    );
+    await ref
+        .read(expiryNotificationServiceProvider)
+        .showExpiryNotification(
+          title: "Expiry Tracking Saved",
+          body: "Tracking enabled for ${item.name} (Expires: $dateStr)",
+        );
 
     if (mounted) {
       context.pop();
@@ -120,10 +122,12 @@ class _AddExpiryTrackingScreenState
             );
           }
 
-          final unTrackedItems =
-              items.where((e) => e.expiryDate == null).toList();
-          final dropdownList =
-              unTrackedItems.isNotEmpty ? unTrackedItems : items;
+          final unTrackedItems = items
+              .where((e) => e.expiryDate == null)
+              .toList();
+          final dropdownList = unTrackedItems.isNotEmpty
+              ? unTrackedItems
+              : items;
 
           return Padding(
             padding: const EdgeInsets.all(20),

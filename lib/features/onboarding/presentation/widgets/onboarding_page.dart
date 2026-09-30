@@ -1,6 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../models/onboarding_item.dart';
 
 class OnboardingPage extends StatelessWidget {
@@ -10,69 +11,58 @@ class OnboardingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final iconSize = (constraints.maxHeight * 0.22).clamp(88.0, 140.0);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Column(
+        children: [
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final side = math.min(
+                  constraints.maxWidth,
+                  constraints.maxHeight,
+                );
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Column(
-            children: [
-              const Spacer(flex: 1),
-              Flexible(
-                flex: 6,
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      Container(
-                        width: iconSize,
-                        height: iconSize,
-                        decoration: BoxDecoration(
-                          color: FreshPalette.highlight,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: FreshPalette.selected.withValues(
-                                alpha: 0.12,
-                              ),
-                              blurRadius: 24,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          item.icon,
-                          size: iconSize * 0.46,
-                          color: FreshPalette.selected,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      Text(
-                        item.title,
-                        textAlign: TextAlign.center,
-                        style: textTheme.headlineMedium?.copyWith(
-                          color: FreshPalette.heading,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        item.description,
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodyLarge?.copyWith(
-                          color: FreshPalette.secondaryText,
-                        ),
-                      ),
-                    ],
+                return Center(
+                  child: Image.asset(
+                    item.imagePath,
+                    width: side,
+                    height: side,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    excludeFromSemantics: true,
                   ),
-                ),
-              ),
-              const Spacer(flex: 1),
-            ],
+                );
+              },
+            ),
           ),
-        );
-      },
+          const SizedBox(height: 20),
+          Text(
+            item.title,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontSize: 22,
+              height: 1.25,
+              fontWeight: FontWeight.w700,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            item.description,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontSize: 15,
+              height: 1.45,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
+      ),
     );
   }
 }
