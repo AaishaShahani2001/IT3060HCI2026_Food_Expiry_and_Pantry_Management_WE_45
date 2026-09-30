@@ -79,55 +79,52 @@ class _ExpiryNotificationSettingsScreenState
 
               const SizedBox(height: 10),
 
-              Material(
-                color: colorScheme.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(18),
-                  side: BorderSide(color: colorScheme.outline),
+                  border: Border.all(color: colorScheme.outline),
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    children: [
-                      _NotificationOption(
-                        title: 'Expiring soon',
-                        subtitle: 'e.g. 1–3 days before expiry',
-                        value: _expiringSoonEnabled,
-                        enabled: _notificationsEnabled,
-                        icon: Icons.schedule_rounded,
-                        onChanged: (value) {
-                          setState(() {
-                            _expiringSoonEnabled = value;
-                          });
-                        },
-                      ),
-                      _NotificationOption(
-                        title: 'Expired items',
-                        subtitle: 'On the day the item expires',
-                        value: _expiredItemsEnabled,
-                        enabled: _notificationsEnabled,
-                        icon: Icons.error_outline_rounded,
-                        onChanged: (value) {
-                          setState(() {
-                            _expiredItemsEnabled = value;
-                          });
-                        },
-                      ),
-                      _NotificationOption(
-                        title: '"Use First" reminders',
-                        subtitle: 'Items that should be used earlier',
-                        value: _useFirstEnabled,
-                        enabled: _notificationsEnabled,
-                        icon: Icons.priority_high_rounded,
-                        onChanged: (value) {
-                          setState(() {
-                            _useFirstEnabled = value;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
+                child: Column(
+                  children: [
+                    _NotificationOption(
+                      title: 'Expiring soon',
+                      subtitle: 'e.g. 1–3 days before expiry',
+                      value: _expiringSoonEnabled,
+                      enabled: _notificationsEnabled,
+                      icon: Icons.schedule_rounded,
+                      onChanged: (value) {
+                        setState(() {
+                          _expiringSoonEnabled = value;
+                        });
+                      },
+                    ),
+                    _NotificationOption(
+                      title: 'Expired items',
+                      subtitle: 'On the day the item expires',
+                      value: _expiredItemsEnabled,
+                      enabled: _notificationsEnabled,
+                      icon: Icons.error_outline_rounded,
+                      onChanged: (value) {
+                        setState(() {
+                          _expiredItemsEnabled = value;
+                        });
+                      },
+                    ),
+                    _NotificationOption(
+                      title: '"Use First" reminders',
+                      subtitle: 'Items that should be used earlier',
+                      value: _useFirstEnabled,
+                      enabled: _notificationsEnabled,
+                      icon: Icons.priority_high_rounded,
+                      onChanged: (value) {
+                        setState(() {
+                          _useFirstEnabled = value;
+                        });
+                      },
+                    ),
+                  ],
                 ),
               ),
 
