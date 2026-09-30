@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_list_repository.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
@@ -45,6 +46,34 @@ void main() {
     await notifier().reload();
     expect(items().length, 2);
   });
+
+  test(
+    'Add All reuses low-stock add logic and cannot create duplicates',
+    () async {
+      await load();
+      PantryItem lowStock(String id, String name) => PantryItem(
+        id: id,
+        firestoreId: id,
+        name: name,
+        category: PantryCategory.dairy,
+        location: PantryLocation.refrigerator,
+        quantity: 1,
+        unit: PantryUnit.bottles,
+      );
+
+      final count = await notifier().addLowStockSuggestions([
+        lowStock('milk-a', 'Milk'),
+        lowStock('milk-b', ' milk '),
+        lowStock('eggs', 'Eggs'),
+      ]);
+
+      expect(count, 2);
+      expect(items().map((item) => item.name), ['Milk', 'Eggs']);
+      expect(session.store.addCalls, 2);
+      expect(items().first.unit, PantryUnit.bottles);
+      expect(items().first.category, 'Dairy');
+    },
+  );
 
   test('failed add retains existing items', () async {
     session.store.seed('alice', 'milk', 'Milk');

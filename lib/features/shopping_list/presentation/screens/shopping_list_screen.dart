@@ -1,11 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
 import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/presentation/utils/pantry_item_actions.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/presentation/widgets/pantry_item_form.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/food_item_suggestions.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_item_metadata.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/shopping_error_message.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/shopping_snackbar.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/low_stock_suggestion_settings_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_pantry_provider.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/widgets/low_stock_suggestions_card.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/widgets/shopping_item_tile.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/widgets/shopping_category_section.dart';
 import 'package:go_router/go_router.dart';
@@ -21,7 +31,6 @@ class ShoppingListScreen extends ConsumerStatefulWidget {
 
 class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   final Set<String> _selectedIds = {};
-  final Set<String> _collapsedCategories = {};
   final TextEditingController _searchController = TextEditingController();
   _ShoppingFilter _filter = _ShoppingFilter.all;
   bool _selectionMode = false;
@@ -57,14 +66,13 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   void _showError(Object error, {VoidCallback? retry, String? message}) {
     if (!mounted) return;
     debugPrint('Shopping List error: $error');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message ?? _errorMessage(error)),
-        duration: const Duration(seconds: 8),
-        action: retry == null
-            ? null
-            : SnackBarAction(label: 'Retry', onPressed: retry),
-      ),
+    ShoppingSnackBar.show(
+      context,
+      message: message ?? _errorMessage(error),
+      duration: ShoppingSnackBar.error,
+      snackBarAction: retry == null
+          ? null
+          : SnackBarAction(label: 'Retry', onPressed: retry),
     );
   }
 
@@ -85,14 +93,20 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       setState(() {
         _filter = _ShoppingFilter.all;
         _searchController.clear();
-        _collapsedCategories.remove(foodItemCategoryFor(item.name));
       });
+      ref
+          .read(shoppingCategoryExpansionProvider.notifier)
+          .setExpanded(
+            uid: uid!,
+            category: resolvedShoppingCategory(item),
+            expanded: true,
+          );
     } finally {
       if (mounted && token == _operationToken) setState(() => _isBusy = false);
     }
   }
 
-  Future<void> _persistChange(Future<void> Function() save) async {
+  Future<bool> _persistChange(Future<void> Function() save) async {
     final uid = _uid;
     final token = ++_operationToken;
     setState(() {
@@ -101,8 +115,10 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     });
     try {
       await save();
+      return _sameSession(uid, token);
     } catch (error) {
       if (_sameSession(uid, token)) _showError(error);
+      return false;
     } finally {
       if (mounted && token == _operationToken) {
         setState(() {
@@ -118,10 +134,188 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     bool isPurchased,
   ) async {
     if (_isBusy || _selectionMode || item.id == null) return;
-    await _persistChange(
+    final saved = await _persistChange(
       () => ref
           .read(shoppingListProvider.notifier)
           .togglePurchased(item.id!, isPurchased),
+    );
+    if (saved && isPurchased && mounted) _offerPantryQuickAdd(item);
+  }
+
+  void _offerPantryQuickAdd(ShoppingItem item) {
+    final pantryItems =
+        ref.read(shoppingPantryItemsProvider).asData?.value ?? const [];
+    final existing = pantryItems
+        .where(
+          (pantryItem) =>
+              pantryItem.name.trim().toLowerCase() ==
+              item.name.trim().toLowerCase(),
+        )
+        .firstOrNull;
+    ShoppingSnackBar.show(
+      context,
+      message: existing == null
+          ? '${item.name} marked Bought. Add it to Pantry?'
+          : '${item.name} marked Bought. Update its Pantry quantity?',
+      duration: ShoppingSnackBar.action,
+      snackBarAction: SnackBarAction(
+        label: existing == null ? 'Add to Pantry' : 'Update Pantry',
+        onPressed: () {
+          if (!mounted) return;
+          if (existing != null) {
+            unawaited(openPantryItemEditor(context, existing));
+            return;
+          }
+          unawaited(
+            openPantryAddItem(
+              context,
+              prefill: PantryItemFormPrefill(
+                name: item.name,
+                quantity: item.quantity.toDouble(),
+                unit: item.unit,
+                category: pantryCategoryForShoppingCategory(
+                  resolvedShoppingCategory(item),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _addLowStockSuggestion(PantryItem item) async {
+    if (_isBusy || _selectionMode) return;
+    ShoppingItem? added;
+    final threshold = ref
+        .read(lowStockSuggestionSettingsProvider)
+        .effectiveThresholdFor(item);
+    final saved = await _persistChange(() async {
+      added = await ref
+          .read(shoppingListProvider.notifier)
+          .addLowStockSuggestion(item, threshold: threshold);
+    });
+    if (!saved || !mounted) return;
+    ShoppingSnackBar.show(
+      context,
+      message: added == null
+          ? '${item.name} is already in your Shopping List.'
+          : '${item.name} added to your Shopping List.',
+    );
+  }
+
+  void _dismissLowStockSuggestion(PantryItem item) {
+    if (_isBusy || _selectionMode) return;
+    final uid = _uid;
+    final pantryItemId = item.firestoreId;
+    if (uid == null || pantryItemId == null) return;
+    ref
+        .read(lowStockDismissalsProvider.notifier)
+        .dismiss(uid: uid, pantryItemId: pantryItemId);
+    ShoppingSnackBar.show(
+      context,
+      message: '${item.name} suggestion dismissed.',
+      duration: ShoppingSnackBar.action,
+      snackBarAction: SnackBarAction(
+        label: 'UNDO',
+        onPressed: () {
+          if (!mounted || uid != _uid) return;
+          ref
+              .read(lowStockDismissalsProvider.notifier)
+              .restore(uid: uid, pantryItemId: pantryItemId);
+        },
+      ),
+    );
+  }
+
+  Future<void> _dismissAllLowStockSuggestions(List<PantryItem> items) async {
+    if (_isBusy || _selectionMode || items.isEmpty) return;
+    final uid = _uid;
+    if (uid == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Dismiss all suggestions?'),
+        content: const Text(
+          'This will hide all current low-stock suggestions for this session.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Dismiss All'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || uid != _uid) return;
+    final newlyDismissed = ref
+        .read(lowStockDismissalsProvider.notifier)
+        .dismissAll(
+          uid: uid,
+          pantryItemIds: items.map((item) => item.firestoreId).whereType(),
+        );
+    if (newlyDismissed.isEmpty) return;
+    ShoppingSnackBar.show(
+      context,
+      message:
+          '${newlyDismissed.length} low-stock ${newlyDismissed.length == 1 ? 'suggestion' : 'suggestions'} dismissed.',
+      duration: ShoppingSnackBar.action,
+      snackBarAction: SnackBarAction(
+        label: 'UNDO',
+        onPressed: () {
+          if (!mounted || uid != _uid) return;
+          ref
+              .read(lowStockDismissalsProvider.notifier)
+              .restoreAll(uid: uid, pantryItemIds: newlyDismissed);
+        },
+      ),
+    );
+  }
+
+  Future<void> _addAllLowStockSuggestions(List<PantryItem> items) async {
+    if (_isBusy || _selectionMode || items.isEmpty) return;
+    final uid = _uid;
+    if (uid == null) return;
+    if (items.length > 5) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Add all suggestions?'),
+          content: Text(
+            'Add ${items.length} suggested items to your Shopping List?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Add All'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted || uid != _uid) return;
+    }
+
+    var addedCount = 0;
+    final thresholds = ref.read(lowStockSuggestionSettingsProvider).thresholds;
+    final saved = await _persistChange(() async {
+      addedCount = await ref
+          .read(shoppingListProvider.notifier)
+          .addLowStockSuggestions(items, categoryThresholds: thresholds);
+    });
+    if (!saved || !mounted) return;
+    ShoppingSnackBar.show(
+      context,
+      message: addedCount == 0
+          ? 'All suggested items are already in your Shopping List.'
+          : '$addedCount ${addedCount == 1 ? 'item' : 'items'} added to your Shopping List.',
     );
   }
 
@@ -170,12 +364,35 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       if (enter) {
         FocusScope.of(context).unfocus();
         _selectionMode = true;
-        // Selection shows every match, including previously collapsed groups.
-        _collapsedCategories.clear();
         _selectedIds.add(item.id!);
       } else if (!_selectedIds.remove(item.id)) {
         _selectedIds.add(item.id!);
       }
+      if (_selectedIds.isEmpty) _selectionMode = false;
+    });
+  }
+
+  void _selectCategory(String category, {bool enter = false}) {
+    if (_isBusy) return;
+    final items = ref.read(shoppingListProvider).asData?.value ?? const [];
+    final ids = items
+        .where((item) => resolvedShoppingCategory(item) == category)
+        .map((item) => item.id)
+        .whereType<String>()
+        .toSet();
+    if (ids.isEmpty) return;
+    setState(() {
+      if (enter) {
+        FocusScope.of(context).unfocus();
+        _selectionMode = true;
+        _selectedIds.addAll(ids);
+      } else if (ids.every(_selectedIds.contains)) {
+        _selectedIds.removeAll(ids);
+      } else {
+        _selectionMode = true;
+        _selectedIds.addAll(ids);
+      }
+      if (_selectedIds.isEmpty) _selectionMode = false;
     });
   }
 
@@ -192,29 +409,64 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     final ids = items.map((item) => item.id).whereType<String>().toSet();
     setState(() {
       if (ids.every(_selectedIds.contains)) {
-        _selectedIds.clear();
+        _selectedIds.removeAll(ids);
       } else {
         _selectedIds.addAll(ids);
       }
+      if (_selectedIds.isEmpty) _selectionMode = false;
     });
   }
 
-  Future<void> _confirmDelete(List<String> ids, {bool single = false}) async {
+  Future<void> _confirmSelectionDelete() async {
+    final count = _selectedIds.length;
+    if (count == 0) return;
+    await _confirmDelete(
+      _selectedIds.toList(),
+      titleOverride: count == 1
+          ? 'Delete selected item?'
+          : 'Delete selected items?',
+      messageOverride:
+          'This will remove $count ${count == 1 ? 'item' : 'items'} from your Shopping List.',
+      successMessage: '$count ${count == 1 ? 'item' : 'items'} deleted.',
+    );
+  }
+
+  Future<void> _confirmDelete(
+    List<String> ids, {
+    bool single = false,
+    String? titleOverride,
+    String? messageOverride,
+    String? successMessage,
+  }) async {
     if (_isBusy || ids.isEmpty || _uid == null) return;
     final uid = _uid;
     final token = ++_operationToken;
     final items = ref.read(shoppingListProvider).asData?.value ?? [];
+    final idSet = ids.toSet();
+    final categoriesToForget = items
+        .map(resolvedShoppingCategory)
+        .toSet()
+        .where(
+          (category) => items
+              .where((item) => resolvedShoppingCategory(item) == category)
+              .every((item) => item.id != null && idSet.contains(item.id)),
+        )
+        .toSet();
     final all = !single && ids.length == _visibleItems(items).length;
-    final title = single || ids.length == 1
-        ? 'Delete item?'
-        : all
-        ? 'Delete all selected items?'
-        : 'Delete selected items?';
-    final message = single || ids.length == 1
-        ? 'Are you sure you want to delete this item?'
-        : ids.length == items.length
-        ? 'Are you sure you want to delete all items from your shopping list?'
-        : 'Are you sure you want to delete ${ids.length} selected items?';
+    final title =
+        titleOverride ??
+        (single || ids.length == 1
+            ? 'Delete item?'
+            : all
+            ? 'Delete all selected items?'
+            : 'Delete selected items?');
+    final message =
+        messageOverride ??
+        (single || ids.length == 1
+            ? 'Are you sure you want to delete this item?'
+            : ids.length == items.length
+            ? 'Are you sure you want to delete all items from your shopping list?'
+            : 'Are you sure you want to delete ${ids.length} selected items?');
     setState(() => _isBusy = true);
     try {
       final confirmed = await showDialog<bool>(
@@ -242,10 +494,19 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       setState(() => _showProgress = true);
       await ref.read(shoppingListProvider.notifier).deleteItems(ids);
       if (_sameSession(uid, token)) {
+        for (final category in categoriesToForget) {
+          ref
+              .read(shoppingCategoryExpansionProvider.notifier)
+              .forgetCategory(uid: uid!, category: category);
+        }
         setState(() {
           _selectionMode = false;
           _selectedIds.clear();
         });
+        if (successMessage != null) {
+          if (!mounted) return;
+          ShoppingSnackBar.show(context, message: successMessage);
+        }
       }
     } catch (error) {
       if (_sameSession(uid, token)) _showError(error);
@@ -280,6 +541,100 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     } finally {
       if (mounted && token == _operationToken) setState(() => _isBusy = false);
     }
+  }
+
+  Future<void> _showHelp() async {
+    if (_selectionMode) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline),
+            SizedBox(width: 12),
+            Expanded(child: Text('Shopping List Help')),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ShoppingHelpPoint(
+                icon: Icons.add_circle_outline,
+                text: 'Add items and use search to find them quickly.',
+              ),
+              _ShoppingHelpPoint(
+                icon: Icons.category_outlined,
+                text: 'Items are organized into categories.',
+              ),
+              _ShoppingHelpPoint(
+                icon: Icons.exposure_outlined,
+                text: 'Adjust quantities and units, then mark items as bought.',
+              ),
+              _ShoppingHelpPoint(
+                icon: Icons.inventory_2_outlined,
+                text:
+                    'Low-stock suggestions help you add Pantry items that are running low.',
+              ),
+              _ShoppingHelpPoint(
+                icon: Icons.touch_app_outlined,
+                text:
+                    'Touch and hold items or categories to select them for deletion.',
+              ),
+              _ShoppingHelpPoint(
+                icon: Icons.delete_sweep_outlined,
+                text:
+                    'Selecting a category includes every Shopping List item in that category.',
+              ),
+              _ShoppingHelpPoint(
+                icon: Icons.settings_outlined,
+                text: 'Use Settings to control low-stock suggestions.',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeletionHint() {
+    final colors = Theme.of(context).colorScheme;
+    const hint =
+        'Tip: Touch and hold an item or category to select and delete.';
+    return Semantics(
+      label: hint,
+      excludeSemantics: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerHighest.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.touch_app_outlined, size: 18, color: colors.primary),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                hint,
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildEmptyState(BuildContext context) {
@@ -330,6 +685,8 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                 icon: const Icon(Icons.add),
                 label: const Text('Add your first item'),
               ),
+              const SizedBox(height: 16),
+              _buildDeletionHint(),
             ],
           ),
         ),
@@ -467,30 +824,33 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       onPurchasedChanged: (value) => _updatePurchasedStatus(item, value),
       onQuantityChanged: (value) => _updateQuantity(item, value),
       onEdit: () {
-        // A menu opened under a previous account must not operate on this one.
+        // A row rendered for a previous account must not operate on this one.
         if (uid != null && uid == _uid) _editItem(item);
-      },
-      onDelete: () {
-        if (uid != null && uid == _uid && item.id != null) {
-          _confirmDelete([item.id!], single: true);
-        }
       },
     );
   }
 
   Widget _buildItemList(List<ShoppingItem> items) {
+    final suggestions = ref.watch(lowStockShoppingSuggestionsProvider);
+    final lowStockSuggestionsExpanded = ref.watch(
+      currentLowStockSuggestionExpandedProvider,
+    );
+    final categoryExpansion = ref.watch(
+      currentShoppingCategoryExpansionProvider,
+    );
     final visible = _visibleItems(items);
     final allSelected =
         visible.isNotEmpty &&
         visible.every((item) => _selectedIds.contains(item.id));
     final groups = <String, List<ShoppingItem>>{};
     for (final item in visible) {
-      groups.putIfAbsent(foodItemCategoryFor(item.name), () => []).add(item);
+      groups.putIfAbsent(resolvedShoppingCategory(item), () => []).add(item);
     }
+    final categoryOrder = [...foodItemSuggestionCategories.keys, 'Other'];
     final categories = [
-      ...foodItemSuggestionCategories.keys,
-      'Other',
-    ].where(groups.containsKey).toList();
+      ...categoryOrder.where(groups.containsKey),
+      ...groups.keys.where((category) => !categoryOrder.contains(category)),
+    ];
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 600),
@@ -500,6 +860,26 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Column(
                 children: [
+                  if (!_selectionMode && suggestions.isNotEmpty) ...[
+                    LowStockSuggestionsCard(
+                      items: suggestions,
+                      enabled: !_isBusy,
+                      onAdd: _addLowStockSuggestion,
+                      onDismiss: _dismissLowStockSuggestion,
+                      onAddAll: () => _addAllLowStockSuggestions(suggestions),
+                      onDismissAll: () =>
+                          _dismissAllLowStockSuggestions(suggestions),
+                      expanded: lowStockSuggestionsExpanded,
+                      onToggleExpanded: () {
+                        final uid = _uid;
+                        if (uid == null) return;
+                        ref
+                            .read(lowStockSuggestionExpansionProvider.notifier)
+                            .toggle(uid: uid);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   _buildFilters(items),
                   const SizedBox(height: 12),
                   _buildSearch(),
@@ -511,13 +891,18 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         spacing: 12,
                         children: [
-                          const Text('Select matching items to delete'),
+                          const Text(
+                            'Category selection includes its full category',
+                            textAlign: TextAlign.center,
+                          ),
                           TextButton(
                             onPressed: _isBusy
                                 ? null
                                 : () => _selectAll(visible),
                             child: Text(
-                              allSelected ? 'Deselect All' : 'Select All',
+                              allSelected
+                                  ? 'Deselect visible'
+                                  : 'Select all visible',
                             ),
                           ),
                         ],
@@ -585,28 +970,63 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                           ) {
                             if (index.isOdd) return const SizedBox(height: 12);
                             final category = categories[index ~/ 2];
+                            final categoryIds = items
+                                .where(
+                                  (item) =>
+                                      resolvedShoppingCategory(item) ==
+                                      category,
+                                )
+                                .map((item) => item.id)
+                                .whereType<String>()
+                                .toSet();
+                            final selectedInCategory = categoryIds
+                                .where(_selectedIds.contains)
+                                .length;
                             return ShoppingCategorySection(
                               key: ValueKey(category),
                               category: category,
                               count: groups[category]!.length,
-                              expanded: !_collapsedCategories.contains(
-                                category,
-                              ),
-                              onToggle: _isBusy || _selectionMode
+                              expanded:
+                                  _selectionMode ||
+                                  (categoryExpansion[category] ?? true),
+                              onToggle: _isBusy
                                   ? null
-                                  : () => setState(() {
-                                      if (!_collapsedCategories.remove(
-                                        category,
-                                      )) {
-                                        _collapsedCategories.add(category);
-                                      }
-                                    }),
+                                  : _selectionMode
+                                  ? () => _selectCategory(category)
+                                  : () {
+                                      final uid = _uid;
+                                      if (uid == null) return;
+                                      ref
+                                          .read(
+                                            shoppingCategoryExpansionProvider
+                                                .notifier,
+                                          )
+                                          .toggle(uid: uid, category: category);
+                                    },
+                              onLongPress: _isBusy
+                                  ? null
+                                  : () => _selectCategory(
+                                      category,
+                                      enter: !_selectionMode,
+                                    ),
+                              selectionMode: _selectionMode,
+                              isSelected:
+                                  categoryIds.isNotEmpty &&
+                                  selectedInCategory == categoryIds.length,
+                              isPartiallySelected:
+                                  selectedInCategory > 0 &&
+                                  selectedInCategory < categoryIds.length,
                               children: groups[category]!
                                   .map(_buildItemRow)
                                   .toList(),
                             );
                           }, childCount: categories.length * 2 - 1),
                         ),
+                      ),
+                    if (items.isNotEmpty && !_selectionMode)
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        sliver: SliverToBoxAdapter(child: _buildDeletionHint()),
                       ),
                   ],
                 ),
@@ -650,7 +1070,6 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
           _selectedIds.clear();
           _filter = _ShoppingFilter.all;
           _searchController.clear();
-          _collapsedCategories.clear();
         });
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
       }
@@ -712,13 +1131,19 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                   IconButton(
                     onPressed: _isBusy || _selectedIds.isEmpty
                         ? null
-                        : () => _confirmDelete(_selectedIds.toList()),
+                        : _confirmSelectionDelete,
                     icon: const Icon(Icons.delete_outline),
                     color: Theme.of(context).colorScheme.error,
                     tooltip: 'Delete selected items',
                   ),
                 ]
-              : null,
+              : [
+                  IconButton(
+                    onPressed: _showHelp,
+                    icon: const Icon(Icons.help_outline),
+                    tooltip: 'Shopping List help',
+                  ),
+                ],
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           elevation: 0,
           centerTitle: true,
@@ -734,4 +1159,24 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       ),
     );
   }
+}
+
+class _ShoppingHelpPoint extends StatelessWidget {
+  const _ShoppingHelpPoint({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 21, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 12),
+        Expanded(child: Text(text)),
+      ],
+    ),
+  );
 }

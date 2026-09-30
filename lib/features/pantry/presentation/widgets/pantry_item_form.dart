@@ -40,10 +40,25 @@ class PantryItemFormData {
   final bool removeExistingPhoto;
 }
 
+class PantryItemFormPrefill {
+  const PantryItemFormPrefill({
+    required this.name,
+    required this.quantity,
+    required this.unit,
+    required this.category,
+  });
+
+  final String name;
+  final double quantity;
+  final PantryUnit unit;
+  final PantryCategory category;
+}
+
 class PantryItemForm extends StatefulWidget {
   const PantryItemForm({
     required this.onSubmit,
     this.initialItem,
+    this.prefill,
     this.existingItems = const [],
     this.isSaving = false,
     this.savingMessage,
@@ -51,6 +66,7 @@ class PantryItemForm extends StatefulWidget {
   });
 
   final PantryItem? initialItem;
+  final PantryItemFormPrefill? prefill;
 
   /// Pantry rows already loaded for this user. Used only to suggest names.
   final List<PantryItem> existingItems;
@@ -87,19 +103,30 @@ class _PantryItemFormState extends State<PantryItemForm> {
   void initState() {
     super.initState();
     final item = widget.initialItem;
-    _nameController = TextEditingController(text: item?.name ?? '');
+    final prefill = widget.prefill;
+    _nameController = TextEditingController(
+      text: item?.name ?? prefill?.name ?? '',
+    );
     _quantityController = TextEditingController(
-      text: item != null ? _decimalFieldText(item.quantity) : '',
+      text: item != null
+          ? _decimalFieldText(item.quantity)
+          : prefill != null
+          ? _decimalFieldText(prefill.quantity)
+          : '',
     );
     _priceController = TextEditingController(
       text: item != null ? _decimalFieldText(item.unitPrice) : '',
     );
-    // Edit and barcode prefill keep the loaded category. A new item stays
-    // unselected until the user chooses one or an exact name is known.
-    // Suggestions stay hidden until the name field actually changes.
-    _category = item?.category;
+    // Existing and Shopping List-prefilled items retain their valid category.
+    // A normal new item stays unselected until the user chooses a category or
+    // an exact food-name match supplies one.
+    _category = item?.category ?? prefill?.category;
+    // Treat a Shopping List category as an intentional initial value so name
+    // edits do not replace it. Explicitly selecting an autocomplete suggestion
+    // can still replace it through _handleSuggestionSelected.
+    _categoryWasManuallyChanged = item == null && prefill != null;
     _location = item?.location ?? PantryLocation.pantry;
-    _unit = item?.unit ?? PantryUnit.items;
+    _unit = item?.unit ?? prefill?.unit ?? PantryUnit.items;
     _expiryDate = item?.expiryDate;
   }
 

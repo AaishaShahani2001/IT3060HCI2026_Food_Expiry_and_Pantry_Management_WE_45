@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/app_routes.dart';
-import '../../../pantry/presentation/providers/pantry_providers.dart';
 import '../../domain/repositories/expiry_repository.dart';
 import '../providers/expiry_provider.dart';
 import '../widgets/empty_expiry_state.dart';
@@ -20,14 +19,7 @@ class ExpiryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(expirySummaryProvider);
     final smartItems = ref.watch(smartAlertItemsProvider);
-    final allItems = ref.watch(expiryItemsProvider);
     final expiryService = ref.read(expiryServiceProvider);
-
-    final savedAlertsAsync = ref.watch(expiryAlertsProvider);
-    final savedAlertsMap = savedAlertsAsync.maybeWhen(
-      data: (alerts) => {for (final a in alerts) a.itemId: a},
-      orElse: () => <String, ExpiryAlert>{},
-    );
 
     return Scaffold(
       backgroundColor: AppColors.cream,
@@ -43,6 +35,7 @@ class ExpiryScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            tooltip: 'Expiry Notifications',
             icon: const Icon(
               Icons.notifications_active_outlined,
               color: AppColors.darkGreen,
@@ -53,17 +46,8 @@ class ExpiryScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primaryGreen,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Track Item Expiry',
-          style: TextStyle(color: Colors.white),
-        ),
-        onPressed: () {
-          context.push(AppRoutes.addExpiryTracking);
-        },
-      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: const ExpiryTrackingActions(),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -145,8 +129,8 @@ class ExpiryScreen extends ConsumerWidget {
               final user = FirebaseAuth.instance.currentUser;
               final existing = savedAlertsMap[item.id];
               final alert = ExpiryAlert(
-                id: existing?.id ?? item.id,
-                userId: user?.uid ?? existing?.userId ?? '',
+                id: item.id,
+                userId: '',
                 itemId: item.id,
                 itemName: item.name,
                 expiryDate: item.expiryDate ?? DateTime.now(),
@@ -154,10 +138,8 @@ class ExpiryScreen extends ConsumerWidget {
                 status: 'active',
                 priority: expiryService.alertPriority(item),
                 message: expiryService.expiryMessage(item),
-                isRead: existing?.isRead ?? false,
-                createdAt: existing?.createdAt ?? DateTime.now(),
-                reminderDays: existing?.reminderDays ?? 3,
-                notificationEnabled: existing?.notificationEnabled ?? true,
+                isRead: false,
+                createdAt: DateTime.now(),
               );
 
               return ExpiryAlertCard(
@@ -170,92 +152,83 @@ class ExpiryScreen extends ConsumerWidget {
                 },
                 onStopTracking: () async {
                   final confirm = await showStopTrackingDialog(context);
-
                   if (confirm == true) {
-                    final updatedItem = item.copyWith(clearExpiryDate: true);
-                    await ref
-                        .read(pantryItemsProvider.notifier)
-                        .updateItem(updatedItem);
-
-                    await ref.read(stopTrackingProvider)(item.id);
-
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Stopped tracking expiry for ${item.name}.',
-                          ),
-                        ),
-                      );
-                    }
+                    await ref.read(stopTrackingProvider)(alert.id);
                   }
                 },
               );
             }),
-          const SizedBox(height: 26),
-          const Text(
-            'All Products',
-            style: TextStyle(
-              color: AppColors.darkGreen,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+        ],
+      ),
+    );
+  }
+}
+
+class ExpiryTrackingActions extends StatelessWidget {
+  const ExpiryTrackingActions({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: MediaQuery.sizeOf(context).width - 32,
+      child: Row(
+        children: [
+          Expanded(
+            flex: 5,
+            child: OutlinedButton(
+              key: const ValueKey('track-waste-button'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryGreen,
+                minimumSize: const Size(0, 56),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              onPressed: () {
+                context.push(AppRoutes.wasteTracker);
+              },
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.delete_outline_rounded, size: 20),
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Track Waste'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          if (allItems.isEmpty)
-            const EmptyExpiryState(message: 'No pantry products found.')
-          else
-            ...allItems.map((item) {
-              final user = FirebaseAuth.instance.currentUser;
-              final existing = savedAlertsMap[item.id];
-              final alert = ExpiryAlert(
-                id: existing?.id ?? item.id,
-                userId: user?.uid ?? existing?.userId ?? '',
-                itemId: item.id,
-                itemName: item.name,
-                expiryDate: item.expiryDate ?? DateTime.now(),
-                daysUntilExpiry: expiryService.daysUntilExpiry(item) ?? 0,
-                status: 'active',
-                priority: expiryService.alertPriority(item),
-                message: expiryService.expiryMessage(item),
-                isRead: existing?.isRead ?? false,
-                createdAt: existing?.createdAt ?? DateTime.now(),
-                reminderDays: existing?.reminderDays ?? 3,
-                notificationEnabled: existing?.notificationEnabled ?? true,
-              );
-
-              return ExpiryAlertCard(
-                name: item.name,
-                quantity: item.quantityLabel,
-                message: expiryService.expiryMessage(item),
-                priority: expiryService.alertPriority(item),
-                onUpdate: () {
-                  context.push(AppRoutes.editExpiryTracking, extra: alert);
-                },
-                onStopTracking: () async {
-                  final confirm = await showStopTrackingDialog(context);
-
-                  if (confirm == true) {
-                    final updatedItem = item.copyWith(clearExpiryDate: true);
-                    await ref
-                        .read(pantryItemsProvider.notifier)
-                        .updateItem(updatedItem);
-
-                    await ref.read(stopTrackingProvider)(item.id);
-
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Stopped tracking expiry for ${item.name}.',
-                          ),
-                        ),
-                      );
-                    }
-                  }
-                },
-              );
-            }),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 6,
+            child: FilledButton(
+              key: const ValueKey('track-item-expiry-button'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 56),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              onPressed: () {
+                context.push(AppRoutes.addExpiryTracking);
+              },
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add, size: 20),
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Track Item Expiry'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

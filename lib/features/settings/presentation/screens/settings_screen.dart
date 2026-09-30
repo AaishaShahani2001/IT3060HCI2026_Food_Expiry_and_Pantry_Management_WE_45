@@ -7,8 +7,13 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/providers/current_user_provider.dart';
 import '../../../../core/providers/theme_mode_provider.dart';
 import '../../../../core/router/app_routes.dart';
+import '../../../shopping_list/presentation/providers/low_stock_suggestion_settings_provider.dart';
 import '../widgets/settings_nav_card.dart';
 import '../widgets/theme_option_button.dart';
+
+final settingsUserEmailProvider = Provider<String?>((ref) {
+  return FirebaseAuth.instance.currentUser?.email;
+});
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -18,6 +23,7 @@ class SettingsScreen extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final themeMode = ref.watch(themeModeProvider);
+    final lowStockSettings = ref.watch(lowStockSuggestionSettingsProvider);
     final userNameAsync = ref.watch(currentUserNameProvider);
 
     final userName = userNameAsync.when(
@@ -26,7 +32,7 @@ class SettingsScreen extends ConsumerWidget {
       error: (_, _) => AppStrings.userFallback,
     );
 
-    final email = FirebaseAuth.instance.currentUser?.email;
+    final email = ref.watch(settingsUserEmailProvider);
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -77,6 +83,26 @@ class SettingsScreen extends ConsumerWidget {
                 title: AppStrings.expiryNotificationsTitle,
                 detail: AppStrings.expiryNotificationsSubtitle,
               ),
+            ),
+
+            const SizedBox(height: 28),
+
+            Text(
+              'Shopping preferences',
+              style: textTheme.headlineMedium?.copyWith(
+                fontSize: 18,
+                color: colorScheme.onSurface,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            SettingsNavCard(
+              icon: Icons.inventory_2_outlined,
+              title: 'Low Stock Suggestions',
+              detail: 'Control shopping suggestions and stock thresholds',
+              trailingLabel: lowStockSettings.enabled ? 'On' : 'Off',
+              onTap: () => context.push(AppRoutes.lowStockSuggestions),
             ),
 
             const SizedBox(height: 28),

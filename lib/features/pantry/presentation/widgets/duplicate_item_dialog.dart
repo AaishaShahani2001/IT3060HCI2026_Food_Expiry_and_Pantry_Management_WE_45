@@ -5,6 +5,41 @@ import '../../domain/models/pantry_item.dart';
 /// Result of the duplicate-item confirmation dialog.
 enum DuplicateItemAction { cancel, addAnyway, updateExisting }
 
+/// Shopping uses Pantry's existing duplicate language and visual treatment,
+/// but only needs an explicit Add Anyway / Cancel decision.
+Future<bool> showPantryPresenceWarning({
+  required BuildContext context,
+  required PantryItem existingItem,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      final colors = Theme.of(context).colorScheme;
+      return AlertDialog(
+        backgroundColor: colors.surfaceContainerHighest,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Already in your pantry'),
+        content: Text(
+          '${existingItem.name} is already in your pantry. '
+          'Current quantity: ${existingItem.quantityLabel}.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Add Anyway'),
+          ),
+        ],
+      );
+    },
+  );
+  return result ?? false;
+}
+
 /// Customer-friendly confirmation when a pantry item name already exists.
 Future<DuplicateItemAction?> showDuplicateItemDialog({
   required BuildContext context,

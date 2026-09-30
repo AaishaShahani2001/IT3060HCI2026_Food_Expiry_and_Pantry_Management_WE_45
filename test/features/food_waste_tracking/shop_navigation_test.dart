@@ -7,11 +7,13 @@ import 'package:food_expiry_and_pantry_management/core/providers/current_user_pr
 import 'package:food_expiry_and_pantry_management/features/home/presentation/home_screen.dart';
 import 'package:food_expiry_and_pantry_management/features/home/presentation/widgets/home_waste_summary_card.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/presentation/providers/pantry_providers.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
 import 'package:food_expiry_and_pantry_management/features/expiry/presentation/providers/expiry_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/food_waste_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/screens/waste_tracker_screen.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_list_repository.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_pantry_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/screens/shopping_list_screen.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/screens/add_shopping_item_screen.dart';
 import 'support/waste_test_session.dart';
@@ -61,6 +63,9 @@ void main() {
               ),
             ),
             shoppingAuthUidProvider.overrideWith((ref) => session.auth()),
+            shoppingPantryItemsProvider.overrideWithValue(
+              const AsyncData(<PantryItem>[]),
+            ),
           ],
           child: MaterialApp.router(
             theme: AppTheme.light,
