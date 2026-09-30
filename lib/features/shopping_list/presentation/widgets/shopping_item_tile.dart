@@ -2,14 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_item_metadata.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
 
-enum _ItemAction { edit, delete }
-
 class ShoppingItemTile extends StatelessWidget {
   final ShoppingItem item;
   final ValueChanged<bool> onPurchasedChanged;
   final ValueChanged<int> onQuantityChanged;
   final VoidCallback onEdit;
-  final VoidCallback onDelete;
   final VoidCallback onLongPress;
   final VoidCallback onSelectionTap;
   final bool selectionMode;
@@ -22,7 +19,6 @@ class ShoppingItemTile extends StatelessWidget {
     required this.onPurchasedChanged,
     required this.onQuantityChanged,
     required this.onEdit,
-    required this.onDelete,
     required this.onLongPress,
     required this.onSelectionTap,
     this.selectionMode = false,
@@ -98,39 +94,12 @@ class ShoppingItemTile extends StatelessWidget {
             activeColor: colors.primary,
             semanticLabel: 'Purchased ${item.name}',
           );
-    final menu = PopupMenuButton<_ItemAction>(
-      tooltip: 'Actions for ${item.name}',
-      enabled: enabled,
-      icon: const Icon(Icons.more_vert),
-      onSelected: (action) {
-        if (action == _ItemAction.edit) {
-          onEdit();
-        } else {
-          onDelete();
-        }
-      },
-      itemBuilder: (context) => const [
-        PopupMenuItem(
-          value: _ItemAction.edit,
-          child: Row(
-            children: [
-              Icon(Icons.edit_outlined, size: 20),
-              SizedBox(width: 12),
-              Text('Edit item'),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: _ItemAction.delete,
-          child: Row(
-            children: [
-              Icon(Icons.delete_outline, size: 20),
-              SizedBox(width: 12),
-              Text('Delete item'),
-            ],
-          ),
-        ),
-      ],
+    final editButton = IconButton(
+      tooltip: 'Edit ${item.name}',
+      onPressed: enabled ? onEdit : null,
+      icon: const Icon(Icons.edit_outlined, size: 21),
+      color: colors.primary,
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
     );
     final name = Text(
       item.name,
@@ -178,7 +147,7 @@ class ShoppingItemTile extends StatelessWidget {
                           _quantityControl(context),
                         ],
                         if (!selectionMode)
-                          SizedBox(width: 48, height: 48, child: menu),
+                          SizedBox(width: 48, height: 48, child: editButton),
                       ],
                     ),
                     if (!selectionMode && stacked)

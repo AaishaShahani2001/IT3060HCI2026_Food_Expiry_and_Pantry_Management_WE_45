@@ -824,13 +824,8 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       onPurchasedChanged: (value) => _updatePurchasedStatus(item, value),
       onQuantityChanged: (value) => _updateQuantity(item, value),
       onEdit: () {
-        // A menu opened under a previous account must not operate on this one.
+        // A row rendered for a previous account must not operate on this one.
         if (uid != null && uid == _uid) _editItem(item);
-      },
-      onDelete: () {
-        if (uid != null && uid == _uid && item.id != null) {
-          _confirmDelete([item.id!], single: true);
-        }
       },
     );
   }

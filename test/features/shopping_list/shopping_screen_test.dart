@@ -124,14 +124,8 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> rowAction(
-    WidgetTester tester,
-    String name,
-    String action,
-  ) async {
-    await tester.tap(find.byTooltip('Actions for $name'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(action));
+  Future<void> tapEdit(WidgetTester tester, String name) async {
+    await tester.tap(find.byTooltip('Edit $name'));
     await tester.pumpAndSettle();
   }
 
@@ -139,6 +133,10 @@ void main() {
     tester,
   ) async {
     await openScreen(tester);
+    expect(find.byIcon(Icons.more_vert), findsNothing);
+    for (final name in ['Milk', 'Bread', 'Rice']) {
+      expect(find.byTooltip('Edit $name'), findsOneWidget);
+    }
     expect(
       find.text(
         'Tip: Touch and hold an item or category to select and delete.',
@@ -150,6 +148,8 @@ void main() {
       tester,
     ).map((item) => item.isPurchased).toList();
     await selectMilk(tester);
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
+    expect(find.byTooltip('Edit Milk'), findsNothing);
     expect(
       find.bySemanticsLabel(RegExp('Selected Milk for deletion')),
       findsOneWidget,
@@ -240,12 +240,14 @@ void main() {
   );
 
   testWidgets(
-    'single delete uses confirmation and the same persistent delete path',
+    'single selection delete uses confirmation and the persistent delete path',
     (tester) async {
       await openScreen(tester);
-      await rowAction(tester, 'Milk', 'Delete item');
+      await selectMilk(tester);
+      await tester.tap(find.byTooltip('Delete selected items'));
+      await tester.pumpAndSettle();
       expect(
-        find.text('Are you sure you want to delete this item?'),
+        find.text('This will remove 1 item from your Shopping List.'),
         findsOneWidget,
       );
       expect(session.store.commitCalls, 0);
@@ -432,7 +434,7 @@ void main() {
     tester,
   ) async {
     await openScreen(tester);
-    await rowAction(tester, 'Bread', 'Edit item');
+    await tapEdit(tester, 'Bread');
     final name = find.byType(TextFormField).at(0);
     final quantity = find.byType(TextFormField).at(1);
     expect(tester.widget<TextFormField>(name).controller!.text, 'Bread');
@@ -460,6 +462,72 @@ void main() {
       isTrue,
     );
   });
+
+  testWidgets(
+    'direct edit preserves metadata and moves an item to its changed category',
+    (tester) async {
+      session.store.seed('alice', 'milk', 'Milk', purchased: true);
+      session.store.documents['users/alice/shopping_items/milk']!.addAll({
+        'quantity': 4,
+        'unit': 'liters',
+        'category': 'Dairy',
+        'source': 'lowStockSuggestion',
+        'sourcePantryItemId': 'pantry-milk',
+      });
+      await openScreen(tester, seed: false);
+
+      await tapEdit(tester, 'Milk');
+      expect(
+        tester
+            .widget<TextFormField>(find.byType(TextFormField).at(0))
+            .controller!
+            .text,
+        'Milk',
+      );
+      expect(
+        tester
+            .widget<TextFormField>(find.byType(TextFormField).at(1))
+            .controller!
+            .text,
+        '4',
+      );
+      expect(
+        tester
+            .widget<DropdownButtonFormField<PantryUnit>>(
+              find.byType(DropdownButtonFormField<PantryUnit>),
+            )
+            .initialValue,
+        PantryUnit.liters,
+      );
+      expect(
+        tester
+            .widget<DropdownButtonFormField<String>>(
+              find.byType(DropdownButtonFormField<String>),
+            )
+            .initialValue,
+        'Dairy',
+      );
+
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Beverages').last);
+      await tester.pumpAndSettle();
+      final update = find.widgetWithText(FilledButton, 'Update Item');
+      await tester.ensureVisible(update);
+      await tester.tap(update);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Dairy (1)'), findsNothing);
+      expect(find.text('Beverages (1)'), findsOneWidget);
+      final saved = session.store.documents.values.single;
+      expect(saved['quantity'], 4);
+      expect(saved['unit'], 'liters');
+      expect(saved['category'], 'Beverages');
+      expect(saved['isPurchased'], isTrue);
+      expect(saved['source'], 'lowStockSuggestion');
+      expect(saved['sourcePantryItemId'], 'pantry-milk');
+    },
+  );
 
   testWidgets('empty name and out-of-range quantity cannot be submitted', (
     tester,
@@ -541,7 +609,9 @@ void main() {
     tester,
   ) async {
     await openScreen(tester);
-    await rowAction(tester, 'Milk', 'Delete item');
+    await selectMilk(tester);
+    await tester.tap(find.byTooltip('Delete selected items'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(find.text('Milk'), findsOneWidget);
@@ -591,6 +661,7 @@ void main() {
     session.store.seed('alice', 'milk', 'Milk');
     await pullRefresh(tester);
     expect(find.text('Milk'), findsOneWidget);
+    expect(find.byTooltip('Edit Milk'), findsOneWidget);
     expect(find.text(hint), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -972,33 +1043,27 @@ void main() {
     },
   );
 
-  testWidgets(
-    'account switch resets query and isolates UI state; stale menu cannot delete',
-    (tester) async {
-      await openScreen(tester);
-      await tester.enterText(
-        find.byKey(const ValueKey('shopping-search')),
-        'milk',
-      );
-      await tester.tap(find.byTooltip('Actions for Milk'));
-      await tester.pumpAndSettle();
-      session.store.seed('bob', 'milk', 'Milk');
-      session.changeUser('bob');
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Delete item'));
-      await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsNothing);
-      expect(session.store.commitCalls, 0);
-      expect(
-        tester
-            .widget<TextField>(find.byKey(const ValueKey('shopping-search')))
-            .controller!
-            .text,
-        isEmpty,
-      );
-      expect(find.text('ALL (1)'), findsOneWidget);
-    },
-  );
+  testWidgets('account switch resets query and isolates UI state', (
+    tester,
+  ) async {
+    await openScreen(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('shopping-search')),
+      'milk',
+    );
+    session.store.seed('bob', 'milk', 'Milk');
+    session.changeUser('bob');
+    await tester.pumpAndSettle();
+    expect(session.store.commitCalls, 0);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('shopping-search')))
+          .controller!
+          .text,
+      isEmpty,
+    );
+    expect(find.text('ALL (1)'), findsOneWidget);
+  });
 
   testWidgets(
     'selection expands collapsed matching groups without changing purchases',
@@ -1204,7 +1269,7 @@ void main() {
         plugin: 'cloud_firestore',
         code: 'permission-denied',
       );
-      await rowAction(tester, 'Milk', 'Edit item');
+      await tapEdit(tester, 'Milk');
       await tester.enterText(find.byType(TextFormField).first, 'Fresh Milk');
       await tester.tap(find.text('Update Item'));
       await tester.pumpAndSettle();
@@ -1231,7 +1296,7 @@ void main() {
   ) async {
     await openScreen(tester);
     session.store.seed('bob', 'milk', 'Bob milk');
-    await rowAction(tester, 'Milk', 'Edit item');
+    await tapEdit(tester, 'Milk');
     await tester.enterText(find.byType(TextFormField).first, 'Alice edit');
     session.changeUser('bob');
     await tester.pumpAndSettle();
@@ -1449,7 +1514,7 @@ void main() {
     'edit duplicate Cancel retains input; Save Anyway keeps same ID and Bought',
     (tester) async {
       await openScreen(tester);
-      await rowAction(tester, 'Bread', 'Edit item');
+      await tapEdit(tester, 'Bread');
       await tester.enterText(find.byType(TextFormField).first, 'Milk');
       await tester.tap(find.text('Update Item'));
       await tester.pumpAndSettle();
@@ -1579,7 +1644,7 @@ void main() {
     ) async {
       await openScreen(tester, seed: edit);
       if (edit) {
-        await rowAction(tester, 'Milk', 'Edit item');
+        await tapEdit(tester, 'Milk');
       } else {
         await tester.tap(find.byTooltip('Add shopping item'));
         await tester.pumpAndSettle();
@@ -2305,6 +2370,12 @@ void main() {
         );
         expect(tester.takeException(), isNull);
         expect(find.byTooltip('Add shopping item'), findsOneWidget);
+        expect(
+          find.byTooltip(
+            'Edit A long custom shopping item name that stays readable',
+          ),
+          findsOneWidget,
+        );
         final category = find.text('Other (1)');
         await tester.ensureVisible(category);
         await tester.longPress(category);
