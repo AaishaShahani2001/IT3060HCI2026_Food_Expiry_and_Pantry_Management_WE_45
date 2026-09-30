@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -36,9 +37,49 @@ class _FakeScheduler implements ShoppingReminderScheduler {
   }
 }
 
+class _ManualTimer implements Timer {
+  _ManualTimer(this.duration, this.callback);
+
+  final Duration duration;
+  final void Function() callback;
+  bool _isActive = true;
+
+  void fire() {
+    if (!_isActive) return;
+    _isActive = false;
+    callback();
+  }
+
+  @override
+  void cancel() => _isActive = false;
+
+  @override
+  bool get isActive => _isActive;
+
+  @override
+  int get tick => _isActive ? 0 : 1;
+}
+
+class _ManualTimerController {
+  final List<_ManualTimer> timers = [];
+
+  Timer create(Duration duration, void Function() callback) {
+    final timer = _ManualTimer(duration, callback);
+    timers.add(timer);
+    return timer;
+  }
+
+  void fireActive() {
+    final active = timers.where((timer) => timer.isActive).toList();
+    expect(active, hasLength(1));
+    active.single.fire();
+  }
+}
+
 void main() {
   late SharedPreferences preferences;
   late _FakeScheduler scheduler;
+  late _ManualTimerController expiryTimers;
   var now = DateTime(2026, 10, 1, 10);
 
   ShoppingReminder reminder(List<DateTime> times) => ShoppingReminder(
@@ -50,16 +91,23 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     preferences = await SharedPreferences.getInstance();
     scheduler = _FakeScheduler();
+    expiryTimers = _ManualTimerController();
     now = DateTime(2026, 10, 1, 10);
   });
 
-  ProviderContainer createContainer(String uid) {
+  ProviderContainer createContainer(
+    String uid, {
+    _ManualTimerController? timerController,
+  }) {
     final container = ProviderContainer(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(preferences),
         shoppingAuthUidProvider.overrideWith((ref) => Stream.value(uid)),
         shoppingReminderSchedulerProvider.overrideWithValue(scheduler),
         shoppingReminderClockProvider.overrideWithValue(() => now),
+        shoppingReminderExpiryTimerFactoryProvider.overrideWithValue(
+          (timerController ?? expiryTimers).create,
+        ),
       ],
     );
     container.listen(shoppingReminderProvider, (_, _) {});
@@ -384,8 +432,9 @@ void main() {
     },
   );
 
-  test('group remains active while at least one reminder is future', () async {
+  test('future persisted reminder is preserved on restoration', () async {
     final partlyCompleted = reminder([
+      now.subtract(const Duration(hours: 2)),
       now.subtract(const Duration(hours: 1)),
       now.add(const Duration(hours: 1)),
     ]);
@@ -399,6 +448,85 @@ void main() {
     final restored = await container.read(shoppingReminderProvider.future);
     expect(restored?.times, partlyCompleted.times);
     expect(scheduler.cancelledUids, isEmpty);
+  });
+
+  test('one reminder resets after its final time passes', () async {
+    const expiryPreference = 'expiry_notifications.enabled';
+    await preferences.setBool(expiryPreference, true);
+    final container = createContainer('alice');
+    addTearDown(container.dispose);
+    await container.read(shoppingReminderProvider.future);
+    await container
+        .read(shoppingReminderProvider.notifier)
+        .setReminder(reminder([now.add(const Duration(hours: 1))]));
+
+    now = now.add(const Duration(hours: 1, minutes: 1));
+    expiryTimers.fireActive();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(container.read(shoppingReminderProvider).requireValue, isNull);
+    expect(scheduler.cancelledUids, ['alice']);
+    expect(
+      preferences.containsKey(shoppingReminderStorageKey('alice')),
+      isFalse,
+    );
+    expect(preferences.getBool(expiryPreference), isTrue);
+  });
+
+  test('three reminders remain active until the final time passes', () async {
+    final selected = reminder([
+      now.add(const Duration(hours: 1)),
+      now.add(const Duration(hours: 2)),
+      now.add(const Duration(hours: 3)),
+    ]);
+    final container = createContainer('alice');
+    addTearDown(container.dispose);
+    await container.read(shoppingReminderProvider.future);
+    await container
+        .read(shoppingReminderProvider.notifier)
+        .setReminder(selected);
+
+    now = now.add(const Duration(hours: 2, minutes: 30));
+    expiryTimers.fireActive();
+    await Future<void>.delayed(Duration.zero);
+    expect(container.read(shoppingReminderProvider).requireValue, selected);
+    expect(scheduler.cancelledUids, isEmpty);
+
+    now = now.add(const Duration(minutes: 31));
+    expiryTimers.fireActive();
+    await Future<void>.delayed(Duration.zero);
+    expect(container.read(shoppingReminderProvider).requireValue, isNull);
+    expect(scheduler.cancelledUids, ['alice']);
+  });
+
+  test('expiry cleanup for one UID does not affect another UID', () async {
+    final aliceTimers = _ManualTimerController();
+    final bobTimers = _ManualTimerController();
+    final alice = createContainer('alice', timerController: aliceTimers);
+    final bob = createContainer('bob', timerController: bobTimers);
+    addTearDown(alice.dispose);
+    addTearDown(bob.dispose);
+    await alice.read(shoppingReminderProvider.future);
+    await bob.read(shoppingReminderProvider.future);
+    await alice
+        .read(shoppingReminderProvider.notifier)
+        .setReminder(reminder([now.add(const Duration(hours: 1))]));
+    await bob
+        .read(shoppingReminderProvider.notifier)
+        .setReminder(reminder([now.add(const Duration(hours: 2))]));
+
+    now = now.add(const Duration(hours: 1, minutes: 1));
+    aliceTimers.fireActive();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(alice.read(shoppingReminderProvider).requireValue, isNull);
+    expect(bob.read(shoppingReminderProvider).requireValue, isNotNull);
+    expect(
+      preferences.containsKey(shoppingReminderStorageKey('alice')),
+      isFalse,
+    );
+    expect(preferences.containsKey(shoppingReminderStorageKey('bob')), isTrue);
+    expect(scheduler.active.keys, ['bob']);
   });
 
   test('malformed persisted data fails safely and is removed', () async {

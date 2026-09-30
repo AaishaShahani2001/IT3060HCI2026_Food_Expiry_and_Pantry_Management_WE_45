@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +21,15 @@ final shoppingReminderSchedulerProvider = Provider<ShoppingReminderScheduler>(
   ),
 );
 
+typedef ShoppingReminderExpiryTimerFactory =
+    Timer Function(Duration duration, void Function() callback);
+
+final shoppingReminderExpiryTimerFactoryProvider =
+    Provider<ShoppingReminderExpiryTimerFactory>(
+      (ref) =>
+          (duration, callback) => Timer(duration, callback),
+    );
+
 final shoppingReminderProvider =
     AsyncNotifierProvider<ShoppingReminderNotifier, ShoppingReminder?>(
       ShoppingReminderNotifier.new,
@@ -27,9 +37,13 @@ final shoppingReminderProvider =
 
 class ShoppingReminderNotifier extends AsyncNotifier<ShoppingReminder?> {
   String? _uid;
+  Timer? _expiryTimer;
+  var _expiryGeneration = 0;
 
   @override
   Future<ShoppingReminder?> build() async {
+    _cancelExpiryTimer();
+    ref.onDispose(_cancelExpiryTimer);
     _uid = await ref.watch(shoppingAuthUidProvider.future);
     final uid = _uid;
     if (uid == null) return null;
@@ -63,7 +77,47 @@ class ShoppingReminderNotifier extends AsyncNotifier<ShoppingReminder?> {
       await _clearPersistedReminder(uid);
       return null;
     }
+    _scheduleExpiryCheck(uid, reminder);
     return reminder;
+  }
+
+  void _cancelExpiryTimer() {
+    ++_expiryGeneration;
+    _expiryTimer?.cancel();
+    _expiryTimer = null;
+  }
+
+  void _scheduleExpiryCheck(String uid, ShoppingReminder reminder) {
+    _cancelExpiryTimer();
+    final generation = _expiryGeneration;
+    final now = ref.read(shoppingReminderClockProvider)();
+    final delay = reminder.times.last.difference(now);
+    if (delay <= Duration.zero) {
+      unawaited(_expireIfCompleted(uid, reminder, generation));
+      return;
+    }
+    _expiryTimer = ref.read(shoppingReminderExpiryTimerFactoryProvider)(
+      delay,
+      () {
+        unawaited(_expireIfCompleted(uid, reminder, generation));
+      },
+    );
+  }
+
+  Future<void> _expireIfCompleted(
+    String uid,
+    ShoppingReminder reminder,
+    int generation,
+  ) async {
+    if (generation != _expiryGeneration || _uid != uid) return;
+    if (reminder.hasFutureTime(ref.read(shoppingReminderClockProvider)())) {
+      _scheduleExpiryCheck(uid, reminder);
+      return;
+    }
+    await _clearPersistedReminder(uid);
+    if (generation != _expiryGeneration || _uid != uid) return;
+    _cancelExpiryTimer();
+    state = const AsyncData(null);
   }
 
   Future<void> _clearPersistedReminder(String uid) async {
@@ -104,7 +158,10 @@ class ShoppingReminderNotifier extends AsyncNotifier<ShoppingReminder?> {
       await scheduler.cancelAll(uid: uid);
       rethrow;
     }
-    if (_uid == uid) state = AsyncData(reminder);
+    if (_uid == uid) {
+      state = AsyncData(reminder);
+      _scheduleExpiryCheck(uid, reminder);
+    }
   }
 
   Future<void> cancelReminder() async {
@@ -113,7 +170,10 @@ class ShoppingReminderNotifier extends AsyncNotifier<ShoppingReminder?> {
     await ref
         .read(sharedPreferencesProvider)
         ?.remove(shoppingReminderStorageKey(uid));
-    if (_uid == uid) state = const AsyncData(null);
+    if (_uid == uid) {
+      _cancelExpiryTimer();
+      state = const AsyncData(null);
+    }
   }
 }
 

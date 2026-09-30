@@ -63,14 +63,54 @@ class FakeShoppingReminderScheduler implements ShoppingReminderScheduler {
   }
 }
 
+class _ManualReminderExpiryTimer implements Timer {
+  _ManualReminderExpiryTimer(this.callback);
+
+  final void Function() callback;
+  bool _isActive = true;
+
+  void fire() {
+    if (!_isActive) return;
+    _isActive = false;
+    callback();
+  }
+
+  @override
+  void cancel() => _isActive = false;
+
+  @override
+  bool get isActive => _isActive;
+
+  @override
+  int get tick => _isActive ? 0 : 1;
+}
+
+class _ManualReminderExpiryTimers {
+  final List<_ManualReminderExpiryTimer> timers = [];
+
+  Timer create(Duration duration, void Function() callback) {
+    final timer = _ManualReminderExpiryTimer(callback);
+    timers.add(timer);
+    return timer;
+  }
+
+  void fireActive() {
+    final active = timers.where((timer) => timer.isActive).toList();
+    expect(active, hasLength(1));
+    active.single.fire();
+  }
+}
+
 void main() {
   late ShoppingTestSession session;
   late FakeShoppingReminderScheduler reminderScheduler;
+  late _ManualReminderExpiryTimers reminderExpiryTimers;
   var reminderNow = DateTime(2026, 10, 1, 10);
 
   setUp(() {
     session = ShoppingTestSession();
     reminderScheduler = FakeShoppingReminderScheduler();
+    reminderExpiryTimers = _ManualReminderExpiryTimers();
     reminderNow = DateTime(2026, 10, 1, 10);
   });
   tearDown(() => session.changes.close());
@@ -118,6 +158,9 @@ void main() {
             reminderScheduler,
           ),
           shoppingReminderClockProvider.overrideWithValue(() => reminderNow),
+          shoppingReminderExpiryTimerFactoryProvider.overrideWithValue(
+            reminderExpiryTimers.create,
+          ),
           if (preferences != null)
             sharedPreferencesProvider.overrideWithValue(preferences),
         ],
@@ -827,6 +870,25 @@ void main() {
       );
     },
   );
+
+  testWidgets('top reminder action resets after the final time passes', (
+    tester,
+  ) async {
+    await openScreen(tester);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Set Reminder'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('shopping-reminder-submit')));
+    await tester.pumpAndSettle();
+    expect(find.text('Today • 1 reminder'), findsOneWidget);
+
+    reminderNow = reminderNow.add(const Duration(hours: 1, minutes: 1));
+    reminderExpiryTimers.fireActive();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Today • 1 reminder'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Set Reminder'), findsOneWidget);
+    expect(reminderScheduler.cancelledUids, ['alice']);
+  });
 
   testWidgets('completing all To Buy items auto-cancels reminder only', (
     tester,
