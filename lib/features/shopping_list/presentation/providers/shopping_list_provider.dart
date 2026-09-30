@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_item_metadata.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_list_repository.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
 
@@ -122,7 +124,9 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
       a.id == b.id &&
       a.name == b.name &&
       a.quantity == b.quantity &&
-      a.isPurchased == b.isPurchased;
+      a.isPurchased == b.isPurchased &&
+      a.unit == b.unit &&
+      a.category == b.category;
 
   Future<ShoppingItem> addItem(
     ShoppingItem item, {
@@ -145,7 +149,7 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
           (duplicateAction == ShoppingDuplicateAction.moveToBuy &&
               !duplicate.isPurchased) ||
           (duplicateAction == ShoppingDuplicateAction.increaseQuantity &&
-              duplicate.isPurchased)) {
+              (duplicate.isPurchased || duplicate.unit != item.unit))) {
         throw ShoppingDuplicateException(duplicate);
       }
       if (duplicateAction != ShoppingDuplicateAction.addAnyway) {
@@ -156,6 +160,8 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
         final updated = duplicate.copyWith(
           quantity: quantity,
           isPurchased: false,
+          unit: duplicate.isPurchased ? item.unit : duplicate.unit,
+          category: duplicate.isPurchased ? item.category : duplicate.category,
         );
         await updateItem(duplicate.id!, updated);
         return updated;
@@ -194,6 +200,8 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
     final updated = originals.single.copyWith(
       name: item.name,
       quantity: item.quantity,
+      unit: item.unit,
+      category: item.category,
     );
     await updateItem(item.id!, updated);
     return updated;
@@ -238,7 +246,9 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
     final existing = previous.firstWhere((saved) => saved.id == itemId);
     if (existing.name == updated.name &&
         existing.quantity == updated.quantity &&
-        existing.isPurchased == updated.isPurchased) {
+        existing.isPurchased == updated.isPurchased &&
+        existing.unit == updated.unit &&
+        existing.category == updated.category) {
       return;
     }
 
@@ -265,6 +275,50 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
       throw StateError('The shopping item changed. Refresh before updating.');
     }
     await updateItem(itemId, matches.single.copyWith(isPurchased: isPurchased));
+  }
+
+  Future<ShoppingItem?> addLowStockSuggestion(
+    PantryItem pantryItem, {
+    double? threshold,
+  }) async {
+    _requireUser();
+    final effectiveThreshold = threshold ?? pantryItem.minQuantity;
+    if (!pantryItem.isConnectedToFirestore ||
+        pantryItem.name.trim().isEmpty ||
+        !pantryItem.quantity.isFinite ||
+        pantryItem.quantity > effectiveThreshold) {
+      throw ArgumentError('This Pantry item is not a low-stock suggestion.');
+    }
+    if (findDuplicate(pantryItem.name) != null) return null;
+    return addItem(
+      ShoppingItem(
+        name: pantryItem.name.trim(),
+        quantity: 1,
+        unit: pantryItem.unit,
+        category: shoppingCategoryForPantryItem(pantryItem),
+        source: 'low_stock',
+        sourcePantryItemId: pantryItem.firestoreId,
+      ),
+    );
+  }
+
+  Future<int> addLowStockSuggestions(
+    Iterable<PantryItem> pantryItems, {
+    Map<PantryCategory, int>? categoryThresholds,
+  }) async {
+    _requireUser();
+    var addedCount = 0;
+    for (final pantryItem in pantryItems) {
+      final added = await addLowStockSuggestion(
+        pantryItem,
+        threshold: categoryThresholds == null
+            ? null
+            : (categoryThresholds[pantryItem.category] ?? 1) *
+                  pantryItem.minQuantity,
+      );
+      if (added != null) addedCount++;
+    }
+    return addedCount;
   }
 
   /// Background sync shares the manual-operation lock, but never opens a

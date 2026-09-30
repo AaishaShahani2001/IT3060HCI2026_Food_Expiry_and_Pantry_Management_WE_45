@@ -1,8 +1,12 @@
+import '../../pantry/domain/models/pantry_item.dart';
+
 class ShoppingItem {
   final String? id;
   final String name;
   final int quantity;
   final bool isPurchased;
+  final PantryUnit unit;
+  final String category;
   final String? source;
   final String? sourcePantryItemId;
 
@@ -11,6 +15,8 @@ class ShoppingItem {
     required this.name,
     required this.quantity,
     this.isPurchased = false,
+    this.unit = PantryUnit.items,
+    this.category = 'Other',
     this.source,
     this.sourcePantryItemId,
   });
@@ -20,6 +26,8 @@ class ShoppingItem {
     String? name,
     int? quantity,
     bool? isPurchased,
+    PantryUnit? unit,
+    String? category,
     String? source,
     String? sourcePantryItemId,
   }) {
@@ -28,6 +36,8 @@ class ShoppingItem {
       name: name ?? this.name,
       quantity: quantity ?? this.quantity,
       isPurchased: isPurchased ?? this.isPurchased,
+      unit: unit ?? this.unit,
+      category: category ?? this.category,
       source: source ?? this.source,
       sourcePantryItemId: sourcePantryItemId ?? this.sourcePantryItemId,
     );
@@ -37,6 +47,8 @@ class ShoppingItem {
     'name': name,
     'quantity': quantity,
     'isPurchased': isPurchased,
+    'unit': unit.name,
+    'category': category,
     if (source != null) 'source': source,
     if (sourcePantryItemId != null) 'sourcePantryItemId': sourcePantryItemId,
   };
@@ -59,6 +71,14 @@ class ShoppingItem {
       name: name,
       quantity: quantity,
       isPurchased: isPurchased,
+      unit: data['unit'] is String
+          ? PantryUnit.fromStorage(data['unit'] as String)
+          : PantryUnit.items,
+      category:
+          data['category'] is String &&
+              (data['category'] as String).trim().isNotEmpty
+          ? (data['category'] as String).trim()
+          : 'Other',
       source: data['source'] is String ? data['source'] as String : null,
       sourcePantryItemId: data['sourcePantryItemId'] is String
           ? data['sourcePantryItemId'] as String

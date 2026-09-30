@@ -1638,11 +1638,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   _pantryType = newValue;
                 });
               },
-              child: Radio<String>(
-                value: value,
-                activeColor:
-                primaryGreen,
-              ),
             ),
           ],
         ),

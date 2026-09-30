@@ -458,7 +458,13 @@ void main() {
       expect(legacy.source, isNull);
       expect(
         legacy.toMap().keys,
-        unorderedEquals(['name', 'quantity', 'isPurchased']),
+        unorderedEquals([
+          'name',
+          'quantity',
+          'isPurchased',
+          'unit',
+          'category',
+        ]),
       );
       final linked = legacy.copyWith(
         source: 'low_stock',

@@ -6,13 +6,17 @@ import '../../domain/models/pantry_item.dart';
 import '../../domain/models/removed_pantry_item.dart';
 import '../providers/pantry_providers.dart';
 import '../screens/pantry_item_form_screen.dart';
+import '../widgets/pantry_item_form.dart';
 import '../widgets/pantry_item_dialogs.dart';
 import 'pantry_snackbar.dart';
 
-Future<void> openPantryAddItem(BuildContext context) {
-  return Navigator.of(
-    context,
-  ).push<bool>(MaterialPageRoute(builder: (_) => const PantryItemFormScreen()));
+Future<void> openPantryAddItem(
+  BuildContext context, {
+  PantryItemFormPrefill? prefill,
+}) {
+  return Navigator.of(context).push<bool>(
+    MaterialPageRoute(builder: (_) => PantryItemFormScreen(prefill: prefill)),
+  );
 }
 
 Future<void> openPantryItemEditor(BuildContext context, PantryItem item) {

@@ -6,6 +6,7 @@ class SettingsNavCard extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.detail,
+    this.trailingLabel,
     this.onTap,
     super.key,
   });
@@ -14,6 +15,7 @@ class SettingsNavCard extends StatelessWidget {
   final String title;
   final String? subtitle;
   final String? detail;
+  final String? trailingLabel;
   final VoidCallback? onTap;
 
   @override
@@ -88,6 +90,16 @@ class SettingsNavCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
+              if (trailingLabel != null && trailingLabel!.isNotEmpty) ...[
+                Text(
+                  trailingLabel!,
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.primary,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
               Icon(
                 Icons.chevron_right_rounded,
                 color: colorScheme.onSurfaceVariant,
