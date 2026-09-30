@@ -27,10 +27,26 @@ int shoppingReminderNotificationId(String uid, int slotIndex) {
   return shoppingReminderNotificationIdNamespace | (hash << 2) | slotIndex;
 }
 
+List<int> pendingShoppingReminderNotificationIds({
+  required String uid,
+  required ShoppingReminder reminder,
+  required DateTime now,
+}) => [
+  for (var index = 0; index < reminder.times.length; index++)
+    if (reminder.times[index].isAfter(now))
+      shoppingReminderNotificationId(uid, index),
+];
+
 abstract interface class ShoppingReminderScheduler {
   Future<void> schedule({
     required String uid,
     required ShoppingReminder reminder,
+  });
+
+  Future<void> cancelPending({
+    required String uid,
+    required ShoppingReminder reminder,
+    required DateTime now,
   });
 
   Future<void> cancelAll({required String uid});
@@ -94,11 +110,12 @@ class LocalShoppingReminderScheduler implements ShoppingReminderScheduler {
         'Notifications are disabled. Enable them before setting a reminder.',
       );
     }
-    await cancelAll(uid: uid);
+    final scheduledIds = <int>[];
     try {
       for (var index = 0; index < reminder.times.length; index++) {
+        final id = shoppingReminderNotificationId(uid, index);
         await _plugin.zonedSchedule(
-          shoppingReminderNotificationId(uid, index),
+          id,
           'Shopping Reminder',
           'You still have items to buy.',
           shoppingReminderScheduledTime(reminder.times[index]),
@@ -106,10 +123,28 @@ class LocalShoppingReminderScheduler implements ShoppingReminderScheduler {
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           payload: shoppingReminderPayload,
         );
+        scheduledIds.add(id);
       }
     } catch (_) {
-      await cancelAll(uid: uid);
+      for (final id in scheduledIds) {
+        await _plugin.cancel(id);
+      }
       rethrow;
+    }
+  }
+
+  @override
+  Future<void> cancelPending({
+    required String uid,
+    required ShoppingReminder reminder,
+    required DateTime now,
+  }) async {
+    for (final id in pendingShoppingReminderNotificationIds(
+      uid: uid,
+      reminder: reminder,
+      now: now,
+    )) {
+      await _plugin.cancel(id);
     }
   }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -45,20 +46,41 @@ class FakeShoppingReminderScheduler implements ShoppingReminderScheduler {
   final Map<String, ShoppingReminder> active = {};
   final List<String> scheduledUids = [];
   final List<String> cancelledUids = [];
+  final List<int> cancelledIds = [];
 
   @override
   Future<void> schedule({
     required String uid,
     required ShoppingReminder reminder,
   }) async {
-    if (active.containsKey(uid)) cancelledUids.add(uid);
     scheduledUids.add(uid);
     active[uid] = reminder;
   }
 
   @override
+  Future<void> cancelPending({
+    required String uid,
+    required ShoppingReminder reminder,
+    required DateTime now,
+  }) async {
+    cancelledUids.add(uid);
+    cancelledIds.addAll(
+      pendingShoppingReminderNotificationIds(
+        uid: uid,
+        reminder: reminder,
+        now: now,
+      ),
+    );
+    active.remove(uid);
+  }
+
+  @override
   Future<void> cancelAll({required String uid}) async {
     cancelledUids.add(uid);
+    cancelledIds.addAll([
+      for (var slot = 0; slot < shoppingReminderMaximumCount; slot++)
+        shoppingReminderNotificationId(uid, slot),
+    ]);
     active.remove(uid);
   }
 }
@@ -887,17 +909,27 @@ void main() {
 
     expect(find.text('Today • 1 reminder'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, 'Set Reminder'), findsOneWidget);
-    expect(reminderScheduler.cancelledUids, ['alice']);
+    expect(reminderScheduler.cancelledUids, isEmpty);
+    expect(reminderScheduler.cancelledIds, isEmpty);
   });
 
-  testWidgets('completing all To Buy items auto-cancels reminder only', (
+  testWidgets('completing all To Buy items cancels only future reminders', (
     tester,
   ) async {
-    await openScreen(tester);
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Set Reminder'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('shopping-reminder-submit')));
-    await tester.pumpAndSettle();
+    final partlyCompleted = ShoppingReminder(
+      date: reminderNow,
+      times: [
+        reminderNow.subtract(const Duration(hours: 2)),
+        reminderNow.subtract(const Duration(hours: 1)),
+        reminderNow.add(const Duration(hours: 1)),
+      ],
+    );
+    SharedPreferences.setMockInitialValues({
+      shoppingReminderStorageKey('alice'): jsonEncode(partlyCompleted.toJson()),
+    });
+    final preferences = await SharedPreferences.getInstance();
+    await openScreen(tester, preferences: preferences);
+    expect(find.text('Today • 3 reminders'), findsOneWidget);
     Future<void> markBought(String name) async {
       final tile = find.ancestor(
         of: find.text(name),
@@ -914,6 +946,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(reminderScheduler.cancelledUids, ['alice']);
+    expect(reminderScheduler.cancelledIds, [
+      shoppingReminderNotificationId('alice', 2),
+    ]);
     expect(find.widgetWithText(OutlinedButton, 'Set Reminder'), findsOneWidget);
     expect(visibleState(tester).length, 3);
     expect(visibleState(tester).every((item) => item.isPurchased), isTrue);

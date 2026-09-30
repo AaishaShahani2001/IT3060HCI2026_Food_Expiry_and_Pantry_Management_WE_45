@@ -59,13 +59,14 @@ class ShoppingReminderNotifier extends AsyncNotifier<ShoppingReminder?> {
       }
       reminder = ShoppingReminder.fromJson(decoded);
     } catch (_) {
-      await _clearPersistedReminder(uid);
+      await _removePersistedReminder(uid);
+      await ref.read(shoppingReminderSchedulerProvider).cancelAll(uid: uid);
       return null;
     }
 
     final now = ref.read(shoppingReminderClockProvider)();
     if (!reminder.hasFutureTime(now)) {
-      await _clearPersistedReminder(uid);
+      await _removePersistedReminder(uid);
       return null;
     }
     if (reminder.count < 1 ||
@@ -74,7 +75,10 @@ class ShoppingReminderNotifier extends AsyncNotifier<ShoppingReminder?> {
         reminder.times.any(
           (time) => DateTime(time.year, time.month, time.day) != reminder.date,
         )) {
-      await _clearPersistedReminder(uid);
+      await ref
+          .read(shoppingReminderSchedulerProvider)
+          .cancelPending(uid: uid, reminder: reminder, now: now);
+      await _removePersistedReminder(uid);
       return null;
     }
     _scheduleExpiryCheck(uid, reminder);
@@ -114,17 +118,16 @@ class ShoppingReminderNotifier extends AsyncNotifier<ShoppingReminder?> {
       _scheduleExpiryCheck(uid, reminder);
       return;
     }
-    await _clearPersistedReminder(uid);
+    await _removePersistedReminder(uid);
     if (generation != _expiryGeneration || _uid != uid) return;
     _cancelExpiryTimer();
     state = const AsyncData(null);
   }
 
-  Future<void> _clearPersistedReminder(String uid) async {
+  Future<void> _removePersistedReminder(String uid) async {
     await ref
         .read(sharedPreferencesProvider)
         ?.remove(shoppingReminderStorageKey(uid));
-    await ref.read(shoppingReminderSchedulerProvider).cancelAll(uid: uid);
   }
 
   String _requireUid() {
@@ -136,13 +139,15 @@ class ShoppingReminderNotifier extends AsyncNotifier<ShoppingReminder?> {
   }
 
   Future<void> setReminder(ShoppingReminder reminder) async {
-    final validation = shoppingReminderValidationMessage(
-      reminder,
-      ref.read(shoppingReminderClockProvider)(),
-    );
+    final now = ref.read(shoppingReminderClockProvider)();
+    final validation = shoppingReminderValidationMessage(reminder, now);
     if (validation != null) throw ArgumentError(validation);
     final uid = _requireUid();
     final scheduler = ref.read(shoppingReminderSchedulerProvider);
+    final previous = state.asData?.value;
+    if (previous != null) {
+      await scheduler.cancelPending(uid: uid, reminder: previous, now: now);
+    }
     await scheduler.schedule(uid: uid, reminder: reminder);
     try {
       final saved =
@@ -155,7 +160,11 @@ class ShoppingReminderNotifier extends AsyncNotifier<ShoppingReminder?> {
           true;
       if (!saved) throw StateError('Could not save the Shopping reminder.');
     } catch (_) {
-      await scheduler.cancelAll(uid: uid);
+      await scheduler.cancelPending(
+        uid: uid,
+        reminder: reminder,
+        now: ref.read(shoppingReminderClockProvider)(),
+      );
       rethrow;
     }
     if (_uid == uid) {
@@ -166,7 +175,16 @@ class ShoppingReminderNotifier extends AsyncNotifier<ShoppingReminder?> {
 
   Future<void> cancelReminder() async {
     final uid = _requireUid();
-    await ref.read(shoppingReminderSchedulerProvider).cancelAll(uid: uid);
+    final reminder = state.asData?.value;
+    if (reminder != null) {
+      await ref
+          .read(shoppingReminderSchedulerProvider)
+          .cancelPending(
+            uid: uid,
+            reminder: reminder,
+            now: ref.read(shoppingReminderClockProvider)(),
+          );
+    }
     await ref
         .read(sharedPreferencesProvider)
         ?.remove(shoppingReminderStorageKey(uid));

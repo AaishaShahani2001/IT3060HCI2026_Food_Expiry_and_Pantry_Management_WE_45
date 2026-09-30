@@ -19,20 +19,41 @@ class _FakeScheduler implements ShoppingReminderScheduler {
   final Map<String, ShoppingReminder> active = {};
   final List<({String uid, ShoppingReminder reminder})> scheduled = [];
   final List<String> cancelledUids = [];
+  final List<int> cancelledIds = [];
 
   @override
   Future<void> schedule({
     required String uid,
     required ShoppingReminder reminder,
   }) async {
-    if (active.containsKey(uid)) cancelledUids.add(uid);
     scheduled.add((uid: uid, reminder: reminder));
     active[uid] = reminder;
   }
 
   @override
+  Future<void> cancelPending({
+    required String uid,
+    required ShoppingReminder reminder,
+    required DateTime now,
+  }) async {
+    cancelledUids.add(uid);
+    cancelledIds.addAll(
+      pendingShoppingReminderNotificationIds(
+        uid: uid,
+        reminder: reminder,
+        now: now,
+      ),
+    );
+    active.remove(uid);
+  }
+
+  @override
   Future<void> cancelAll({required String uid}) async {
     cancelledUids.add(uid);
+    cancelledIds.addAll([
+      for (var slot = 0; slot < shoppingReminderMaximumCount; slot++)
+        shoppingReminderNotificationId(uid, slot),
+    ]);
     active.remove(uid);
   }
 }
@@ -362,9 +383,43 @@ void main() {
       expect(scheduler.scheduled.length, 2);
       expect(scheduler.active, {'alice': second});
       expect(scheduler.cancelledUids, ['alice']);
+      expect(scheduler.cancelledIds, [
+        shoppingReminderNotificationId('alice', 0),
+      ]);
       expect(
         container.read(shoppingReminderProvider).requireValue,
         same(second),
+      );
+    },
+  );
+
+  test(
+    'changing a partly elapsed group cancels only its future slot',
+    () async {
+      final previous = reminder([
+        now.subtract(const Duration(hours: 1)),
+        now.add(const Duration(hours: 1)),
+      ]);
+      await preferences.setString(
+        shoppingReminderStorageKey('alice'),
+        jsonEncode(previous.toJson()),
+      );
+      final container = createContainer('alice');
+      addTearDown(container.dispose);
+      await container.read(shoppingReminderProvider.future);
+      final replacement = reminder([now.add(const Duration(days: 1))]);
+
+      await container
+          .read(shoppingReminderProvider.notifier)
+          .setReminder(replacement);
+
+      expect(scheduler.cancelledIds, [
+        shoppingReminderNotificationId('alice', 1),
+      ]);
+      expect(scheduler.scheduled.single.reminder, replacement);
+      expect(
+        container.read(shoppingReminderProvider).requireValue,
+        replacement,
       );
     },
   );
@@ -410,7 +465,7 @@ void main() {
   });
 
   test(
-    'fully expired reminder is cleared and all Shopping slots cancel',
+    'fully expired reminder clears without cancelling delivered slots',
     () async {
       final expired = reminder([
         now.subtract(const Duration(hours: 2)),
@@ -424,7 +479,8 @@ void main() {
       addTearDown(container.dispose);
 
       expect(await container.read(shoppingReminderProvider.future), isNull);
-      expect(scheduler.cancelledUids, ['alice']);
+      expect(scheduler.cancelledUids, isEmpty);
+      expect(scheduler.cancelledIds, isEmpty);
       expect(
         preferences.containsKey(shoppingReminderStorageKey('alice')),
         isFalse,
@@ -465,7 +521,8 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(container.read(shoppingReminderProvider).requireValue, isNull);
-    expect(scheduler.cancelledUids, ['alice']);
+    expect(scheduler.cancelledUids, isEmpty);
+    expect(scheduler.cancelledIds, isEmpty);
     expect(
       preferences.containsKey(shoppingReminderStorageKey('alice')),
       isFalse,
@@ -496,7 +553,8 @@ void main() {
     expiryTimers.fireActive();
     await Future<void>.delayed(Duration.zero);
     expect(container.read(shoppingReminderProvider).requireValue, isNull);
-    expect(scheduler.cancelledUids, ['alice']);
+    expect(scheduler.cancelledUids, isEmpty);
+    expect(scheduler.cancelledIds, isEmpty);
   });
 
   test('expiry cleanup for one UID does not affect another UID', () async {
@@ -526,7 +584,8 @@ void main() {
       isFalse,
     );
     expect(preferences.containsKey(shoppingReminderStorageKey('bob')), isTrue);
-    expect(scheduler.active.keys, ['bob']);
+    expect(scheduler.cancelledUids, isEmpty);
+    expect(scheduler.cancelledIds, isEmpty);
   });
 
   test('malformed persisted data fails safely and is removed', () async {
@@ -549,14 +608,23 @@ void main() {
       await preferences.setBool(expiryPreference, true);
       final container = createContainer('alice');
       addTearDown(container.dispose);
+      final partlyCompleted = reminder([
+        now.subtract(const Duration(hours: 2)),
+        now.subtract(const Duration(hours: 1)),
+        now.add(const Duration(hours: 1)),
+      ]);
+      await preferences.setString(
+        shoppingReminderStorageKey('alice'),
+        jsonEncode(partlyCompleted.toJson()),
+      );
       await container.read(shoppingReminderProvider.future);
-      await container
-          .read(shoppingReminderProvider.notifier)
-          .setReminder(reminder([now.add(const Duration(hours: 1))]));
 
       await container.read(shoppingReminderProvider.notifier).cancelReminder();
 
       expect(scheduler.cancelledUids, ['alice']);
+      expect(scheduler.cancelledIds, [
+        shoppingReminderNotificationId('alice', 2),
+      ]);
       expect(scheduler.active, isEmpty);
       expect(container.read(shoppingReminderProvider).requireValue, isNull);
       expect(preferences.getBool(expiryPreference), isTrue);
