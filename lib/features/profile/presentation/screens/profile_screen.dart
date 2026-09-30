@@ -412,10 +412,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ? const Color(0xFF34423B)
         : const Color(0xFFE3E9E6);
 
-    final inputColor = isDark
-        ? const Color(0xFF202A25)
-        : const Color(0xFFF7F8F8);
-
     final subtleBorderColor = isDark
         ? const Color(0xFF3A4741)
         : const Color(0xFFE1E5E3);
@@ -1623,9 +1619,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
             ),
 
-            Radio<String>(
-              value: value,
-              groupValue: _pantryType,
+            Checkbox.adaptive(
+              value: selected,
               activeColor: primaryGreen,
               onChanged: _isSaving
                   ? null
@@ -1635,7 +1630,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 }
 
                 setState(() {
-                  _pantryType = newValue;
+                  _pantryType = value;
                 });
               },
             ),

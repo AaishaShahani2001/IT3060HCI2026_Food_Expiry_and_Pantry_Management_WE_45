@@ -29,10 +29,7 @@ class ExpiryAlertService {
   /// do not generate alerts.
   Future<void> synchronizeAlerts(Iterable<PantryItem> items) async {
     final user = _auth.currentUser;
-
-    if (user == null) {
-      throw StateError('No authenticated user found.');
-    }
+    final uid = user?.uid ?? "guest";
 
     for (final item in items) {
       final priority = _expiryService.alertPriority(item);
@@ -56,8 +53,8 @@ class ExpiryAlertService {
       final status = _statusFromDays(daysUntilExpiry);
 
       final alert = ExpiryAlert(
-        id: _alertId(user.uid, item.id),
-        userId: user.uid,
+        id: _alertId(uid, item.id),
+        userId: uid,
         itemId: item.id,
         itemName: item.name,
         expiryDate: item.expiryDate!,
@@ -71,15 +68,10 @@ class ExpiryAlertService {
 
       await _repository.saveAlert(alert);
       await _notificationService.showExpiryNotification(
+        title: "${item.name} expiry alert",
 
-title:
-"${item.name} expiry alert",
-
-
-body:
-message,
-
-);
+        body: message,
+      );
     }
   }
 

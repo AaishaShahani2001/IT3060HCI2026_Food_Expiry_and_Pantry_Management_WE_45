@@ -36,9 +36,6 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
   Color get _softGreenColor =>
       _isDark ? const Color(0xFF1E3A2C) : AppColors.softGreen;
 
-  Color get _inputColor =>
-      _isDark ? const Color(0xFF202A25) : _cardColor;
-
   final TextEditingController _searchController = TextEditingController();
 
   @override
