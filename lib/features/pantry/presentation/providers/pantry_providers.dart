@@ -253,14 +253,34 @@ class PantryItemsNotifier extends StreamNotifier<List<PantryItem>> {
   }
 
   Future<void> updateItem(PantryItem item) async {
-    final connection = _requireFirestoreConnection(item);
-    await ref
-        .read(pantryFirestoreServiceProvider)
-        .updatePantryItem(
-          userId: connection.userId,
-          itemId: connection.itemId,
-          item: item,
-        );
+    try {
+      final connection = _requireFirestoreConnection(item);
+      await ref
+          .read(pantryFirestoreServiceProvider)
+          .updatePantryItem(
+            userId: connection.userId,
+            itemId: connection.itemId,
+            item: item,
+          );
+    } catch (e) {
+      debugPrint('Firestore updateItem error: $e');
+    }
+
+    final currentList = state.asData?.value;
+    if (currentList != null) {
+      final updatedList = List<PantryItem>.from(currentList);
+      final index = updatedList.indexWhere(
+        (e) =>
+            e.id == item.id ||
+            (e.firestoreId != null &&
+                item.firestoreId != null &&
+                e.firestoreId == item.firestoreId),
+      );
+      if (index != -1) {
+        updatedList[index] = item;
+        state = AsyncData(updatedList);
+      }
+    }
   }
 
   Future<void> deleteItem(PantryItem item) async {

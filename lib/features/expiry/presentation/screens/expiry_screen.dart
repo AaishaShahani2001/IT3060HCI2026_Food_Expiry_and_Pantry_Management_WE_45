@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -125,6 +126,8 @@ class ExpiryScreen extends ConsumerWidget {
             const EmptyExpiryState(message: 'No expiry alerts currently')
           else
             ...smartItems.map((item) {
+              final user = FirebaseAuth.instance.currentUser;
+              final existing = savedAlertsMap[item.id];
               final alert = ExpiryAlert(
                 id: item.id,
                 userId: '',
