@@ -8,6 +8,9 @@ import '../models/shopping_reminder.dart';
 const int shoppingReminderNotificationIdNamespace = 0x51000000;
 const int shoppingReminderMaximumCount = 3;
 
+tz.TZDateTime shoppingReminderScheduledTime(DateTime localDateTime) =>
+    tz.TZDateTime.from(localDateTime, tz.UTC);
+
 int shoppingReminderNotificationId(String uid, int slotIndex) {
   if (slotIndex < 0 || slotIndex >= shoppingReminderMaximumCount) {
     throw RangeError.range(
@@ -98,7 +101,7 @@ class LocalShoppingReminderScheduler implements ShoppingReminderScheduler {
           shoppingReminderNotificationId(uid, index),
           'Shopping Reminder',
           'You still have items to buy.',
-          tz.TZDateTime.from(reminder.times[index].toUtc(), tz.UTC),
+          shoppingReminderScheduledTime(reminder.times[index]),
           _details,
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           payload: shoppingReminderPayload,

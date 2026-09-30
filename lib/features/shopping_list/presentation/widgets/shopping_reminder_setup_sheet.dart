@@ -31,7 +31,7 @@ class _ShoppingReminderSetupSheetState
     final initial = widget.initialReminder;
     _date = initial?.date ?? DateTime(now.year, now.month, now.day);
     _count = initial?.count ?? 1;
-    _times = _defaultTimes(_date);
+    _times = List<TimeOfDay>.from(_defaultTimes(_date));
     if (initial != null) {
       for (var index = 0; index < initial.times.length; index++) {
         _times[index] = TimeOfDay.fromDateTime(initial.times[index]);
@@ -54,10 +54,10 @@ class _ShoppingReminderSetupSheetState
         return candidates.map(TimeOfDay.fromDateTime).toList();
       }
     }
-    return const [
-      TimeOfDay(hour: 10, minute: 0),
-      TimeOfDay(hour: 15, minute: 0),
-      TimeOfDay(hour: 18, minute: 0),
+    return <TimeOfDay>[
+      const TimeOfDay(hour: 10, minute: 0),
+      const TimeOfDay(hour: 15, minute: 0),
+      const TimeOfDay(hour: 18, minute: 0),
     ];
   }
 

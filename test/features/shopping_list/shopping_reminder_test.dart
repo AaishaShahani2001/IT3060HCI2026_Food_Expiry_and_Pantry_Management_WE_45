@@ -66,6 +66,85 @@ void main() {
     return container;
   }
 
+  Future<void> openReminderSheet(
+    WidgetTester tester, {
+    required ValueChanged<ShoppingReminder> onSaved,
+    ShoppingReminder? initialReminder,
+  }) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        ),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () async {
+                  final selected = await showModalBottomSheet<ShoppingReminder>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (context) => ShoppingReminderSetupSheet(
+                      clock: () => now,
+                      initialReminder: initialReminder,
+                    ),
+                  );
+                  if (selected != null) onSaved(selected);
+                },
+                child: const Text('Open reminder'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open reminder'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> editReminderTime(
+    WidgetTester tester,
+    int index, {
+    required int hour,
+    required int minute,
+  }) async {
+    await tester.tap(find.byKey(ValueKey('shopping-reminder-time-$index')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Switch to text input mode'));
+    await tester.pumpAndSettle();
+    final dialog = find.byType(TimePickerDialog);
+    final fields = find.descendant(
+      of: dialog,
+      matching: find.byType(TextField),
+    );
+    expect(fields, findsNWidgets(2));
+    await tester.enterText(fields.at(0), hour.toString().padLeft(2, '0'));
+    await tester.enterText(fields.at(1), minute.toString().padLeft(2, '0'));
+    await tester.tap(find.descendant(of: dialog, matching: find.text('OK')));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> selectReminderDate(
+    WidgetTester tester, {
+    required int day,
+    int monthsForward = 0,
+  }) async {
+    await tester.tap(find.byKey(const ValueKey('shopping-reminder-date')));
+    await tester.pumpAndSettle();
+    for (var index = 0; index < monthsForward; index++) {
+      await tester.tap(find.byTooltip('Next month'));
+      await tester.pumpAndSettle();
+    }
+    final dialog = find.byType(DatePickerDialog);
+    await tester.tap(
+      find.descendant(of: dialog, matching: find.text('$day')).last,
+    );
+    await tester.tap(find.descendant(of: dialog, matching: find.text('OK')));
+    await tester.pumpAndSettle();
+  }
+
   test('three Shopping notification slot IDs are stable and unique', () {
     final firstRun = [
       for (var slot = 0; slot < shoppingReminderMaximumCount; slot++)
@@ -122,6 +201,57 @@ void main() {
     expect(
       shoppingReminderValidationMessage(earlierToday, now),
       'Choose reminder times that are still in the future.',
+    );
+  });
+
+  test('validation compares complete local date and time values', () {
+    now = DateTime(2026, 10, 30, 18);
+
+    expect(
+      shoppingReminderValidationMessage(
+        reminder([DateTime(2026, 10, 30, 18, 30)]),
+        now,
+      ),
+      isNull,
+    );
+    expect(
+      shoppingReminderValidationMessage(
+        reminder([DateTime(2026, 10, 30, 19)]),
+        now,
+      ),
+      isNull,
+    );
+    expect(
+      shoppingReminderValidationMessage(
+        reminder([DateTime(2026, 10, 30, 17)]),
+        now,
+      ),
+      'Choose reminder times that are still in the future.',
+    );
+    expect(
+      shoppingReminderValidationMessage(
+        reminder([DateTime(2026, 10, 31, 8)]),
+        now,
+      ),
+      isNull,
+    );
+    expect(
+      shoppingReminderValidationMessage(
+        reminder([DateTime(2026, 11, 5, 15)]),
+        now,
+      ),
+      isNull,
+    );
+  });
+
+  test('scheduling conversion preserves the selected local instant', () {
+    final selected = DateTime(2026, 11, 5, 15);
+    final scheduled = shoppingReminderScheduledTime(selected);
+
+    expect(scheduled.millisecondsSinceEpoch, selected.millisecondsSinceEpoch);
+    expect(
+      DateTime.fromMillisecondsSinceEpoch(scheduled.millisecondsSinceEpoch),
+      selected,
     );
   });
 
@@ -362,5 +492,66 @@ void main() {
       find.text('Choose reminder times that are still in the future.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('all three new-reminder time slots are independently editable', (
+    tester,
+  ) async {
+    now = DateTime(2026, 10, 30, 18);
+    ShoppingReminder? saved;
+    await openReminderSheet(tester, onSaved: (value) => saved = value);
+
+    await tester.tap(find.text('3'));
+    await tester.pumpAndSettle();
+    await editReminderTime(tester, 0, hour: 19, minute: 0);
+    await editReminderTime(tester, 1, hour: 20, minute: 0);
+    await editReminderTime(tester, 2, hour: 21, minute: 0);
+
+    expect(find.text('19:00'), findsWidgets);
+    expect(find.text('20:00'), findsWidgets);
+    expect(find.text('21:00'), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const ValueKey('shopping-reminder-submit')));
+    await tester.pumpAndSettle();
+    expect(saved?.times, [
+      DateTime(2026, 10, 30, 19),
+      DateTime(2026, 10, 30, 20),
+      DateTime(2026, 10, 30, 21),
+    ]);
+  });
+
+  testWidgets('change reminder can edit its future date and immutable times', (
+    tester,
+  ) async {
+    now = DateTime(2026, 10, 30, 18);
+    final existing = reminder([
+      DateTime(2026, 10, 31, 8),
+      DateTime(2026, 10, 31, 13),
+      DateTime(2026, 10, 31, 18),
+    ]);
+    ShoppingReminder? saved;
+    await openReminderSheet(
+      tester,
+      initialReminder: existing,
+      onSaved: (value) => saved = value,
+    );
+
+    expect(find.text('Oct 31, 2026'), findsWidgets);
+    await selectReminderDate(tester, day: 5, monthsForward: 1);
+    expect(find.text('Nov 5, 2026'), findsWidgets);
+    await editReminderTime(tester, 0, hour: 7, minute: 0);
+    await editReminderTime(tester, 1, hour: 12, minute: 0);
+    await editReminderTime(tester, 2, hour: 20, minute: 0);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const ValueKey('shopping-reminder-submit')));
+    await tester.pumpAndSettle();
+    expect(saved?.date, DateTime(2026, 11, 5));
+    expect(saved?.times, [
+      DateTime(2026, 11, 5, 7),
+      DateTime(2026, 11, 5, 12),
+      DateTime(2026, 11, 5, 20),
+    ]);
   });
 }
