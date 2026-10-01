@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../pantry/domain/models/pantry_item.dart';
 import '../../data/repositories/firestore_expiry_repository.dart';
 import '../../domain/repositories/expiry_repository.dart';
+import 'expiry_notification_service.dart';
 import 'expiry_service.dart';
 
 class ExpiryAlertService {
@@ -10,13 +11,16 @@ class ExpiryAlertService {
     ExpiryService? expiryService,
     ExpiryRepository? repository,
     FirebaseAuth? auth,
+    required ExpiryNotificationService notificationService,
   }) : _expiryService = expiryService ?? const ExpiryService(),
        _repository = repository ?? FirestoreExpiryRepository(),
-       _auth = auth ?? FirebaseAuth.instance;
+       _auth = auth ?? FirebaseAuth.instance,
+       _notificationService = notificationService;
 
   final ExpiryService _expiryService;
   final ExpiryRepository _repository;
   final FirebaseAuth _auth;
+  final ExpiryNotificationService _notificationService;
 
   /// Creates or updates Firestore alerts for pantry items that
   /// currently require expiry attention.
@@ -25,10 +29,7 @@ class ExpiryAlertService {
   /// do not generate alerts.
   Future<void> synchronizeAlerts(Iterable<PantryItem> items) async {
     final user = _auth.currentUser;
-
-    if (user == null) {
-      throw StateError('No authenticated user found.');
-    }
+    final uid = user?.uid ?? "guest";
 
     for (final item in items) {
       final priority = _expiryService.alertPriority(item);
@@ -52,8 +53,8 @@ class ExpiryAlertService {
       final status = _statusFromDays(daysUntilExpiry);
 
       final alert = ExpiryAlert(
-        id: _alertId(user.uid, item.id),
-        userId: user.uid,
+        id: _alertId(uid, item.id),
+        userId: uid,
         itemId: item.id,
         itemName: item.name,
         expiryDate: item.expiryDate!,
@@ -66,6 +67,11 @@ class ExpiryAlertService {
       );
 
       await _repository.saveAlert(alert);
+      await _notificationService.showExpiryNotification(
+        title: "${item.name} expiry alert",
+
+        body: message,
+      );
     }
   }
 

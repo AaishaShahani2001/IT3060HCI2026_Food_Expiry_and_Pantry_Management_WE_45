@@ -873,15 +873,17 @@ class _PantryOption extends StatelessWidget {
                 ],
               ),
             ),
-            Radio<PantryType>(
-              value: value,
+            RadioGroup<PantryType>(
               groupValue: groupValue,
-              activeColor: primaryGreen,
               onChanged: (newValue) {
                 if (newValue != null) {
                   onChanged(newValue);
                 }
               },
+              child: Radio<PantryType>(
+                value: value,
+                activeColor: primaryGreen,
+              ),
             ),
           ],
         ),

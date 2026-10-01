@@ -1,27 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class ExpiryNotificationSettingsScreen extends StatefulWidget {
+import '../../domain/services/expiry_notification_provider.dart';
+import '../providers/expiry_notification_settings_provider.dart';
+
+class ExpiryNotificationSettingsScreen extends ConsumerStatefulWidget {
   const ExpiryNotificationSettingsScreen({super.key});
 
   @override
-  State<ExpiryNotificationSettingsScreen> createState() =>
+  ConsumerState<ExpiryNotificationSettingsScreen> createState() =>
       _ExpiryNotificationSettingsScreenState();
 }
 
 class _ExpiryNotificationSettingsScreenState
-    extends State<ExpiryNotificationSettingsScreen> {
-  bool _notificationsEnabled = true;
+    extends ConsumerState<ExpiryNotificationSettingsScreen> {
+  late bool _notificationsEnabled;
+  late bool _expiringSoonEnabled;
+  late bool _expiredItemsEnabled;
+  late bool _useFirstEnabled;
+  late int _daysBefore;
+  late TimeOfDay _notificationTime;
+  late String _frequency;
 
-  bool _expiringSoonEnabled = true;
-  bool _expiredItemsEnabled = true;
-  bool _useFirstEnabled = true;
-
-  int _daysBefore = 3;
-
-  TimeOfDay _notificationTime = const TimeOfDay(hour: 9, minute: 0);
-
-  String _frequency = 'Daily';
+  @override
+  void initState() {
+    super.initState();
+    final settings = ref.read(expiryNotificationSettingsProvider);
+    _notificationsEnabled = settings.notificationsEnabled;
+    _expiringSoonEnabled = settings.expiringSoonEnabled;
+    _expiredItemsEnabled = settings.expiredItemsEnabled;
+    _useFirstEnabled = settings.useFirstEnabled;
+    _daysBefore = settings.daysBefore;
+    _notificationTime = settings.notificationTime;
+    _frequency = settings.frequency;
+  }
 
   Future<void> _selectTime() async {
     final selectedTime = await showTimePicker(
@@ -36,7 +49,33 @@ class _ExpiryNotificationSettingsScreenState
     });
   }
 
-  void _saveChanges() {
+  Future<void> _saveChanges() async {
+    final newState = ExpiryNotificationSettingsState(
+      notificationsEnabled: _notificationsEnabled,
+      expiringSoonEnabled: _expiringSoonEnabled,
+      expiredItemsEnabled: _expiredItemsEnabled,
+      useFirstEnabled: _useFirstEnabled,
+      daysBefore: _daysBefore,
+      notificationTime: _notificationTime,
+      frequency: _frequency,
+    );
+
+    await ref
+        .read(expiryNotificationSettingsProvider.notifier)
+        .saveSettings(newState);
+
+    if (_notificationsEnabled) {
+      await ref
+          .read(expiryNotificationServiceProvider)
+          .showExpiryNotification(
+            title: "Expiry Notifications Enabled",
+            body:
+                "You will receive alerts for expiring and expired pantry items.",
+          );
+    }
+
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Expiry notification settings saved.')),
     );
@@ -79,52 +118,55 @@ class _ExpiryNotificationSettingsScreenState
 
               const SizedBox(height: 10),
 
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
+              Material(
+                color: colorScheme.surfaceContainerHighest,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: colorScheme.outline),
+                  side: BorderSide(color: colorScheme.outline),
                 ),
-                child: Column(
-                  children: [
-                    _NotificationOption(
-                      title: 'Expiring soon',
-                      subtitle: 'e.g. 1–3 days before expiry',
-                      value: _expiringSoonEnabled,
-                      enabled: _notificationsEnabled,
-                      icon: Icons.schedule_rounded,
-                      onChanged: (value) {
-                        setState(() {
-                          _expiringSoonEnabled = value;
-                        });
-                      },
-                    ),
-                    _NotificationOption(
-                      title: 'Expired items',
-                      subtitle: 'On the day the item expires',
-                      value: _expiredItemsEnabled,
-                      enabled: _notificationsEnabled,
-                      icon: Icons.error_outline_rounded,
-                      onChanged: (value) {
-                        setState(() {
-                          _expiredItemsEnabled = value;
-                        });
-                      },
-                    ),
-                    _NotificationOption(
-                      title: '"Use First" reminders',
-                      subtitle: 'Items that should be used earlier',
-                      value: _useFirstEnabled,
-                      enabled: _notificationsEnabled,
-                      icon: Icons.priority_high_rounded,
-                      onChanged: (value) {
-                        setState(() {
-                          _useFirstEnabled = value;
-                        });
-                      },
-                    ),
-                  ],
+                clipBehavior: Clip.antiAlias,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    children: [
+                      _NotificationOption(
+                        title: 'Expiring soon',
+                        subtitle: 'e.g. 1–3 days before expiry',
+                        value: _expiringSoonEnabled,
+                        enabled: _notificationsEnabled,
+                        icon: Icons.schedule_rounded,
+                        onChanged: (value) {
+                          setState(() {
+                            _expiringSoonEnabled = value;
+                          });
+                        },
+                      ),
+                      _NotificationOption(
+                        title: 'Expired items',
+                        subtitle: 'On the day the item expires',
+                        value: _expiredItemsEnabled,
+                        enabled: _notificationsEnabled,
+                        icon: Icons.error_outline_rounded,
+                        onChanged: (value) {
+                          setState(() {
+                            _expiredItemsEnabled = value;
+                          });
+                        },
+                      ),
+                      _NotificationOption(
+                        title: '"Use First" reminders',
+                        subtitle: 'Items that should be used earlier',
+                        value: _useFirstEnabled,
+                        enabled: _notificationsEnabled,
+                        icon: Icons.priority_high_rounded,
+                        onChanged: (value) {
+                          setState(() {
+                            _useFirstEnabled = value;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
 

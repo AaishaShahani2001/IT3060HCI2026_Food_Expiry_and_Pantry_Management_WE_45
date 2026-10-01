@@ -5,6 +5,7 @@ import '../../../pantry/presentation/providers/pantry_providers.dart';
 import '../../data/repositories/firestore_expiry_repository.dart';
 import '../../domain/repositories/expiry_repository.dart';
 import '../../domain/services/expiry_alert_service.dart';
+import '../../domain/services/expiry_notification_provider.dart';
 import '../../domain/services/expiry_service.dart';
 
 final expiryServiceProvider = Provider<ExpiryService>((ref) {
@@ -19,6 +20,7 @@ final expiryAlertServiceProvider = Provider<ExpiryAlertService>((ref) {
   return ExpiryAlertService(
     expiryService: ref.read(expiryServiceProvider),
     repository: ref.read(expiryRepositoryProvider),
+    notificationService: ref.read(expiryNotificationServiceProvider),
   );
 });
 
@@ -130,11 +132,32 @@ final markExpiryAlertAsReadProvider =
       };
     });
 
+/// Stops tracking a Firestore expiry alert.
+final stopTrackingProvider = Provider<Future<void> Function(String alertId)>((
+  ref,
+) {
+  return (String alertId) async {
+    await ref.read(expiryRepositoryProvider).deleteAlert(alertId);
+
+    ref.invalidate(expiryAlertsProvider);
+  };
+});
+
 /// Deletes a Firestore expiry alert.
 final deleteExpiryAlertProvider =
     Provider<Future<void> Function(String alertId)>((ref) {
       return (String alertId) async {
         await ref.read(expiryRepositoryProvider).deleteAlert(alertId);
+
+        ref.invalidate(expiryAlertsProvider);
+      };
+    });
+
+/// Saves a new expiry alert
+final saveExpiryAlertProvider =
+    Provider<Future<void> Function(ExpiryAlert alert)>((ref) {
+      return (ExpiryAlert alert) async {
+        await ref.read(expiryRepositoryProvider).saveAlert(alert);
 
         ref.invalidate(expiryAlertsProvider);
       };

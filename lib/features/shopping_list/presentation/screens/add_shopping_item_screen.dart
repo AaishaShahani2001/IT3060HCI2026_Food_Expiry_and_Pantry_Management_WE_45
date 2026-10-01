@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/domain/utils/pantry_duplicate_lookup.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/presentation/widgets/duplicate_item_dialog.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/food_item_suggestions.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/quantity_presets.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_item_metadata.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_pantry_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/shopping_error_message.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/shopping_snackbar.dart';
 import 'package:go_router/go_router.dart';
 
 class AddShoppingItemScreen extends ConsumerStatefulWidget {
@@ -31,6 +37,11 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
   String? _formUid;
   bool _sessionExpired = false;
   BuildContext? _duplicateDialogContext;
+  late PantryUnit _selectedUnit;
+  late String _selectedCategory;
+  late bool _unitManuallySelected;
+  late bool _categoryManuallySelected;
+  String? _confirmedPantryName;
 
   bool get _sameUser =>
       !_sessionExpired &&
@@ -49,7 +60,11 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
     _quantityController = TextEditingController(
       text: widget.initialItem?.quantity.toString() ?? '',
     );
-    _itemNameController.addListener(_refreshFormOptions);
+    _selectedUnit = widget.initialItem?.unit ?? PantryUnit.items;
+    _selectedCategory = widget.initialItem?.category ?? 'Other';
+    _unitManuallySelected = _isEditing;
+    _categoryManuallySelected = _isEditing;
+    _itemNameController.addListener(_onNameChanged);
     _quantityController.addListener(_refreshFormOptions);
   }
 
@@ -67,7 +82,7 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
 
   @override
   void dispose() {
-    _itemNameController.removeListener(_refreshFormOptions);
+    _itemNameController.removeListener(_onNameChanged);
     _quantityController.removeListener(_refreshFormOptions);
     _itemNameController.dispose();
     _quantityController.dispose();
@@ -77,6 +92,11 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
 
   void _refreshFormOptions() {
     setState(() {});
+  }
+
+  void _onNameChanged() {
+    _confirmedPantryName = null;
+    _refreshFormOptions();
   }
 
   void _setQuantity(int quantity) {
@@ -106,21 +126,55 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
     );
   }
 
+  PantryItem? _matchingPantryItem() {
+    final items =
+        ref.read(shoppingPantryItemsProvider).asData?.value ?? const [];
+    return lookupDuplicatePantryItemByName(items, _itemNameController.text);
+  }
+
+  String _effectiveCategory(PantryItem? pantryMatch) {
+    if (_categoryManuallySelected) return _selectedCategory;
+    if (pantryMatch != null) return shoppingCategoryForPantryItem(pantryMatch);
+    return foodItemCategoryFor(_itemNameController.text);
+  }
+
+  PantryUnit _effectiveUnit(PantryItem? pantryMatch) {
+    if (_unitManuallySelected) return _selectedUnit;
+    return pantryMatch?.unit ?? PantryUnit.items;
+  }
+
   Future<void> _submitForm() async {
     if (_hasSubmitted || _isSubmitting) return;
     if (_formKey.currentState?.validate() ?? false) {
-      final item = ShoppingItem(
-        id: widget.initialItem?.id,
-        name: _itemNameController.text.trim(),
-        quantity: int.parse(_quantityController.text.trim()),
-        isPurchased: widget.initialItem?.isPurchased ?? false,
-      );
-
       FocusScope.of(context).unfocus();
       setState(() => _isSubmitting = true);
       ShoppingItem? confirmedDuplicate;
       ShoppingDuplicateAction? action;
       try {
+        final pantryMatch = _matchingPantryItem();
+        final normalizedName = _itemNameController.text.trim().toLowerCase();
+        if (!_isEditing &&
+            pantryMatch != null &&
+            _confirmedPantryName != normalizedName) {
+          setState(() => _waitingForChoice = true);
+          final addAnyway = await showPantryPresenceWarning(
+            context: context,
+            existingItem: pantryMatch,
+          );
+          if (mounted) setState(() => _waitingForChoice = false);
+          if (!addAnyway || !mounted || !_sameUser) return;
+          _confirmedPantryName = normalizedName;
+        }
+        final item = ShoppingItem(
+          id: widget.initialItem?.id,
+          name: _itemNameController.text.trim(),
+          quantity: int.parse(_quantityController.text.trim()),
+          isPurchased: widget.initialItem?.isPurchased ?? false,
+          unit: _effectiveUnit(pantryMatch),
+          category: _effectiveCategory(pantryMatch),
+          source: widget.initialItem?.source,
+          sourcePantryItemId: widget.initialItem?.sourcePantryItemId,
+        );
         // Stay on the form until persistence succeeds; Cancel keeps the draft.
         while (mounted) {
           if (!_sameUser) throw StateError('Account changed');
@@ -145,10 +199,7 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
             if (!mounted || !_sameUser) return;
             setState(() => _waitingForChoice = true);
             try {
-              action = await _confirmDuplicate(
-                duplicate.existing,
-                item.quantity,
-              );
+              action = await _confirmDuplicate(duplicate.existing, item);
             } finally {
               if (mounted) setState(() => _waitingForChoice = false);
             }
@@ -159,9 +210,11 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
       } catch (error) {
         if (mounted && _sameUser) {
           debugPrint('Shopping form error: $error');
-          ScaffoldMessenger.of(
+          ShoppingSnackBar.show(
             context,
-          ).showSnackBar(SnackBar(content: Text(shoppingErrorMessage(error))));
+            message: shoppingErrorMessage(error),
+            duration: ShoppingSnackBar.error,
+          );
         }
       } finally {
         if (mounted) setState(() => _isSubmitting = false);
@@ -171,9 +224,10 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
 
   Future<ShoppingDuplicateAction?> _confirmDuplicate(
     ShoppingItem existing,
-    int requestedQuantity,
+    ShoppingItem requested,
   ) async {
-    final total = existing.quantity + requestedQuantity;
+    final total = existing.quantity + requested.quantity;
+    final sameUnit = existing.unit == requested.unit;
     bool resolved = false;
     void choose(BuildContext dialogContext, ShoppingDuplicateAction? action) {
       if (resolved) return;
@@ -198,9 +252,13 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
             _isEditing
                 ? '${existing.name} is already in your shopping list. Save this as a separate entry?'
                 : existing.isPurchased
-                ? '${existing.name} is already marked as Bought. Move it to To Buy with quantity $requestedQuantity, or add another entry?'
-                : '${existing.name} is already in your shopping list with quantity ${existing.quantity}. '
-                      '${total > 100 ? 'Maximum quantity is 100. You can add a separate entry or change your quantity.' : 'Increase it to $total, or add another entry?'}',
+                ? '${existing.name} is already marked as Bought. Move it to To Buy with quantity ${requested.quantity} ${shoppingUnitLabel(requested.unit)}, or add another entry?'
+                : '${existing.name} is already in your shopping list with quantity ${existing.quantity} ${shoppingUnitLabel(existing.unit)}. '
+                      '${!sameUnit
+                          ? 'The units differ, so add a separate entry or change the unit.'
+                          : total > 100
+                          ? 'Maximum quantity is 100. You can add a separate entry or change your quantity.'
+                          : 'Increase it to $total ${shoppingUnitLabel(existing.unit)}, or add another entry?'}',
           ),
           actions: [
             TextButton(
@@ -214,7 +272,7 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
             ),
             if (!_isEditing)
               FilledButton(
-                onPressed: !existing.isPurchased && total > 100
+                onPressed: !existing.isPurchased && (!sameUnit || total > 100)
                     ? null
                     : () => choose(
                         dialogContext,
@@ -278,14 +336,27 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
     final auth = ref.watch(shoppingAuthUidProvider);
     _formUid ??= auth.asData?.value;
     final shopping = ref.watch(shoppingListProvider);
+    final pantry = ref.watch(shoppingPantryItemsProvider);
+    final pantryMatch = lookupDuplicatePantryItemByName(
+      pantry.asData?.value ?? const <PantryItem>[],
+      _itemNameController.text,
+    );
     final textTheme = Theme.of(context).textTheme;
     final colors = Theme.of(context).colorScheme;
     final quickQuantities = quantityPresetsFor(_itemNameController.text);
     final selectedQuantity = _quantityController.text.trim();
     final quantityValue = int.tryParse(selectedQuantity);
-    final quickPicks = foodItemSuggestions.where(
-      (name) => const {'Milk', 'Eggs', 'Bread', 'Rice'}.contains(name),
+    final quickPicks = shoppingQuickPicks(
+      shopping.asData?.value ?? const <ShoppingItem>[],
     );
+    final effectiveCategory = _effectiveCategory(pantryMatch);
+    final effectiveUnit = _effectiveUnit(pantryMatch);
+    final categoryOptions = <String>{
+      ...foodItemSuggestionCategories.keys,
+      effectiveCategory,
+      'Other',
+    }.toList();
+    final unitOptions = <PantryUnit>{...shoppingUnits, effectiveUnit}.toList();
 
     return PopScope(
       canPop: !_isSubmitting || _sessionExpired,
@@ -482,9 +553,45 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
                                         );
                                       },
                                     ),
+                                    if (pantryMatch != null) ...[
+                                      const SizedBox(height: 12),
+                                      Semantics(
+                                        label:
+                                            '${pantryMatch.name} is already in your pantry with ${pantryMatch.quantityLabel}',
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: colors.secondaryContainer,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.inventory_2_outlined,
+                                                color: colors.primary,
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Text(
+                                                  '${pantryMatch.quantityLabel} remaining in pantry',
+                                                  style: textTheme.bodyMedium
+                                                      ?.copyWith(
+                                                        color: colors.onSurface,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                     const SizedBox(height: 16),
                                     Text(
-                                      'Quick Pick',
+                                      'Recent & frequent picks',
                                       style: textTheme.titleSmall?.copyWith(
                                         color: colors.onSurface,
                                         fontWeight: FontWeight.w600,
@@ -637,6 +744,63 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
                                           onFieldSubmitted: (_) =>
                                               _submitForm(),
                                         );
+                                      },
+                                    ),
+                                    const SizedBox(height: 16),
+                                    DropdownButtonFormField<PantryUnit>(
+                                      key: ValueKey(effectiveUnit),
+                                      initialValue: effectiveUnit,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Unit',
+                                        prefixIcon: Icon(
+                                          Icons.straighten_outlined,
+                                        ),
+                                      ),
+                                      items: [
+                                        for (final unit in unitOptions)
+                                          DropdownMenuItem(
+                                            value: unit,
+                                            child: Text(
+                                              shoppingUnitLabel(unit),
+                                            ),
+                                          ),
+                                      ],
+                                      onChanged: (unit) {
+                                        if (unit == null) return;
+                                        setState(() {
+                                          _selectedUnit = unit;
+                                          _unitManuallySelected = true;
+                                        });
+                                      },
+                                    ),
+                                    const SizedBox(height: 16),
+                                    DropdownButtonFormField<String>(
+                                      key: ValueKey(effectiveCategory),
+                                      initialValue: effectiveCategory,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Category',
+                                        prefixIcon: Icon(
+                                          Icons.category_outlined,
+                                        ),
+                                      ),
+                                      items: [
+                                        for (final category in categoryOptions)
+                                          DropdownMenuItem(
+                                            value: category,
+                                            child: Text(
+                                              category,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                      ],
+                                      onChanged: (category) {
+                                        if (category == null) return;
+                                        setState(() {
+                                          _selectedCategory = category;
+                                          _categoryManuallySelected = true;
+                                        });
                                       },
                                     ),
                                   ],

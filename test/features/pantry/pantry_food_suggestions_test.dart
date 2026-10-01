@@ -304,6 +304,57 @@ void main() {
       expect(_category(tester), PantryCategory.other);
     });
 
+    testWidgets('prefill and loaded pantry autocomplete work together', (
+      tester,
+    ) async {
+      await _pumpForm(
+        tester,
+        log: _SubmitLog(),
+        prefill: const PantryItemFormPrefill(
+          name: 'Brown Rice',
+          quantity: 2,
+          unit: PantryUnit.kg,
+          category: PantryCategory.grains,
+        ),
+        existingItems: [
+          _item('sambol', 'Coconut Sambol', PantryCategory.other),
+        ],
+      );
+
+      expect(_nameText(tester), 'Brown Rice');
+      expect(
+        tester
+            .widget<TextFormField>(find.byType(TextFormField).at(1))
+            .controller!
+            .text,
+        '2',
+      );
+      expect(_category(tester), PantryCategory.grains);
+      expect(
+        tester
+            .state<FormFieldState<PantryUnit>>(
+              find.byType(DropdownButtonFormField<PantryUnit>),
+            )
+            .value,
+        PantryUnit.kg,
+      );
+
+      await tester.enterText(find.byType(TextFormField).first, 'coco');
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('pantry-suggestion-Coconut Sambol')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('pantry-suggestion-Coconut Sambol')),
+      );
+      await tester.pumpAndSettle();
+      expect(_nameText(tester), 'Coconut Sambol');
+      expect(_category(tester), PantryCategory.other);
+      expect(find.text('Category suggested from item name'), findsOneWidget);
+    });
+
     testWidgets('shows at most six suggestion rows', (tester) async {
       await _pumpForm(tester, log: _SubmitLog());
       await tester.enterText(find.byType(TextFormField).first, 'a');
@@ -412,6 +463,7 @@ Future<void> _pumpForm(
   WidgetTester tester, {
   required _SubmitLog log,
   PantryItem? initialItem,
+  PantryItemFormPrefill? prefill,
   List<PantryItem> existingItems = const [],
   ThemeData? theme,
   Size size = const Size(400, 1600),
@@ -436,6 +488,7 @@ Future<void> _pumpForm(
         body: SingleChildScrollView(
           child: PantryItemForm(
             initialItem: initialItem,
+            prefill: prefill,
             existingItems: existingItems,
             onSubmit: (data) async {
               log

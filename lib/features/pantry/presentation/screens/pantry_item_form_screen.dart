@@ -13,9 +13,10 @@ import '../widgets/pantry_item_form.dart';
 import '../widgets/pantry_photo_upload_failure_dialog.dart';
 
 class PantryItemFormScreen extends ConsumerStatefulWidget {
-  const PantryItemFormScreen({this.item, super.key});
+  const PantryItemFormScreen({this.item, this.prefill, super.key});
 
   final PantryItem? item;
+  final PantryItemFormPrefill? prefill;
 
   @override
   ConsumerState<PantryItemFormScreen> createState() =>
@@ -296,6 +297,7 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
                 ),
                 child: PantryItemForm(
                   initialItem: widget.item,
+                  prefill: widget.prefill,
                   existingItems: existingItems,
                   isSaving: _isSaving,
                   savingMessage: _savingMessage,

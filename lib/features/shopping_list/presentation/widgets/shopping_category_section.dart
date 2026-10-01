@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 class ShoppingCategorySection extends StatelessWidget {
   const ShoppingCategorySection({
@@ -7,6 +8,10 @@ class ShoppingCategorySection extends StatelessWidget {
     required this.count,
     required this.expanded,
     required this.onToggle,
+    required this.onLongPress,
+    required this.selectionMode,
+    required this.isSelected,
+    required this.isPartiallySelected,
     required this.children,
   });
 
@@ -14,6 +19,10 @@ class ShoppingCategorySection extends StatelessWidget {
   final int count;
   final bool expanded;
   final VoidCallback? onToggle;
+  final VoidCallback? onLongPress;
+  final bool selectionMode;
+  final bool isSelected;
+  final bool isPartiallySelected;
   final List<Widget> children;
 
   IconData get _icon => switch (category) {
@@ -34,7 +43,7 @@ class ShoppingCategorySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final title = category == 'Rice, Grains and Cereals' ? 'Grains' : category;
+    final title = shoppingCategoryTitle(category);
     return Material(
       color: colors.surfaceContainerHighest,
       clipBehavior: Clip.antiAlias,
@@ -45,12 +54,30 @@ class ShoppingCategorySection extends StatelessWidget {
       child: Column(
         children: [
           Semantics(
+            button: true,
             expanded: expanded,
+            selected: selectionMode ? isSelected : null,
+            label: selectionMode
+                ? '${isSelected ? 'Selected' : 'Select'} $title category for deletion'
+                : expanded
+                ? 'Collapse $title category'
+                : 'Expand $title category',
+            customSemanticsActions: onLongPress == null
+                ? const {}
+                : {
+                    CustomSemanticsAction(
+                      label:
+                          '${selectionMode && isSelected ? 'Deselect' : 'Select'} $title category for deletion',
+                    ): onLongPress!,
+                  },
             child: InkWell(
               onTap: onToggle,
+              onLongPress: onLongPress,
               child: Container(
                 constraints: const BoxConstraints(minHeight: 56),
-                color: colors.secondaryContainer.withValues(alpha: 0.3),
+                color: isSelected || isPartiallySelected
+                    ? colors.secondaryContainer
+                    : colors.secondaryContainer.withValues(alpha: 0.3),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 10,
@@ -70,7 +97,17 @@ class ShoppingCategorySection extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Icon(expanded ? Icons.expand_less : Icons.expand_more),
+                    if (selectionMode)
+                      Icon(
+                        isSelected
+                            ? Icons.check_circle
+                            : isPartiallySelected
+                            ? Icons.indeterminate_check_box
+                            : Icons.radio_button_unchecked,
+                        color: colors.primary,
+                      )
+                    else
+                      Icon(expanded ? Icons.expand_less : Icons.expand_more),
                   ],
                 ),
               ),
@@ -90,3 +127,6 @@ class ShoppingCategorySection extends StatelessWidget {
     );
   }
 }
+
+String shoppingCategoryTitle(String category) =>
+    category == 'Rice, Grains and Cereals' ? 'Grains' : category;
