@@ -5,25 +5,18 @@ import 'package:go_router/go_router.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/services/auth_service.dart';
 
-enum PantryType {
-  personal,
-  family,
-  shared,
-}
+enum PantryType { personal, family, shared }
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({
-    super.key,
-    this.onSignup,
-    this.onLogin,
-  });
+  const SignupScreen({super.key, this.onSignup, this.onLogin});
 
   final void Function({
-  required String name,
-  required String email,
-  required String password,
-  required PantryType pantryType,
-  })? onSignup;
+    required String name,
+    required String email,
+    required String password,
+    required PantryType pantryType,
+  })?
+  onSignup;
 
   final VoidCallback? onLogin;
 
@@ -63,9 +56,7 @@ class _SignupScreenState extends State<SignupScreen> {
     if (!agree) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Please accept the Terms and Privacy Policy.',
-          ),
+          content: Text('Please accept the Terms and Privacy Policy.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -97,9 +88,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Account created successfully!',
-          ),
+          content: Text('Account created successfully!'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -112,8 +101,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
       switch (e.code) {
         case 'email-already-in-use':
-          message =
-          'An account already exists with this email address.';
+          message = 'An account already exists with this email address.';
           break;
 
         case 'invalid-email':
@@ -122,34 +110,27 @@ class _SignupScreenState extends State<SignupScreen> {
 
         case 'weak-password':
           message =
-          'Your password is too weak. Please choose a stronger password.';
+              'Your password is too weak. Please choose a stronger password.';
           break;
 
         case 'operation-not-allowed':
-          message =
-          'Email/password registration is not enabled in Firebase.';
+          message = 'Email/password registration is not enabled in Firebase.';
           break;
 
         case 'network-request-failed':
-          message =
-          'Network error. Please check your internet connection.';
+          message = 'Network error. Please check your internet connection.';
           break;
 
         case 'too-many-requests':
-          message =
-          'Too many attempts. Please try again later.';
+          message = 'Too many attempts. Please try again later.';
           break;
 
         default:
-          message =
-              e.message ?? 'Unable to create your account.';
+          message = e.message ?? 'Unable to create your account.';
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
     } on FirebaseException catch (e) {
       if (!mounted) return;
@@ -158,7 +139,7 @@ class _SignupScreenState extends State<SignupScreen> {
         SnackBar(
           content: Text(
             'Unable to save your profile: '
-                '${e.message ?? 'Please try again.'}',
+            '${e.message ?? 'Please try again.'}',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -168,9 +149,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Something went wrong. Please try again.',
-          ),
+          content: Text('Something went wrong. Please try again.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -206,24 +185,20 @@ class _SignupScreenState extends State<SignupScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   minHeight: constraints.maxHeight - 16,
                 ),
                 child: IntrinsicHeight(
                   child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 28),
 
                       // ------------------------------------------------
                       // BRANDING
                       // ------------------------------------------------
-
                       Center(
                         child: Column(
                           children: [
@@ -232,8 +207,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               height: 72,
                               decoration: BoxDecoration(
                                 color: lightGreen,
-                                borderRadius:
-                                BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(20),
                               ),
                               child: const Icon(
                                 Icons.kitchen_rounded,
@@ -255,10 +229,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             const Text(
                               'Create your pantry and start reducing waste.',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: textGrey,
-                              ),
+                              style: TextStyle(fontSize: 14, color: textGrey),
                             ),
                           ],
                         ),
@@ -269,7 +240,6 @@ class _SignupScreenState extends State<SignupScreen> {
                       // ------------------------------------------------
                       // TITLE
                       // ------------------------------------------------
-
                       const Text(
                         'Create your account',
                         style: TextStyle(
@@ -295,12 +265,10 @@ class _SignupScreenState extends State<SignupScreen> {
                       // ------------------------------------------------
                       // FORM
                       // ------------------------------------------------
-
                       Form(
                         key: _formKey,
                         child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment.stretch,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             // NAME
                             const Text(
@@ -316,20 +284,15 @@ class _SignupScreenState extends State<SignupScreen> {
 
                             TextFormField(
                               controller: name,
-                              textInputAction:
-                              TextInputAction.next,
-                              autofillHints: const [
-                                AutofillHints.name,
-                              ],
+                              textInputAction: TextInputAction.next,
+                              autofillHints: const [AutofillHints.name],
                               decoration: _inputDecoration(
                                 hintText: 'Enter your name',
-                                icon:
-                                Icons.person_outline_rounded,
+                                icon: Icons.person_outline_rounded,
                                 primaryGreen: primaryGreen,
                               ),
                               validator: (value) {
-                                final valueText =
-                                    value?.trim() ?? '';
+                                final valueText = value?.trim() ?? '';
 
                                 if (valueText.isEmpty) {
                                   return 'Please enter your name';
@@ -359,21 +322,16 @@ class _SignupScreenState extends State<SignupScreen> {
 
                             TextFormField(
                               controller: email,
-                              keyboardType:
-                              TextInputType.emailAddress,
-                              textInputAction:
-                              TextInputAction.next,
-                              autofillHints: const [
-                                AutofillHints.email,
-                              ],
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              autofillHints: const [AutofillHints.email],
                               decoration: _inputDecoration(
                                 hintText: 'Enter your email',
                                 icon: Icons.email_outlined,
                                 primaryGreen: primaryGreen,
                               ),
                               validator: (value) {
-                                final emailValue =
-                                    value?.trim() ?? '';
+                                final emailValue = value?.trim() ?? '';
 
                                 if (emailValue.isEmpty) {
                                   return 'Please enter your email address';
@@ -406,39 +364,33 @@ class _SignupScreenState extends State<SignupScreen> {
                             TextFormField(
                               controller: password,
                               obscureText: hidePassword,
-                              textInputAction:
-                              TextInputAction.next,
-                              autofillHints: const [
-                                AutofillHints.newPassword,
-                              ],
-                              decoration: _inputDecoration(
-                                hintText: 'Create a password',
-                                icon:
-                                Icons.lock_outline_rounded,
-                                primaryGreen: primaryGreen,
-                              ).copyWith(
-                                suffixIcon: IconButton(
-                                  tooltip: hidePassword
-                                      ? 'Show password'
-                                      : 'Hide password',
-                                  onPressed: () {
-                                    setState(() {
-                                      hidePassword =
-                                      !hidePassword;
-                                    });
-                                  },
-                                  icon: Icon(
-                                    hidePassword
-                                        ? Icons.visibility_outlined
-                                        : Icons
-                                        .visibility_off_outlined,
-                                    color: textGrey,
+                              textInputAction: TextInputAction.next,
+                              autofillHints: const [AutofillHints.newPassword],
+                              decoration:
+                                  _inputDecoration(
+                                    hintText: 'Create a password',
+                                    icon: Icons.lock_outline_rounded,
+                                    primaryGreen: primaryGreen,
+                                  ).copyWith(
+                                    suffixIcon: IconButton(
+                                      tooltip: hidePassword
+                                          ? 'Show password'
+                                          : 'Hide password',
+                                      onPressed: () {
+                                        setState(() {
+                                          hidePassword = !hidePassword;
+                                        });
+                                      },
+                                      icon: Icon(
+                                        hidePassword
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        color: textGrey,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
                               validator: (value) {
-                                if (value == null ||
-                                    value.isEmpty) {
+                                if (value == null || value.isEmpty) {
                                   return 'Please enter a password';
                                 }
 
@@ -467,39 +419,33 @@ class _SignupScreenState extends State<SignupScreen> {
                             TextFormField(
                               controller: confirm,
                               obscureText: hideConfirm,
-                              textInputAction:
-                              TextInputAction.done,
-                              autofillHints: const [
-                                AutofillHints.newPassword,
-                              ],
-                              decoration: _inputDecoration(
-                                hintText: 'Re-enter your password',
-                                icon:
-                                Icons.lock_reset_outlined,
-                                primaryGreen: primaryGreen,
-                              ).copyWith(
-                                suffixIcon: IconButton(
-                                  tooltip: hideConfirm
-                                      ? 'Show password'
-                                      : 'Hide password',
-                                  onPressed: () {
-                                    setState(() {
-                                      hideConfirm =
-                                      !hideConfirm;
-                                    });
-                                  },
-                                  icon: Icon(
-                                    hideConfirm
-                                        ? Icons.visibility_outlined
-                                        : Icons
-                                        .visibility_off_outlined,
-                                    color: textGrey,
+                              textInputAction: TextInputAction.done,
+                              autofillHints: const [AutofillHints.newPassword],
+                              decoration:
+                                  _inputDecoration(
+                                    hintText: 'Re-enter your password',
+                                    icon: Icons.lock_reset_outlined,
+                                    primaryGreen: primaryGreen,
+                                  ).copyWith(
+                                    suffixIcon: IconButton(
+                                      tooltip: hideConfirm
+                                          ? 'Show password'
+                                          : 'Hide password',
+                                      onPressed: () {
+                                        setState(() {
+                                          hideConfirm = !hideConfirm;
+                                        });
+                                      },
+                                      icon: Icon(
+                                        hideConfirm
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        color: textGrey,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
                               validator: (value) {
-                                if (value == null ||
-                                    value.isEmpty) {
+                                if (value == null || value.isEmpty) {
                                   return 'Please confirm your password';
                                 }
 
@@ -516,7 +462,6 @@ class _SignupScreenState extends State<SignupScreen> {
                             // ------------------------------------------------
                             // PANTRY TYPE
                             // ------------------------------------------------
-
                             const Text(
                               'Pantry type',
                               style: TextStyle(
@@ -530,18 +475,14 @@ class _SignupScreenState extends State<SignupScreen> {
 
                             const Text(
                               'Choose how you plan to use PantryPal.',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: textGrey,
-                              ),
+                              style: TextStyle(fontSize: 13, color: textGrey),
                             ),
 
                             const SizedBox(height: 12),
 
                             _PantryOption(
                               title: 'Personal pantry',
-                              subtitle:
-                              'For managing your own food.',
+                              subtitle: 'For managing your own food.',
                               icon: Icons.person_outline_rounded,
                               value: PantryType.personal,
                               groupValue: pantryType,
@@ -557,8 +498,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
                             _PantryOption(
                               title: 'Family pantry',
-                              subtitle:
-                              'Share and manage food with family.',
+                              subtitle: 'Share and manage food with family.',
                               icon: Icons.family_restroom_rounded,
                               value: PantryType.family,
                               groupValue: pantryType,
@@ -574,8 +514,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
                             _PantryOption(
                               title: 'Shared pantry',
-                              subtitle:
-                              'For hostels, roommates, or groups.',
+                              subtitle: 'For hostels, roommates, or groups.',
                               icon: Icons.groups_outlined,
                               value: PantryType.shared,
                               groupValue: pantryType,
@@ -592,10 +531,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             // ------------------------------------------------
                             // TERMS
                             // ------------------------------------------------
-
                             Row(
-                              crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Checkbox(
                                   value: agree,
@@ -603,16 +540,14 @@ class _SignupScreenState extends State<SignupScreen> {
                                   onChanged: loading
                                       ? null
                                       : (value) {
-                                    setState(() {
-                                      agree =
-                                          value ?? false;
-                                    });
-                                  },
+                                          setState(() {
+                                            agree = value ?? false;
+                                          });
+                                        },
                                 ),
                                 const Expanded(
                                   child: Padding(
-                                    padding:
-                                    EdgeInsets.only(top: 12),
+                                    padding: EdgeInsets.only(top: 12),
                                     child: Text(
                                       'I agree to the Terms of Service and Privacy Policy.',
                                       style: TextStyle(
@@ -631,51 +566,39 @@ class _SignupScreenState extends State<SignupScreen> {
                             // ------------------------------------------------
                             // CREATE ACCOUNT
                             // ------------------------------------------------
-
                             SizedBox(
                               height: 54,
                               child: ElevatedButton(
-                                onPressed:
-                                loading ? null : _signup,
-                                style:
-                                ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                  primaryGreen,
-                                  foregroundColor:
-                                  Colors.white,
-                                  disabledBackgroundColor:
-                                  primaryGreen.withValues(
-                                    alpha: 0.5,
-                                  ),
+                                onPressed: loading ? null : _signup,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryGreen,
+                                  foregroundColor: Colors.white,
+                                  disabledBackgroundColor: primaryGreen
+                                      .withValues(alpha: 0.5),
                                   elevation: 0,
-                                  shape:
-                                  RoundedRectangleBorder(
-                                    borderRadius:
-                                    BorderRadius.circular(10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
                                 child: loading
                                     ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child:
-                                  CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    valueColor:
-                                    AlwaysStoppedAnimation<
-                                        Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
+                                        ),
+                                      )
                                     : const Text(
-                                  'Create Account',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight:
-                                    FontWeight.w700,
-                                  ),
-                                ),
+                                        'Create Account',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                               ),
                             ),
                           ],
@@ -687,22 +610,15 @@ class _SignupScreenState extends State<SignupScreen> {
                       // ------------------------------------------------
                       // LOGIN LINK
                       // ------------------------------------------------
-
                       Row(
-                        mainAxisAlignment:
-                        MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Text(
                             'Already have an account?',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: textGrey,
-                            ),
+                            style: TextStyle(fontSize: 14, color: textGrey),
                           ),
                           TextButton(
-                            onPressed: loading
-                                ? null
-                                : _openLogin,
+                            onPressed: loading ? null : _openLogin,
                             child: const Text(
                               'Login',
                               style: TextStyle(
@@ -719,10 +635,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       const Text(
                         'Your pantry, organized for a less wasteful home.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: textGrey,
-                        ),
+                        style: TextStyle(fontSize: 12, color: textGrey),
                       ),
 
                       const SizedBox(height: 24),
@@ -747,39 +660,26 @@ class _SignupScreenState extends State<SignupScreen> {
       prefixIcon: Icon(icon),
       filled: true,
       fillColor: const Color(0xFFF7F8F8),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 16,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(
-          color: Color(0xFFE1E5E3),
-        ),
+        borderSide: const BorderSide(color: Color(0xFFE1E5E3)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(
-          color: primaryGreen,
-          width: 1.5,
-        ),
+        borderSide: BorderSide(color: primaryGreen, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(
-          color: Color(0xFFD64545),
-        ),
+        borderSide: const BorderSide(color: Color(0xFFD64545)),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(
-          color: Color(0xFFD64545),
-          width: 1.5,
-        ),
+        borderSide: const BorderSide(color: Color(0xFFD64545), width: 1.5),
       ),
     );
   }
@@ -819,14 +719,10 @@ class _PantryOption extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: selected
-              ? const Color(0xFFEAF4EE)
-              : const Color(0xFFF8F9F9),
+          color: selected ? const Color(0xFFEAF4EE) : const Color(0xFFF8F9F9),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected
-                ? primaryGreen
-                : const Color(0xFFE1E5E3),
+            color: selected ? primaryGreen : const Color(0xFFE1E5E3),
             width: selected ? 1.4 : 1,
           ),
         ),
@@ -836,23 +732,18 @@ class _PantryOption extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: selected
-                    ? Colors.white
-                    : const Color(0xFFEFF2F1),
+                color: selected ? Colors.white : const Color(0xFFEFF2F1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 icon,
-                color: selected
-                    ? primaryGreen
-                    : const Color(0xFF6B7280),
+                color: selected ? primaryGreen : const Color(0xFF6B7280),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
@@ -880,10 +771,7 @@ class _PantryOption extends StatelessWidget {
                   onChanged(newValue);
                 }
               },
-              child: Radio<PantryType>(
-                value: value,
-                activeColor: primaryGreen,
-              ),
+              child: Radio<PantryType>(value: value, activeColor: primaryGreen),
             ),
           ],
         ),

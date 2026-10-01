@@ -9,6 +9,10 @@ class HomeShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(body: child, bottomNavigationBar: const HomeBottomNav());
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: child,
+      bottomNavigationBar: const HomeBottomNav(),
+    );
   }
 }

@@ -82,12 +82,14 @@ class _PantryItemsScreenState extends ConsumerState<PantryItemsScreen> {
 
     final colorScheme = Theme.of(context).colorScheme;
 
+    final pageBackground = Theme.of(context).scaffoldBackgroundColor;
+
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: pageBackground,
       appBar: AppBar(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: pageBackground,
         foregroundColor: colorScheme.onSurface,
-        surfaceTintColor: colorScheme.surface,
+        surfaceTintColor: pageBackground,
         leading: IconButton(
           tooltip: 'Back',
           icon: const Icon(Icons.arrow_back),

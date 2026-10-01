@@ -106,17 +106,13 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
         ),
       );
 
-      context.push(
-        '${AppRoutes.sharedPantryMembers}?pantryId=$pantryId',
-      );
+      context.push('${AppRoutes.sharedPantryMembers}?pantryId=$pantryId');
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -162,17 +158,13 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
         ),
       );
 
-      context.push(
-        '${AppRoutes.sharedPantryMembers}?pantryId=$pantryId',
-      );
+      context.push('${AppRoutes.sharedPantryMembers}?pantryId=$pantryId');
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -190,9 +182,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
   // ============================================================
 
   Future<void> _copyInviteCode(String inviteCode) async {
-    await Clipboard.setData(
-      ClipboardData(text: inviteCode),
-    );
+    await Clipboard.setData(ClipboardData(text: inviteCode));
 
     if (!mounted) return;
 
@@ -209,14 +199,11 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
   // SHARE INVITE CODE
   // ============================================================
 
-  Future<void> _shareInviteCode(
-      String pantryName,
-      String inviteCode,
-      ) async {
+  Future<void> _shareInviteCode(String pantryName, String inviteCode) async {
     await SharePlus.instance.share(
       ShareParams(
         text:
-        'Join my PantryPal shared pantry!\n\n'
+            'Join my PantryPal shared pantry!\n\n'
             'Pantry: $pantryName\n'
             'Invite Code: $inviteCode\n\n'
             'Open PantryPal and use this code to join.',
@@ -234,12 +221,10 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text(
-            'Leave Shared Pantry?',
-          ),
+          title: const Text('Leave Shared Pantry?'),
           content: const Text(
             'You will no longer have access to this shared pantry. '
-                'You can join another pantry later using an invite code.',
+            'You can join another pantry later using an invite code.',
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
@@ -298,9 +283,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -333,10 +316,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
         scrolledUnderElevation: 0,
         leading: IconButton(
           onPressed: () => context.pop(),
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            size: 20,
-          ),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
           color: textDark,
         ),
         title: const Text(
@@ -351,98 +331,399 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
       ),
       body: SafeArea(
         child: _isLoadingPantry
-            ? const Center(
-          child: CircularProgressIndicator(
-            color: forest,
-          ),
-        )
+            ? const Center(child: CircularProgressIndicator(color: forest))
             : RefreshIndicator(
-          color: forest,
-          onRefresh: _loadCurrentPantry,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
-            ),
-            padding: const EdgeInsets.fromLTRB(
-              18,
-              6,
-              18,
-              36,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ==================================================
-                // HERO
-                // ==================================================
-
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFFEAF4EE),
-                        Color(0xFFDCEEE3),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(26),
-                    border: Border.all(
-                      color: Color(0xFFD5E7DC),
-                    ),
+                color: forest,
+                onRefresh: _loadCurrentPantry,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
                   ),
-                  child: Row(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                  padding: const EdgeInsets.fromLTRB(18, 6, 18, 36),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ==================================================
+                      // HERO
+                      // ==================================================
                       Container(
-                        width: 58,
-                        height: 58,
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius:
-                          BorderRadius.circular(18),
-                          boxShadow: [
-                            BoxShadow(
-                              color: darkForest.withValues(
-                                alpha: 0.08,
-                              ),
-                              blurRadius: 14,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFFEAF4EE), Color(0xFFDCEEE3)],
+                          ),
+                          borderRadius: BorderRadius.circular(26),
+                          border: Border.all(color: Color(0xFFD5E7DC)),
                         ),
-                        child: const Icon(
-                          Icons.groups_rounded,
-                          color: darkForest,
-                          size: 30,
-                        ),
-                      ),
-                      const SizedBox(width: 15),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Share your pantry',
-                              style: TextStyle(
+                            Container(
+                              width: 58,
+                              height: 58,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: darkForest.withValues(alpha: 0.08),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.groups_rounded,
                                 color: darkForest,
-                                fontSize: 20,
-                                fontWeight:
-                                FontWeight.w800,
-                                letterSpacing: -0.4,
+                                size: 30,
                               ),
                             ),
-                            SizedBox(height: 7),
+                            const SizedBox(width: 15),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Share your pantry',
+                                    style: TextStyle(
+                                      color: darkForest,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.4,
+                                    ),
+                                  ),
+                                  SizedBox(height: 7),
+                                  Text(
+                                    'Manage groceries together with your family, roommates, or household.',
+                                    style: TextStyle(
+                                      color: textGrey,
+                                      fontSize: 13,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 28),
+
+                      // ==================================================
+                      // EXISTING PANTRY
+                      // ==================================================
+                      if (_currentPantry != null)
+                        _buildExistingPantryCard(
+                          pantry: _currentPantry!,
+                          darkForest: darkForest,
+                          forest: forest,
+                          paleGreen: paleGreen,
+                          textDark: textDark,
+                          textGrey: textGrey,
+                          border: border,
+                        )
+                      else ...[
+                        // ==================================================
+                        // CREATE PANTRY
+                        // ==================================================
+                        const Text(
+                          'Create a Shared Pantry',
+                          style: TextStyle(
+                            color: textDark,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+
+                        const SizedBox(height: 6),
+
+                        const Text(
+                          'Start a pantry and invite your household members.',
+                          style: TextStyle(
+                            color: textGrey,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+
+                        const SizedBox(height: 15),
+
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(17),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(color: border),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.035),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Form(
+                            key: _createFormKey,
+                            child: Column(
+                              children: [
+                                TextFormField(
+                                  controller: _pantryNameController,
+                                  textCapitalization: TextCapitalization.words,
+                                  decoration: _inputDecoration(
+                                    label: 'Pantry name',
+                                    hint: 'e.g. Family Pantry',
+                                    icon: Icons.kitchen_rounded,
+                                    darkForest: darkForest,
+                                    paleGreen: paleGreen,
+                                    softGreen: softGreen,
+                                    border: border,
+                                    forest: forest,
+                                    textGrey: textGrey,
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Enter a pantry name.';
+                                    }
+
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 14),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 52,
+                                  child: FilledButton.icon(
+                                    onPressed: _isCreating
+                                        ? null
+                                        : _createPantry,
+                                    icon: _isCreating
+                                        ? const SizedBox(
+                                            width: 19,
+                                            height: 19,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.add_home_rounded,
+                                            size: 20,
+                                          ),
+                                    label: Text(
+                                      _isCreating
+                                          ? 'Creating Pantry...'
+                                          : 'Create Pantry',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: darkForest,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 27),
+
+                        // ==================================================
+                        // OR
+                        // ==================================================
+                        Row(
+                          children: [
+                            const Expanded(child: Divider(color: border)),
+                            Container(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: paleGreen,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text(
+                                'OR',
+                                style: TextStyle(
+                                  color: forest,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ),
+                            const Expanded(child: Divider(color: border)),
+                          ],
+                        ),
+
+                        const SizedBox(height: 27),
+
+                        // ==================================================
+                        // JOIN PANTRY
+                        // ==================================================
+                        const Text(
+                          'Join a Shared Pantry',
+                          style: TextStyle(
+                            color: textDark,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+
+                        const SizedBox(height: 6),
+
+                        const Text(
+                          'Use the invite code provided by your pantry owner.',
+                          style: TextStyle(
+                            color: textGrey,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+
+                        const SizedBox(height: 15),
+
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(17),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(color: border),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.035),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Form(
+                            key: _joinFormKey,
+                            child: Column(
+                              children: [
+                                TextFormField(
+                                  controller: _inviteCodeController,
+                                  textCapitalization:
+                                      TextCapitalization.characters,
+                                  maxLength: 6,
+                                  style: const TextStyle(
+                                    color: textDark,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 3,
+                                  ),
+                                  decoration: _inputDecoration(
+                                    label: 'Invite code',
+                                    hint: 'ABC123',
+                                    icon: Icons.key_rounded,
+                                    darkForest: darkForest,
+                                    paleGreen: paleGreen,
+                                    softGreen: softGreen,
+                                    border: border,
+                                    forest: forest,
+                                    textGrey: textGrey,
+                                  ).copyWith(counterText: ''),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Enter an invite code.';
+                                    }
+
+                                    if (value.trim().length != 6) {
+                                      return 'Invite code must be 6 characters.';
+                                    }
+
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 14),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 52,
+                                  child: OutlinedButton.icon(
+                                    onPressed: _isJoining ? null : _joinPantry,
+                                    icon: _isJoining
+                                        ? const SizedBox(
+                                            width: 19,
+                                            height: 19,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: forest,
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.group_add_rounded,
+                                            size: 20,
+                                          ),
+                                    label: Text(
+                                      _isJoining
+                                          ? 'Joining Pantry...'
+                                          : 'Join Pantry',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: darkForest,
+                                      side: const BorderSide(
+                                        color: forest,
+                                        width: 1.3,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        _buildInfoCard(
+                          darkForest: darkForest,
+                          forest: forest,
+                          paleGreen: paleGreen,
+                        ),
+                      ],
+
+                      const SizedBox(height: 22),
+
+                      Center(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(
+                              Icons.eco_rounded,
+                              size: 15,
+                              color: mediumForest,
+                            ),
+                            SizedBox(width: 6),
                             Text(
-                              'Manage groceries together with your family, roommates, or household.',
+                              'Plan together. Waste less.',
                               style: TextStyle(
-                                color: textGrey,
-                                fontSize: 13,
-                                height: 1.5,
+                                color: mediumForest,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
@@ -451,385 +732,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 28),
-
-                // ==================================================
-                // EXISTING PANTRY
-                // ==================================================
-
-                if (_currentPantry != null)
-                  _buildExistingPantryCard(
-                    pantry: _currentPantry!,
-                    darkForest: darkForest,
-                    forest: forest,
-                    paleGreen: paleGreen,
-                    textDark: textDark,
-                    textGrey: textGrey,
-                    border: border,
-                  )
-                else ...[
-                  // ==================================================
-                  // CREATE PANTRY
-                  // ==================================================
-
-                  const Text(
-                    'Create a Shared Pantry',
-                    style: TextStyle(
-                      color: textDark,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  const Text(
-                    'Start a pantry and invite your household members.',
-                    style: TextStyle(
-                      color: textGrey,
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(17),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius:
-                      BorderRadius.circular(22),
-                      border: Border.all(
-                        color: border,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(
-                            alpha: 0.035,
-                          ),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Form(
-                      key: _createFormKey,
-                      child: Column(
-                        children: [
-                          TextFormField(
-                            controller:
-                            _pantryNameController,
-                            textCapitalization:
-                            TextCapitalization.words,
-                            decoration: _inputDecoration(
-                              label: 'Pantry name',
-                              hint: 'e.g. Family Pantry',
-                              icon: Icons.kitchen_rounded,
-                              darkForest: darkForest,
-                              paleGreen: paleGreen,
-                              softGreen: softGreen,
-                              border: border,
-                              forest: forest,
-                              textGrey: textGrey,
-                            ),
-                            validator: (value) {
-                              if (value == null ||
-                                  value.trim().isEmpty) {
-                                return 'Enter a pantry name.';
-                              }
-
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 14),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: FilledButton.icon(
-                              onPressed: _isCreating
-                                  ? null
-                                  : _createPantry,
-                              icon: _isCreating
-                                  ? const SizedBox(
-                                width: 19,
-                                height: 19,
-                                child:
-                                CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                                  : const Icon(
-                                Icons.add_home_rounded,
-                                size: 20,
-                              ),
-                              label: Text(
-                                _isCreating
-                                    ? 'Creating Pantry...'
-                                    : 'Create Pantry',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight:
-                                  FontWeight.w700,
-                                ),
-                              ),
-                              style: FilledButton.styleFrom(
-                                backgroundColor:
-                                darkForest,
-                                foregroundColor:
-                                Colors.white,
-                                shape:
-                                RoundedRectangleBorder(
-                                  borderRadius:
-                                  BorderRadius.circular(
-                                    15,
-                                  ),
-                                ),
-                                elevation: 0,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 27),
-
-                  // ==================================================
-                  // OR
-                  // ==================================================
-
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Divider(
-                          color: border,
-                        ),
-                      ),
-                      Container(
-                        margin:
-                        const EdgeInsets.symmetric(
-                          horizontal: 14,
-                        ),
-                        padding:
-                        const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: paleGreen,
-                          borderRadius:
-                          BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'OR',
-                          style: TextStyle(
-                            color: forest,
-                            fontSize: 10,
-                            fontWeight:
-                            FontWeight.w800,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
-                      ),
-                      const Expanded(
-                        child: Divider(
-                          color: border,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 27),
-
-                  // ==================================================
-                  // JOIN PANTRY
-                  // ==================================================
-
-                  const Text(
-                    'Join a Shared Pantry',
-                    style: TextStyle(
-                      color: textDark,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  const Text(
-                    'Use the invite code provided by your pantry owner.',
-                    style: TextStyle(
-                      color: textGrey,
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(17),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius:
-                      BorderRadius.circular(22),
-                      border: Border.all(
-                        color: border,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(
-                            alpha: 0.035,
-                          ),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Form(
-                      key: _joinFormKey,
-                      child: Column(
-                        children: [
-                          TextFormField(
-                            controller:
-                            _inviteCodeController,
-                            textCapitalization:
-                            TextCapitalization.characters,
-                            maxLength: 6,
-                            style: const TextStyle(
-                              color: textDark,
-                              fontSize: 17,
-                              fontWeight:
-                              FontWeight.w800,
-                              letterSpacing: 3,
-                            ),
-                            decoration:
-                            _inputDecoration(
-                              label: 'Invite code',
-                              hint: 'ABC123',
-                              icon: Icons.key_rounded,
-                              darkForest: darkForest,
-                              paleGreen: paleGreen,
-                              softGreen: softGreen,
-                              border: border,
-                              forest: forest,
-                              textGrey: textGrey,
-                            ).copyWith(
-                              counterText: '',
-                            ),
-                            validator: (value) {
-                              if (value == null ||
-                                  value.trim().isEmpty) {
-                                return 'Enter an invite code.';
-                              }
-
-                              if (value.trim().length != 6) {
-                                return 'Invite code must be 6 characters.';
-                              }
-
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 14),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: OutlinedButton.icon(
-                              onPressed: _isJoining
-                                  ? null
-                                  : _joinPantry,
-                              icon: _isJoining
-                                  ? const SizedBox(
-                                width: 19,
-                                height: 19,
-                                child:
-                                CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: forest,
-                                ),
-                              )
-                                  : const Icon(
-                                Icons
-                                    .group_add_rounded,
-                                size: 20,
-                              ),
-                              label: Text(
-                                _isJoining
-                                    ? 'Joining Pantry...'
-                                    : 'Join Pantry',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight:
-                                  FontWeight.w700,
-                                ),
-                              ),
-                              style:
-                              OutlinedButton.styleFrom(
-                                foregroundColor:
-                                darkForest,
-                                side:
-                                const BorderSide(
-                                  color: forest,
-                                  width: 1.3,
-                                ),
-                                shape:
-                                RoundedRectangleBorder(
-                                  borderRadius:
-                                  BorderRadius.circular(
-                                    15,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  _buildInfoCard(
-                    darkForest: darkForest,
-                    forest: forest,
-                    paleGreen: paleGreen,
-                  ),
-                ],
-
-                const SizedBox(height: 22),
-
-                Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(
-                        Icons.eco_rounded,
-                        size: 15,
-                        color: mediumForest,
-                      ),
-                      SizedBox(width: 6),
-                      Text(
-                        'Plan together. Waste less.',
-                        style: TextStyle(
-                          color: mediumForest,
-                          fontSize: 11.5,
-                          fontWeight:
-                          FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+              ),
       ),
     );
   }
@@ -870,11 +773,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
         const SizedBox(height: 6),
         Text(
           'Manage your shared groceries and household members.',
-          style: TextStyle(
-            color: textGrey,
-            fontSize: 13,
-            height: 1.4,
-          ),
+          style: TextStyle(color: textGrey, fontSize: 13, height: 1.4),
         ),
         const SizedBox(height: 15),
         Container(
@@ -1033,14 +932,9 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                           child: OutlinedButton.icon(
                             onPressed: inviteCode.isEmpty
                                 ? null
-                                : () => _shareInviteCode(
-                              pantryName,
-                              inviteCode,
-                            ),
-                            icon: const Icon(
-                              Icons.ios_share_rounded,
-                              size: 17,
-                            ),
+                                : () =>
+                                      _shareInviteCode(pantryName, inviteCode),
+                            icon: const Icon(Icons.ios_share_rounded, size: 17),
                             label: const Text(
                               'Share Code',
                               style: TextStyle(
@@ -1050,10 +944,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                             ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: darkForest,
-                              side: BorderSide(
-                                color: darkForest,
-                                width: 1.1,
-                              ),
+                              side: BorderSide(color: darkForest, width: 1.1),
                               padding: const EdgeInsets.symmetric(vertical: 11),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -1069,11 +960,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
               const SizedBox(height: 8),
               Text(
                 'Share this code with household members so they can join this pantry.',
-                style: TextStyle(
-                  color: textGrey,
-                  fontSize: 11.5,
-                  height: 1.4,
-                ),
+                style: TextStyle(color: textGrey, fontSize: 11.5, height: 1.4),
               ),
               const SizedBox(height: 22),
               Row(
@@ -1107,10 +994,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                         const SizedBox(height: 2),
                         Text(
                           'People sharing this pantry',
-                          style: TextStyle(
-                            color: textGrey,
-                            fontSize: 11,
-                          ),
+                          style: TextStyle(color: textGrey, fontSize: 11),
                         ),
                       ],
                     ),
@@ -1143,10 +1027,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                           const SizedBox(width: 10),
                           Text(
                             'Loading members...',
-                            style: TextStyle(
-                              color: textGrey,
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(color: textGrey, fontSize: 12),
                           ),
                         ],
                       ),
@@ -1160,9 +1041,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFF5F4),
                         borderRadius: BorderRadius.circular(15),
-                        border: Border.all(
-                          color: const Color(0xFFE8C5C1),
-                        ),
+                        border: Border.all(color: const Color(0xFFE8C5C1)),
                       ),
                       child: const Text(
                         'Unable to load pantry members.',
@@ -1195,10 +1074,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                           const SizedBox(width: 9),
                           Text(
                             'No members found.',
-                            style: TextStyle(
-                              color: textGrey,
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(color: textGrey, fontSize: 12),
                           ),
                         ],
                       ),
@@ -1212,13 +1088,15 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                       ...visibleMembers.map((memberDoc) {
                         final memberData = memberDoc.data();
                         final memberName =
-                        memberData['name']?.toString().trim().isNotEmpty == true
+                            memberData['name']?.toString().trim().isNotEmpty ==
+                                true
                             ? memberData['name'].toString().trim()
                             : 'Pantry Member';
                         final memberEmail =
                             memberData['email']?.toString().trim() ?? '';
                         final role =
-                            memberData['role']?.toString().toLowerCase() ?? 'member';
+                            memberData['role']?.toString().toLowerCase() ??
+                            'member';
                         final memberIsOwner = role == 'owner';
                         final memberUid = memberData['uid']?.toString() ?? '';
                         final isCurrentUser =
@@ -1278,14 +1156,17 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                                         ),
                                         if (isCurrentUser)
                                           Container(
-                                            margin: const EdgeInsets.only(left: 6),
+                                            margin: const EdgeInsets.only(
+                                              left: 6,
+                                            ),
                                             padding: const EdgeInsets.symmetric(
                                               horizontal: 6,
                                               vertical: 3,
                                             ),
                                             decoration: BoxDecoration(
                                               color: paleGreen,
-                                              borderRadius: BorderRadius.circular(8),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
                                             child: Text(
                                               'YOU',
@@ -1320,7 +1201,9 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                                   vertical: 5,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: memberIsOwner ? paleGreen : Colors.white,
+                                  color: memberIsOwner
+                                      ? paleGreen
+                                      : Colors.white,
                                   borderRadius: BorderRadius.circular(9),
                                   border: Border.all(
                                     color: memberIsOwner ? paleGreen : border,
@@ -1329,7 +1212,9 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                                 child: Text(
                                   memberIsOwner ? 'OWNER' : 'MEMBER',
                                   style: TextStyle(
-                                    color: memberIsOwner ? darkForest : textGrey,
+                                    color: memberIsOwner
+                                        ? darkForest
+                                        : textGrey,
                                     fontSize: 8,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 0.3,
@@ -1371,10 +1256,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                   icon: const Icon(Icons.groups_rounded, size: 19),
                   label: const Text(
                     'View All Pantry Members',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                   ),
                   style: FilledButton.styleFrom(
                     backgroundColor: darkForest,
@@ -1400,11 +1282,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.verified_rounded,
-                        color: forest,
-                        size: 18,
-                      ),
+                      Icon(Icons.verified_rounded, color: forest, size: 18),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -1430,10 +1308,10 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                         : () => _leavePantry(pantry.id),
                     icon: _isLeaving
                         ? const SizedBox(
-                      width: 17,
-                      height: 17,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                            width: 17,
+                            height: 17,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         : const Icon(Icons.logout_rounded, size: 18),
                     label: Text(
                       _isLeaving ? 'Leaving Pantry...' : 'Leave Pantry',
@@ -1444,9 +1322,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFB42318),
-                      side: const BorderSide(
-                        color: Color(0xFFE5B7B3),
-                      ),
+                      side: const BorderSide(color: Color(0xFFE5B7B3)),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -1471,34 +1347,23 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 15,
-        vertical: 14,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
       decoration: BoxDecoration(
         color: paleGreen.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFD5E8DC),
-        ),
+        border: Border.all(color: const Color(0xFFD5E8DC)),
       ),
       child: Row(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 30,
             height: 30,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius:
-              BorderRadius.circular(9),
+              borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(
-              Icons.info_outline_rounded,
-              color: forest,
-              size: 17,
-            ),
+            child: Icon(Icons.info_outline_rounded, color: forest, size: 17),
           ),
 
           const SizedBox(width: 10),
@@ -1506,12 +1371,8 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
           Expanded(
             child: Text(
               'Each shared pantry has a unique 6-character invite code. '
-                  'Share it only with the people you want to add.',
-              style: TextStyle(
-                color: darkForest,
-                fontSize: 11.5,
-                height: 1.45,
-              ),
+              'Share it only with the people you want to add.',
+              style: TextStyle(color: darkForest, fontSize: 11.5, height: 1.45),
             ),
           ),
         ],
@@ -1543,54 +1404,33 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
         child: Container(
           decoration: BoxDecoration(
             color: paleGreen,
-            borderRadius:
-            BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(
-            icon,
-            color: darkForest,
-            size: 19,
-          ),
+          child: Icon(icon, color: darkForest, size: 19),
         ),
       ),
 
       filled: true,
       fillColor: softGreen,
 
-      contentPadding:
-      const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 16,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
 
       border: OutlineInputBorder(
-        borderRadius:
-        BorderRadius.circular(15),
-        borderSide: BorderSide(
-          color: border,
-        ),
+        borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide(color: border),
       ),
 
       enabledBorder: OutlineInputBorder(
-        borderRadius:
-        BorderRadius.circular(15),
-        borderSide: BorderSide(
-          color: border,
-        ),
+        borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide(color: border),
       ),
 
       focusedBorder: OutlineInputBorder(
-        borderRadius:
-        BorderRadius.circular(15),
-        borderSide: BorderSide(
-          color: forest,
-          width: 1.5,
-        ),
+        borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide(color: forest, width: 1.5),
       ),
 
-      labelStyle: TextStyle(
-        color: textGrey,
-      ),
+      labelStyle: TextStyle(color: textGrey),
     );
   }
 }

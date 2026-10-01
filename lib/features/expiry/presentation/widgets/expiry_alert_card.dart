@@ -1,93 +1,90 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../pantry/domain/utils/expiry_status.dart';
 
 class ExpiryAlertCard extends StatelessWidget {
-  final String name;
-  final String quantity;
-  final String message;
-  final String priority;
-
-  final VoidCallback onUpdate;
-  final VoidCallback onStopTracking;
-
   const ExpiryAlertCard({
     super.key,
-
     required this.name,
     required this.quantity,
     required this.message,
-    required this.priority,
-
+    required this.status,
+    this.badgeText,
     required this.onUpdate,
     required this.onStopTracking,
   });
 
+  final String name;
+  final String quantity;
+  final String message;
+  final ExpiryStatus status;
+
+  /// Replaces the status badge text when a section needs its own label.
+  final String? badgeText;
+  final VoidCallback onUpdate;
+  final VoidCallback onStopTracking;
+
   @override
   Widget build(BuildContext context) {
-    Color color;
-
-    switch (priority) {
-      case "critical":
-        color = AppColors.statusRed;
-        break;
-
-      case "high":
-        color = AppColors.statusOrange;
-        break;
-
-      default:
-        color = AppColors.statusAmber;
-    }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final statusColor = status.foregroundColorFor(colorScheme);
+    final cardColor = isDark
+        ? colorScheme.surfaceContainerHighest
+        : FreshPalette.card;
 
     return Container(
       padding: const EdgeInsets.all(15),
-
       margin: const EdgeInsets.only(bottom: 12),
-
       decoration: BoxDecoration(
-        color: Colors.white,
-
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: colorScheme.outline),
       ),
-
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.warning_amber, color: color),
-
+          Icon(status.icon, color: statusColor),
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-
               children: [
-                Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-
-                Text(quantity),
-
+                Text(
+                  name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(quantity, style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 5),
-
+                Text(
+                  badgeText ?? status.badgeLabel,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: statusColor,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
                 Text(
                   message,
-
-                  style: TextStyle(color: color, fontWeight: FontWeight.w600),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: statusColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-
-                Row(
+                Wrap(
+                  spacing: 4,
                   children: [
                     TextButton(
                       onPressed: onUpdate,
-
-                      child: const Text("Update"),
+                      child: const Text('Update'),
                     ),
-
                     TextButton(
                       onPressed: onStopTracking,
-
-                      child: const Text("Stop Tracking"),
+                      child: const Text('Stop Tracking'),
                     ),
                   ],
                 ),

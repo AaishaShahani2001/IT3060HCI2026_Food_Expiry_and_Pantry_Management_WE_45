@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
 import '../../domain/repositories/expiry_repository.dart';
 import '../../domain/services/expiry_notification_provider.dart';
@@ -104,8 +106,22 @@ class _EditExpiryTrackingScreenState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final backgroundColor = featurePageBackground(context);
+    final headingColor = isDark ? colorScheme.onSurface : FreshPalette.heading;
+
     return Scaffold(
-      appBar: AppBar(title: Text('Update ${widget.alert.itemName}')),
+      backgroundColor: backgroundColor,
+      appBar: AppBar(
+        backgroundColor: backgroundColor,
+        foregroundColor: headingColor,
+        title: Text(
+          'Update ${widget.alert.itemName}',
+          style: TextStyle(color: headingColor, fontWeight: FontWeight.bold),
+        ),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),

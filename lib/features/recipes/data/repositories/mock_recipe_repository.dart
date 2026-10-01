@@ -3,9 +3,7 @@ import '../../domain/repositories/recipe_repository.dart';
 
 class MockRecipeRepository implements RecipeRepository {
   MockRecipeRepository({List<Recipe>? initialRecipes})
-      : _recipes = List<Recipe>.from(
-    initialRecipes ?? _seedRecipes,
-  );
+    : _recipes = List<Recipe>.from(initialRecipes ?? _seedRecipes);
 
   final List<Recipe> _recipes;
 
@@ -15,14 +13,10 @@ class MockRecipeRepository implements RecipeRepository {
     Recipe(
       id: '1',
       name: 'Vegetable Fried Rice',
-      description:
-      'A quick fried rice using fresh vegetables and cooked rice.',
+      description: 'A quick fried rice using fresh vegetables and cooked rice.',
       category: RecipeCategory.lunch,
       preparationTime: 25,
-      tags: [
-        'vegetarian',
-        'high-protein',
-      ],
+      tags: ['vegetarian', 'high-protein'],
       ingredients: [
         'Cooked rice',
         'Carrot',
@@ -44,14 +38,10 @@ class MockRecipeRepository implements RecipeRepository {
     Recipe(
       id: '2',
       name: 'Chicken Rice Bowl',
-      description:
-      'A simple chicken and rice meal for a filling dinner.',
+      description: 'A simple chicken and rice meal for a filling dinner.',
       category: RecipeCategory.dinner,
       preparationTime: 35,
-      tags: [
-        'non-vegetarian',
-        'high-protein',
-      ],
+      tags: ['non-vegetarian', 'high-protein'],
       ingredients: [
         'Chicken',
         'Rice',
@@ -72,19 +62,11 @@ class MockRecipeRepository implements RecipeRepository {
     Recipe(
       id: '3',
       name: 'Apple Yogurt Bowl',
-      description:
-      'A quick and healthy breakfast using apples and yogurt.',
+      description: 'A quick and healthy breakfast using apples and yogurt.',
       category: RecipeCategory.breakfast,
       preparationTime: 10,
-      tags: [
-        'vegetarian',
-      ],
-      ingredients: [
-        'Apples',
-        'Yogurt',
-        'Honey',
-        'Granola',
-      ],
+      tags: ['vegetarian'],
+      ingredients: ['Apples', 'Yogurt', 'Honey', 'Granola'],
       instructions: [
         'Wash and slice the apples.',
         'Add yogurt to a bowl.',
@@ -97,13 +79,10 @@ class MockRecipeRepository implements RecipeRepository {
     Recipe(
       id: '4',
       name: 'Creamy Spinach Pasta',
-      description:
-      'A simple pasta dish with creamy spinach sauce.',
+      description: 'A simple pasta dish with creamy spinach sauce.',
       category: RecipeCategory.dinner,
       preparationTime: 30,
-      tags: [
-        'vegetarian',
-      ],
+      tags: ['vegetarian'],
       ingredients: [
         'Pasta',
         'Spinach',
@@ -125,20 +104,11 @@ class MockRecipeRepository implements RecipeRepository {
     Recipe(
       id: '5',
       name: 'Fresh Fruit Snack',
-      description:
-      'A quick snack made from available fresh fruits.',
+      description: 'A quick snack made from available fresh fruits.',
       category: RecipeCategory.snack,
       preparationTime: 5,
-      tags: [
-        'vegetarian',
-        'vegan',
-        'low-carb',
-      ],
-      ingredients: [
-        'Apples',
-        'Banana',
-        'Orange',
-      ],
+      tags: ['vegetarian', 'vegan', 'low-carb'],
+      ingredients: ['Apples', 'Banana', 'Orange'],
       instructions: [
         'Wash all fruits thoroughly.',
         'Peel and cut the fruits into small pieces.',
@@ -150,20 +120,11 @@ class MockRecipeRepository implements RecipeRepository {
     Recipe(
       id: '6',
       name: 'Vegetable Sandwich',
-      description:
-      'A quick sandwich using vegetables and cheese.',
+      description: 'A quick sandwich using vegetables and cheese.',
       category: RecipeCategory.snack,
       preparationTime: 15,
-      tags: [
-        'vegetarian',
-      ],
-      ingredients: [
-        'Bread',
-        'Tomato',
-        'Spinach',
-        'Cheese',
-        'Olive oil',
-      ],
+      tags: ['vegetarian'],
+      ingredients: ['Bread', 'Tomato', 'Spinach', 'Cheese', 'Olive oil'],
       instructions: [
         'Slice the vegetables.',
         'Place cheese and vegetables between two slices of bread.',
@@ -175,18 +136,14 @@ class MockRecipeRepository implements RecipeRepository {
 
   @override
   Future<List<Recipe>> fetchRecipes() async {
-    await Future<void>.delayed(
-      const Duration(milliseconds: 500),
-    );
+    await Future<void>.delayed(const Duration(milliseconds: 500));
 
     return List<Recipe>.from(_recipes);
   }
 
   @override
   Future<Recipe> addRecipe(Recipe recipe) async {
-    await Future<void>.delayed(
-      const Duration(milliseconds: 300),
-    );
+    await Future<void>.delayed(const Duration(milliseconds: 300));
 
     final newRecipe = recipe.copyWith(
       id: recipe.id.isEmpty ? '${++_idCounter}' : recipe.id,
@@ -199,13 +156,9 @@ class MockRecipeRepository implements RecipeRepository {
 
   @override
   Future<Recipe> updateRecipe(Recipe recipe) async {
-    await Future<void>.delayed(
-      const Duration(milliseconds: 300),
-    );
+    await Future<void>.delayed(const Duration(milliseconds: 300));
 
-    final index = _recipes.indexWhere(
-          (entry) => entry.id == recipe.id,
-    );
+    final index = _recipes.indexWhere((entry) => entry.id == recipe.id);
 
     if (index == -1) {
       throw StateError('Recipe not found.');
@@ -218,12 +171,8 @@ class MockRecipeRepository implements RecipeRepository {
 
   @override
   Future<void> deleteRecipe(String id) async {
-    await Future<void>.delayed(
-      const Duration(milliseconds: 250),
-    );
+    await Future<void>.delayed(const Duration(milliseconds: 250));
 
-    _recipes.removeWhere(
-          (recipe) => recipe.id == id,
-    );
+    _recipes.removeWhere((recipe) => recipe.id == id);
   }
 }
