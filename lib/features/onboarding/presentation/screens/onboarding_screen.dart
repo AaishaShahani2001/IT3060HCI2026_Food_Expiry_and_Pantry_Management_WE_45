@@ -57,12 +57,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(onboardingPageIndexProvider);
-    final isLastPage =
-        currentIndex == OnboardingData.items.length - 1;
+    final isLastPage = currentIndex == OnboardingData.items.length - 1;
 
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark =
-        Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Background for each onboarding page
     const backgroundImages = [
@@ -82,7 +80,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           // ============================================================
           // ONBOARDING BACKGROUND
           // ============================================================
-
           Image.asset(
             backgroundImages[currentIndex],
             fit: BoxFit.cover,
@@ -92,21 +89,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           // ============================================================
           // EXISTING ONBOARDING UI
           // ============================================================
-
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                24,
-                4,
-                24,
-                20,
-              ),
+              padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
               child: Column(
                 children: [
                   // ==================================================
                   // SKIP
                   // ==================================================
-
                   SizedBox(
                     height: 44,
                     child: Align(
@@ -114,28 +104,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       child: isLastPage
                           ? const SizedBox.shrink()
                           : TextButton(
-                        onPressed: _goLogin,
-                        child: const Text(
-                          AppStrings.skip,
-                        ),
-                      ),
+                              onPressed: _goLogin,
+                              child: const Text(AppStrings.skip),
+                            ),
                     ),
                   ),
 
                   // ==================================================
                   // ONBOARDING CONTENT
                   // ==================================================
-
                   Expanded(
                     child: PageView.builder(
                       controller: _pageController,
                       itemCount: OnboardingData.items.length,
                       onPageChanged: (index) {
                         ref
-                            .read(
-                          onboardingPageIndexProvider
-                              .notifier,
-                        )
+                            .read(onboardingPageIndexProvider.notifier)
                             .setPage(index);
                       },
                       itemBuilder: (context, index) {
@@ -149,7 +133,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   // ==================================================
                   // PAGE INDICATOR
                   // ==================================================
-
                   const SizedBox(height: 16),
 
                   PageIndicator(
@@ -160,14 +143,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   // ==================================================
                   // NEXT / GET STARTED
                   // ==================================================
-
                   const SizedBox(height: 22),
 
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed:
-                      isLastPage ? _goLogin : _onNext,
+                      onPressed: isLastPage ? _goLogin : _onNext,
                       style: FilledButton.styleFrom(
                         backgroundColor: isDark
                             ? colorScheme.primary
@@ -175,12 +156,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         foregroundColor: isDark
                             ? colorScheme.onPrimary
                             : FreshPalette.card,
-                        minimumSize:
-                        const Size.fromHeight(54),
+                        minimumSize: const Size.fromHeight(54),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                          BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                         textStyle: const TextStyle(
                           fontSize: 16,
@@ -188,9 +167,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         ),
                       ),
                       child: Text(
-                        isLastPage
-                            ? AppStrings.getStarted
-                            : AppStrings.next,
+                        isLastPage ? AppStrings.getStarted : AppStrings.next,
                       ),
                     ),
                   ),

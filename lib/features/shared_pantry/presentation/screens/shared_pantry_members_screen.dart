@@ -8,18 +8,14 @@ import '../../data/shared_pantry_service.dart';
 class SharedPantryMembersScreen extends StatefulWidget {
   final String pantryId;
 
-  const SharedPantryMembersScreen({
-    super.key,
-    required this.pantryId,
-  });
+  const SharedPantryMembersScreen({super.key, required this.pantryId});
 
   @override
   State<SharedPantryMembersScreen> createState() =>
       _SharedPantryMembersScreenState();
 }
 
-class _SharedPantryMembersScreenState
-    extends State<SharedPantryMembersScreen> {
+class _SharedPantryMembersScreenState extends State<SharedPantryMembersScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   bool _isLeaving = false;
@@ -34,8 +30,7 @@ class _SharedPantryMembersScreenState
 
   Future<void> _loadPantry() async {
     try {
-      final pantry =
-      await SharedPantryService.instance.getPantry(
+      final pantry = await SharedPantryService.instance.getPantry(
         widget.pantryId,
       );
 
@@ -48,11 +43,7 @@ class _SharedPantryMembersScreenState
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
-        ),
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
     }
   }
@@ -65,9 +56,7 @@ class _SharedPantryMembersScreenState
     final pantryData = _pantry?.data();
 
     if (pantryData?['ownerId'] == user.uid) {
-      _showMessage(
-        'The pantry owner cannot leave the pantry.',
-      );
+      _showMessage('The pantry owner cannot leave the pantry.');
       return;
     }
 
@@ -78,7 +67,7 @@ class _SharedPantryMembersScreenState
           title: const Text('Leave pantry?'),
           content: const Text(
             'Are you sure you want to leave this shared pantry? '
-                'You will no longer be able to access its members or pantry items.',
+            'You will no longer be able to access its members or pantry items.',
           ),
           actions: [
             TextButton(
@@ -105,27 +94,19 @@ class _SharedPantryMembersScreenState
     });
 
     try {
-      await SharedPantryService.instance.leavePantry(
-        widget.pantryId,
-      );
+      await SharedPantryService.instance.leavePantry(widget.pantryId);
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'You left the shared pantry.',
-          ),
-        ),
+        const SnackBar(content: Text('You left the shared pantry.')),
       );
 
       context.pop();
     } catch (e) {
       if (!mounted) return;
 
-      _showMessage(
-        e.toString().replaceFirst('Exception: ', ''),
-      );
+      _showMessage(e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) {
         setState(() {
@@ -136,16 +117,12 @@ class _SharedPantryMembersScreenState
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  String _memberName(
-      Map<String, dynamic> data,
-      ) {
+  String _memberName(Map<String, dynamic> data) {
     final name = data['name'];
 
     if (name is String && name.trim().isNotEmpty) {
@@ -161,9 +138,7 @@ class _SharedPantryMembersScreenState
     return 'Pantry member';
   }
 
-  String _memberEmail(
-      Map<String, dynamic> data,
-      ) {
+  String _memberEmail(Map<String, dynamic> data) {
     final email = data['email'];
 
     if (email is String && email.trim().isNotEmpty) {
@@ -173,9 +148,7 @@ class _SharedPantryMembersScreenState
     return '';
   }
 
-  String _memberRole(
-      Map<String, dynamic> data,
-      ) {
+  String _memberRole(Map<String, dynamic> data) {
     final role = data['role'];
 
     if (role is String && role.trim().isNotEmpty) {
@@ -185,10 +158,7 @@ class _SharedPantryMembersScreenState
     return 'member';
   }
 
-  Widget _memberAvatar({
-    required String name,
-    required bool isOwner,
-  }) {
+  Widget _memberAvatar({required String name, required bool isOwner}) {
     const primaryGreen = Color(0xFF2E6B4E);
     const lightGreen = Color(0xFFEAF4EE);
 
@@ -200,9 +170,7 @@ class _SharedPantryMembersScreenState
       width: 48,
       height: 48,
       decoration: BoxDecoration(
-        color: isOwner
-            ? primaryGreen
-            : lightGreen,
+        color: isOwner ? primaryGreen : lightGreen,
         shape: BoxShape.circle,
       ),
       child: Center(
@@ -211,9 +179,7 @@ class _SharedPantryMembersScreenState
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
-            color: isOwner
-                ? Colors.white
-                : primaryGreen,
+            color: isOwner ? Colors.white : primaryGreen,
           ),
         ),
       ),
@@ -226,14 +192,9 @@ class _SharedPantryMembersScreenState
     final isOwner = role.toLowerCase() == 'owner';
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 5,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: isOwner
-            ? const Color(0xFFEAF4EE)
-            : const Color(0xFFF1F3F2),
+        color: isOwner ? const Color(0xFFEAF4EE) : const Color(0xFFF1F3F2),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -241,17 +202,13 @@ class _SharedPantryMembersScreenState
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: isOwner
-              ? primaryGreen
-              : const Color(0xFF6B7280),
+          color: isOwner ? primaryGreen : const Color(0xFF6B7280),
         ),
       ),
     );
   }
 
-  Widget _buildMemberCard(
-      QueryDocumentSnapshot<Map<String, dynamic>> member,
-      ) {
+  Widget _buildMemberCard(QueryDocumentSnapshot<Map<String, dynamic>> member) {
     const primaryGreen = Color(0xFF2E6B4E);
     const textDark = Color(0xFF1F2933);
     const textGrey = Color(0xFF6B7280);
@@ -269,21 +226,15 @@ class _SharedPantryMembersScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFE3E9E6),
-        ),
+        border: Border.all(color: const Color(0xFFE3E9E6)),
       ),
       child: Row(
         children: [
-          _memberAvatar(
-            name: name,
-            isOwner: isOwner,
-          ),
+          _memberAvatar(name: name, isOwner: isOwner),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
@@ -291,8 +242,7 @@ class _SharedPantryMembersScreenState
                       child: Text(
                         name,
                         maxLines: 1,
-                        overflow:
-                        TextOverflow.ellipsis,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -300,8 +250,7 @@ class _SharedPantryMembersScreenState
                         ),
                       ),
                     ),
-                    if (member.id ==
-                        _auth.currentUser?.uid) ...[
+                    if (member.id == _auth.currentUser?.uid) ...[
                       const SizedBox(width: 6),
                       const Text(
                         '(You)',
@@ -320,10 +269,7 @@ class _SharedPantryMembersScreenState
                     email,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: textGrey,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: textGrey),
                   ),
                 ],
                 const SizedBox(height: 7),
@@ -337,20 +283,13 @@ class _SharedPantryMembersScreenState
   }
 
   Widget _buildMembersList() {
-    return StreamBuilder<
-        QuerySnapshot<Map<String, dynamic>>>(
-      stream: SharedPantryService.instance
-          .getMembers(widget.pantryId),
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: SharedPantryService.instance.getMembers(widget.pantryId),
       builder: (context, snapshot) {
-        if (snapshot.connectionState ==
-            ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
-            padding: EdgeInsets.symmetric(
-              vertical: 40,
-            ),
-            child: Center(
-              child: CircularProgressIndicator(),
-            ),
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(child: CircularProgressIndicator()),
           );
         }
 
@@ -361,9 +300,7 @@ class _SharedPantryMembersScreenState
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFFE3E9E6),
-              ),
+              border: Border.all(color: const Color(0xFFE3E9E6)),
             ),
             child: const Column(
               children: [
@@ -376,18 +313,14 @@ class _SharedPantryMembersScreenState
                 Text(
                   'Unable to load pantry members.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ],
             ),
           );
         }
 
-        final members =
-            snapshot.data?.docs ?? [];
+        final members = snapshot.data?.docs ?? [];
 
         if (members.isEmpty) {
           return Container(
@@ -396,17 +329,11 @@ class _SharedPantryMembersScreenState
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFFE3E9E6),
-              ),
+              border: Border.all(color: const Color(0xFFE3E9E6)),
             ),
             child: const Column(
               children: [
-                Icon(
-                  Icons.group_outlined,
-                  size: 44,
-                  color: Color(0xFF2E6B4E),
-                ),
+                Icon(Icons.group_outlined, size: 44, color: Color(0xFF2E6B4E)),
                 SizedBox(height: 10),
                 Text(
                   'No members yet.',
@@ -420,21 +347,14 @@ class _SharedPantryMembersScreenState
                 Text(
                   'Share the invite code to add people to this pantry.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF6B7280),
-                  ),
+                  style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
                 ),
               ],
             ),
           );
         }
 
-        return Column(
-          children: members
-              .map(_buildMemberCard)
-              .toList(),
-        );
+        return Column(children: members.map(_buildMemberCard).toList());
       },
     );
   }
@@ -449,28 +369,18 @@ class _SharedPantryMembersScreenState
 
     final pantryData = _pantry?.data();
 
-    final pantryName =
-        pantryData?['name']?.toString() ??
-            'Shared Pantry';
+    final pantryName = pantryData?['name']?.toString() ?? 'Shared Pantry';
 
-    final inviteCode =
-        pantryData?['inviteCode']?.toString() ??
-            '';
+    final inviteCode = pantryData?['inviteCode']?.toString() ?? '';
 
-    final currentUser =
-        _auth.currentUser;
+    final currentUser = _auth.currentUser;
 
-    final isOwner =
-        pantryData?['ownerId'] ==
-            currentUser?.uid;
+    final isOwner = pantryData?['ownerId'] == currentUser?.uid;
 
     return Scaffold(
-      backgroundColor:
-      const Color(0xFFF7FAF8),
+      backgroundColor: const Color(0xFFF7FAF8),
       appBar: AppBar(
-        title: const Text(
-          'Shared Pantry Members',
-        ),
+        title: const Text('Shared Pantry Members'),
         backgroundColor: Colors.white,
         foregroundColor: textDark,
         elevation: 0,
@@ -478,20 +388,17 @@ class _SharedPantryMembersScreenState
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // =====================================================
             // PANTRY HEADER
             // =====================================================
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: lightGreen,
-                borderRadius:
-                BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(18),
               ),
               child: Row(
                 children: [
@@ -500,8 +407,7 @@ class _SharedPantryMembersScreenState
                     height: 54,
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius:
-                      BorderRadius.circular(15),
+                      borderRadius: BorderRadius.circular(15),
                     ),
                     child: const Icon(
                       Icons.groups_rounded,
@@ -512,26 +418,20 @@ class _SharedPantryMembersScreenState
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
                           'Shared Pantry',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: textGrey,
-                          ),
+                          style: TextStyle(fontSize: 13, color: textGrey),
                         ),
                         const SizedBox(height: 3),
                         Text(
                           pantryName,
                           maxLines: 1,
-                          overflow:
-                          TextOverflow.ellipsis,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 21,
-                            fontWeight:
-                            FontWeight.w800,
+                            fontWeight: FontWeight.w800,
                             color: darkGreen,
                           ),
                         ),
@@ -547,7 +447,6 @@ class _SharedPantryMembersScreenState
             // =====================================================
             // INVITE CODE
             // =====================================================
-
             const Text(
               'Invite members',
               style: TextStyle(
@@ -561,11 +460,7 @@ class _SharedPantryMembersScreenState
 
             const Text(
               'Share this code with family or household members to let them join your pantry.',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.4,
-                color: textGrey,
-              ),
+              style: TextStyle(fontSize: 13, height: 1.4, color: textGrey),
             ),
 
             const SizedBox(height: 14),
@@ -575,11 +470,8 @@ class _SharedPantryMembersScreenState
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius:
-                BorderRadius.circular(16),
-                border: Border.all(
-                  color: primaryGreen,
-                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: primaryGreen),
               ),
               child: Column(
                 children: [
@@ -594,9 +486,7 @@ class _SharedPantryMembersScreenState
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    inviteCode.isEmpty
-                        ? '------'
-                        : inviteCode,
+                    inviteCode.isEmpty ? '------' : inviteCode,
                     style: const TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.w900,
@@ -613,7 +503,6 @@ class _SharedPantryMembersScreenState
             // =====================================================
             // MEMBERS
             // =====================================================
-
             Row(
               children: [
                 const Expanded(
@@ -621,48 +510,32 @@ class _SharedPantryMembersScreenState
                     'Pantry members',
                     style: TextStyle(
                       fontSize: 18,
-                      fontWeight:
-                      FontWeight.w800,
+                      fontWeight: FontWeight.w800,
                       color: textDark,
                     ),
                   ),
                 ),
-                StreamBuilder<
-                    QuerySnapshot<
-                        Map<String, dynamic>>>(
-                  stream:
-                  SharedPantryService
-                      .instance
-                      .getMembers(
+                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: SharedPantryService.instance.getMembers(
                     widget.pantryId,
                   ),
-                  builder:
-                      (context, snapshot) {
-                    final count =
-                        snapshot.data?.docs.length ??
-                            0;
+                  builder: (context, snapshot) {
+                    final count = snapshot.data?.docs.length ?? 0;
 
                     return Container(
-                      padding:
-                      const EdgeInsets.symmetric(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: 10,
                         vertical: 5,
                       ),
-                      decoration:
-                      BoxDecoration(
+                      decoration: BoxDecoration(
                         color: lightGreen,
-                        borderRadius:
-                        BorderRadius.circular(
-                          20,
-                        ),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         '$count ${count == 1 ? 'member' : 'members'}',
-                        style:
-                        const TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
-                          fontWeight:
-                          FontWeight.w700,
+                          fontWeight: FontWeight.w700,
                           color: primaryGreen,
                         ),
                       ),
@@ -681,15 +554,13 @@ class _SharedPantryMembersScreenState
             // =====================================================
             // OWNER INFORMATION
             // =====================================================
-
             if (isOwner)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: lightGreen,
-                  borderRadius:
-                  BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Row(
                   children: [
@@ -703,8 +574,7 @@ class _SharedPantryMembersScreenState
                         'You are the owner of this pantry.',
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight:
-                          FontWeight.w600,
+                          fontWeight: FontWeight.w600,
                           color: darkGreen,
                         ),
                       ),
@@ -718,46 +588,25 @@ class _SharedPantryMembersScreenState
             // =====================================================
             // LEAVE PANTRY
             // =====================================================
-
             if (!isOwner)
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: _isLeaving
-                      ? null
-                      : _leavePantry,
+                  onPressed: _isLeaving ? null : _leavePantry,
                   icon: _isLeaving
                       ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child:
-                    CircularProgressIndicator(
-                      strokeWidth: 2,
-                    ),
-                  )
-                      : const Icon(
-                    Icons.logout_rounded,
-                  ),
-                  label: Text(
-                    _isLeaving
-                        ? 'Leaving...'
-                        : 'Leave Pantry',
-                  ),
-                  style:
-                  OutlinedButton.styleFrom(
-                    foregroundColor:
-                    const Color(0xFFD64545),
-                    side: const BorderSide(
-                      color: Color(0xFFD64545),
-                    ),
-                    padding:
-                    const EdgeInsets.symmetric(
-                      vertical: 14,
-                    ),
-                    shape:
-                    RoundedRectangleBorder(
-                      borderRadius:
-                      BorderRadius.circular(12),
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.logout_rounded),
+                  label: Text(_isLeaving ? 'Leaving...' : 'Leave Pantry'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFD64545),
+                    side: const BorderSide(color: Color(0xFFD64545)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),

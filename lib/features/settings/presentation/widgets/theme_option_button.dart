@@ -22,9 +22,7 @@ class ThemeOptionButton extends StatelessWidget {
     final background = selected
         ? colorScheme.primary
         : colorScheme.surfaceContainerHighest;
-    final foreground = selected
-        ? colorScheme.onPrimary
-        : colorScheme.onSurface;
+    final foreground = selected ? colorScheme.onPrimary : colorScheme.onSurface;
 
     return Material(
       color: background,

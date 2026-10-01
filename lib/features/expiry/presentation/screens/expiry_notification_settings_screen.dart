@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../domain/services/expiry_notification_provider.dart';
 import '../providers/expiry_notification_settings_provider.dart';
 
@@ -83,18 +85,29 @@ class _ExpiryNotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final backgroundColor = featurePageBackground(context);
+    final headingColor = isDark ? colorScheme.onSurface : FreshPalette.heading;
 
     return Scaffold(
+      backgroundColor: backgroundColor,
       appBar: AppBar(
         elevation: 0,
+        backgroundColor: backgroundColor,
+        foregroundColor: headingColor,
         leading: IconButton(
           onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: headingColor),
         ),
-        title: const Text(
+        title: Text(
           'Expiry Notifications',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: headingColor,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
       body: SafeArea(

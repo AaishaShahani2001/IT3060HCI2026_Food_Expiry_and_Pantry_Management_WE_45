@@ -21,12 +21,10 @@ class _SplashScreenState extends State<SplashScreen>
   static const _navigationDelay = Duration(milliseconds: 2500);
 
   // Background image WITHOUT logo
-  static const _backgroundAsset =
-      'assets/images/pantrypal_splash.png';
+  static const _backgroundAsset = 'assets/images/pantrypal_splash.png';
 
   // PantryPal logo
-  static const _logoAsset =
-      'assets/images/HCI_LOGO.png';
+  static const _logoAsset = 'assets/images/HCI_LOGO.png';
 
   late final AnimationController _controller;
   late final Animation<double> _fadeAnimation;
@@ -106,7 +104,6 @@ class _SplashScreenState extends State<SplashScreen>
                 // =====================================================
                 // BACKGROUND
                 // =====================================================
-
                 Image.asset(
                   _backgroundAsset,
                   fit: BoxFit.cover,
@@ -117,7 +114,6 @@ class _SplashScreenState extends State<SplashScreen>
                 // =====================================================
                 // PANTRYPAL LOGO
                 // =====================================================
-
                 Center(
                   child: FractionallySizedBox(
                     widthFactor: 0.62,

@@ -34,8 +34,10 @@ class SettingsScreen extends ConsumerWidget {
 
     final email = ref.watch(settingsUserEmailProvider);
 
+    final pageBackground = Theme.of(context).scaffoldBackgroundColor;
+
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: pageBackground,
 
       appBar: AppBar(
         title: Text(
@@ -45,7 +47,7 @@ class SettingsScreen extends ConsumerWidget {
             color: colorScheme.onSurface,
           ),
         ),
-        backgroundColor: colorScheme.surface,
+        backgroundColor: pageBackground,
         foregroundColor: colorScheme.onSurface,
         elevation: 0,
         scrolledUnderElevation: 0,

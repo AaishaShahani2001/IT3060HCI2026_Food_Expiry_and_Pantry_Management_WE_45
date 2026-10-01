@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
 
+// Keep feature pages cream in light mode while allowing the dark
+// theme to provide its own accessible surface colour.
+Color featurePageBackground(BuildContext context) {
+  return Theme.of(context).scaffoldBackgroundColor;
+}
+
 abstract final class AppTheme {
   static ThemeData get light {
     final colorScheme = ColorScheme.fromSeed(
@@ -36,7 +42,7 @@ abstract final class AppTheme {
 
     return _buildTheme(
       colorScheme: colorScheme,
-      scaffoldBackground: FreshPalette.pageBackground,
+      scaffoldBackground: AppColors.cream,
       headlineColor: FreshPalette.heading,
       bodyColor: FreshPalette.secondaryText,
       textButtonColor: FreshPalette.selected,

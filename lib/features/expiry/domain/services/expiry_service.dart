@@ -1,6 +1,22 @@
 import '../../../pantry/domain/models/pantry_item.dart';
 import '../../../pantry/domain/utils/expiry_status.dart';
 
+class ExpiryPriorityGroups {
+  const ExpiryPriorityGroups({
+    required this.useFirst,
+    required this.expiringSoon,
+    required this.expired,
+    required this.outsidePriority,
+  });
+
+  final List<PantryItem> useFirst;
+  final List<PantryItem> expiringSoon;
+  final List<PantryItem> expired;
+
+  /// Dated items that are outside the three priority windows.
+  final List<PantryItem> outsidePriority;
+}
+
 /// Provides expiry-related calculations and filtering for pantry items.
 ///
 /// This service does not access Firebase or modify pantry data.
@@ -105,6 +121,60 @@ class ExpiryService {
       ...expiredItems(items, referenceDate: referenceDate),
       ...expiringSoonItems(items, referenceDate: referenceDate),
     ];
+  }
+
+  /// Calendar days remaining that belong in the Use First section.
+  ///
+  /// Today, tomorrow, and the day after are included. Later days that are
+  /// still inside [kExpiryExpiringSoonDays] stay in Expiring Soon.
+  static const int useFirstMaxDays = 2;
+
+  /// Groups [items] into priority sections without modifying [items].
+  ///
+  /// Calendar-day rules, reusing [kExpiryExpiringSoonDays]:
+  /// - below 0 → Expired, longest overdue first
+  /// - 0 through [useFirstMaxDays] → Use First, earliest expiry first
+  /// - after Use First through [kExpiryExpiringSoonDays] → Expiring Soon
+  ///
+  /// Items with no expiry date are left out. Later dated items are returned
+  /// in [ExpiryPriorityGroups.outsidePriority] so existing filters can still
+  /// show them without a fourth section.
+  ExpiryPriorityGroups groupByPriority(
+    Iterable<PantryItem> items, {
+    DateTime? referenceDate,
+  }) {
+    final useFirst = <PantryItem>[];
+    final expiringSoon = <PantryItem>[];
+    final expired = <PantryItem>[];
+    final outsidePriority = <PantryItem>[];
+
+    for (final item in items) {
+      final days = daysUntilExpiry(item, referenceDate: referenceDate);
+      if (days == null) continue;
+
+      if (days < 0) {
+        expired.add(item);
+      } else if (days <= useFirstMaxDays) {
+        useFirst.add(item);
+      } else if (days <= kExpiryExpiringSoonDays) {
+        expiringSoon.add(item);
+      } else {
+        outsidePriority.add(item);
+      }
+    }
+
+    return ExpiryPriorityGroups(
+      useFirst: sortByExpiryUrgency(useFirst, referenceDate: referenceDate),
+      expiringSoon: sortByExpiryUrgency(
+        expiringSoon,
+        referenceDate: referenceDate,
+      ),
+      expired: sortByExpiryUrgency(expired, referenceDate: referenceDate),
+      outsidePriority: sortByExpiryUrgency(
+        outsidePriority,
+        referenceDate: referenceDate,
+      ),
+    );
   }
 
   /// Sorts pantry items by expiry urgency.

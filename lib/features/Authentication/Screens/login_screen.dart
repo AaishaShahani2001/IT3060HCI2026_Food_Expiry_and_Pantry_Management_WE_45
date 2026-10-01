@@ -55,10 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
-        widget.onLogin!(
-          _emailController.text.trim(),
-          _passwordController.text,
-        );
+        widget.onLogin!(_emailController.text.trim(), _passwordController.text);
       } finally {
         if (mounted) {
           setState(() {
@@ -84,9 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Login successful!',
-          ),
+          content: Text('Login successful!'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -103,50 +98,39 @@ class _LoginScreenState extends State<LoginScreen> {
           break;
 
         case 'user-not-found':
-          message =
-          'No account was found with this email address.';
+          message = 'No account was found with this email address.';
           break;
 
         case 'wrong-password':
         case 'invalid-credential':
-          message =
-          'Incorrect email or password. Please try again.';
+          message = 'Incorrect email or password. Please try again.';
           break;
 
         case 'user-disabled':
-          message =
-          'This account has been disabled.';
+          message = 'This account has been disabled.';
           break;
 
         case 'too-many-requests':
-          message =
-          'Too many login attempts. Please try again later.';
+          message = 'Too many login attempts. Please try again later.';
           break;
 
         case 'network-request-failed':
-          message =
-          'Network error. Please check your internet connection.';
+          message = 'Network error. Please check your internet connection.';
           break;
 
         default:
-          message =
-              e.message ?? 'Unable to log in. Please try again.';
+          message = e.message ?? 'Unable to log in. Please try again.';
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Something went wrong. Please try again.',
-          ),
+          content: Text('Something went wrong. Please try again.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -187,23 +171,17 @@ class _LoginScreenState extends State<LoginScreen> {
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Please enter your email address first.',
-          ),
+          content: Text('Please enter your email address first.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
 
-    if (!RegExp(
-      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-    ).hasMatch(email)) {
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Please enter a valid email address.',
-          ),
+          content: Text('Please enter a valid email address.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -215,17 +193,13 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: email,
-      );
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Password reset email sent. Check your inbox.',
-          ),
+          content: Text('Password reset email sent. Check your inbox.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -240,39 +214,30 @@ class _LoginScreenState extends State<LoginScreen> {
           break;
 
         case 'user-not-found':
-          message =
-          'No account was found with this email address.';
+          message = 'No account was found with this email address.';
           break;
 
         case 'network-request-failed':
-          message =
-          'Network error. Please check your internet connection.';
+          message = 'Network error. Please check your internet connection.';
           break;
 
         case 'too-many-requests':
-          message =
-          'Too many requests. Please try again later.';
+          message = 'Too many requests. Please try again later.';
           break;
 
         default:
-          message =
-              e.message ?? 'Unable to send the reset email.';
+          message = e.message ?? 'Unable to send the reset email.';
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Unable to send password reset email.',
-          ),
+          content: Text('Unable to send password reset email.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -299,24 +264,20 @@ class _LoginScreenState extends State<LoginScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   minHeight: constraints.maxHeight - 16,
                 ),
                 child: IntrinsicHeight(
                   child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 32),
 
                       // ==================================================
                       // APP LOGO / BRANDING
                       // ==================================================
-
                       Center(
                         child: Column(
                           children: [
@@ -325,8 +286,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               height: 72,
                               decoration: BoxDecoration(
                                 color: lightGreen,
-                                borderRadius:
-                                BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(20),
                               ),
                               child: const Icon(
                                 Icons.kitchen_rounded,
@@ -348,10 +308,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             const Text(
                               'Manage your pantry. Reduce food waste.',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: textGrey,
-                              ),
+                              style: TextStyle(fontSize: 14, color: textGrey),
                             ),
                           ],
                         ),
@@ -362,7 +319,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       // ==================================================
                       // WELCOME
                       // ==================================================
-
                       const Text(
                         'Welcome back',
                         style: TextStyle(
@@ -388,12 +344,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       // ==================================================
                       // LOGIN FORM
                       // ==================================================
-
                       Form(
                         key: _formKey,
                         child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment.stretch,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             // EMAIL
                             const Text(
@@ -409,21 +363,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
                             TextFormField(
                               controller: _emailController,
-                              keyboardType:
-                              TextInputType.emailAddress,
-                              textInputAction:
-                              TextInputAction.next,
-                              autofillHints: const [
-                                AutofillHints.email,
-                              ],
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              autofillHints: const [AutofillHints.email],
                               decoration: _inputDecoration(
                                 hintText: 'Enter your email',
                                 icon: Icons.email_outlined,
                                 primaryGreen: primaryGreen,
                               ),
                               validator: (value) {
-                                final email =
-                                    value?.trim() ?? '';
+                                final email = value?.trim() ?? '';
 
                                 if (email.isEmpty) {
                                   return 'Please enter your email address';
@@ -456,45 +405,38 @@ class _LoginScreenState extends State<LoginScreen> {
                             TextFormField(
                               controller: _passwordController,
                               obscureText: _obscurePassword,
-                              textInputAction:
-                              TextInputAction.done,
-                              autofillHints: const [
-                                AutofillHints.password,
-                              ],
+                              textInputAction: TextInputAction.done,
+                              autofillHints: const [AutofillHints.password],
                               onFieldSubmitted: (_) {
                                 if (!_isLoading) {
                                   _login();
                                 }
                               },
-                              decoration: _inputDecoration(
-                                hintText: 'Enter your password',
-                                icon:
-                                Icons.lock_outline_rounded,
-                                primaryGreen: primaryGreen,
-                              ).copyWith(
-                                suffixIcon: IconButton(
-                                  tooltip: _obscurePassword
-                                      ? 'Show password'
-                                      : 'Hide password',
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscurePassword =
-                                      !_obscurePassword;
-                                    });
-                                  },
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons
-                                        .visibility_outlined
-                                        : Icons
-                                        .visibility_off_outlined,
-                                    color: textGrey,
+                              decoration:
+                                  _inputDecoration(
+                                    hintText: 'Enter your password',
+                                    icon: Icons.lock_outline_rounded,
+                                    primaryGreen: primaryGreen,
+                                  ).copyWith(
+                                    suffixIcon: IconButton(
+                                      tooltip: _obscurePassword
+                                          ? 'Show password'
+                                          : 'Hide password',
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscurePassword = !_obscurePassword;
+                                        });
+                                      },
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        color: textGrey,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
                               validator: (value) {
-                                if (value == null ||
-                                    value.isEmpty) {
+                                if (value == null || value.isEmpty) {
                                   return 'Please enter your password';
                                 }
 
@@ -511,38 +453,30 @@ class _LoginScreenState extends State<LoginScreen> {
                             // ==================================================
                             // FORGOT PASSWORD
                             // ==================================================
-
                             Align(
-                              alignment:
-                              Alignment.centerRight,
+                              alignment: Alignment.centerRight,
                               child: TextButton(
-                                onPressed:
-                                _isResettingPassword ||
-                                    _isLoading
+                                onPressed: _isResettingPassword || _isLoading
                                     ? null
                                     : _forgotPassword,
                                 style: TextButton.styleFrom(
-                                  foregroundColor:
-                                  primaryGreen,
+                                  foregroundColor: primaryGreen,
                                   padding: EdgeInsets.zero,
                                 ),
-                                child:
-                                _isResettingPassword
+                                child: _isResettingPassword
                                     ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child:
-                                  CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
                                     : const Text(
-                                  'Forgot password?',
-                                  style: TextStyle(
-                                    fontWeight:
-                                    FontWeight.w600,
-                                  ),
-                                ),
+                                        'Forgot password?',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                               ),
                             ),
 
@@ -551,51 +485,39 @@ class _LoginScreenState extends State<LoginScreen> {
                             // ==================================================
                             // LOGIN BUTTON
                             // ==================================================
-
                             SizedBox(
                               height: 54,
                               child: ElevatedButton(
-                                onPressed:
-                                _isLoading ? null : _login,
-                                style:
-                                ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                  primaryGreen,
-                                  foregroundColor:
-                                  Colors.white,
-                                  disabledBackgroundColor:
-                                  primaryGreen.withValues(
-                                    alpha: 0.5,
-                                  ),
+                                onPressed: _isLoading ? null : _login,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryGreen,
+                                  foregroundColor: Colors.white,
+                                  disabledBackgroundColor: primaryGreen
+                                      .withValues(alpha: 0.5),
                                   elevation: 0,
-                                  shape:
-                                  RoundedRectangleBorder(
-                                    borderRadius:
-                                    BorderRadius.circular(10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
                                 child: _isLoading
                                     ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child:
-                                  CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    valueColor:
-                                    AlwaysStoppedAnimation<
-                                        Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
+                                        ),
+                                      )
                                     : const Text(
-                                  'Login',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight:
-                                    FontWeight.w700,
-                                  ),
-                                ),
+                                        'Login',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                               ),
                             ),
                           ],
@@ -607,32 +529,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       // ==================================================
                       // DIVIDER
                       // ==================================================
-
                       Row(
                         children: [
-                          Expanded(
-                            child: Divider(
-                              color: Colors.grey.shade300,
-                            ),
-                          ),
+                          Expanded(child: Divider(color: Colors.grey.shade300)),
                           Padding(
-                            padding:
-                            const EdgeInsets.symmetric(
-                              horizontal: 14,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
                             child: Text(
                               'New to PantryPal?',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: textGrey,
-                              ),
+                              style: TextStyle(fontSize: 13, color: textGrey),
                             ),
                           ),
-                          Expanded(
-                            child: Divider(
-                              color: Colors.grey.shade300,
-                            ),
-                          ),
+                          Expanded(child: Divider(color: Colors.grey.shade300)),
                         ],
                       ),
 
@@ -641,22 +548,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       // ==================================================
                       // CREATE ACCOUNT
                       // ==================================================
-
                       OutlinedButton(
-                        onPressed:
-                        _isLoading ? null : _openSignup,
+                        onPressed: _isLoading ? null : _openSignup,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: primaryGreen,
                           side: const BorderSide(
                             color: primaryGreen,
                             width: 1.2,
                           ),
-                          minimumSize:
-                          const Size.fromHeight(52),
-                          shape:
-                          RoundedRectangleBorder(
-                            borderRadius:
-                            BorderRadius.circular(10),
+                          minimumSize: const Size.fromHeight(52),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
                         child: const Text(
@@ -673,18 +575,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       // ==================================================
                       // FOOTER
                       // ==================================================
-
                       const Padding(
-                        padding: EdgeInsets.symmetric(
-                          vertical: 24,
-                        ),
+                        padding: EdgeInsets.symmetric(vertical: 24),
                         child: Text(
                           'Your pantry, organized for a less wasteful home.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: textGrey,
-                          ),
+                          style: TextStyle(fontSize: 12, color: textGrey),
                         ),
                       ),
                     ],
@@ -712,39 +608,26 @@ class _LoginScreenState extends State<LoginScreen> {
       prefixIcon: Icon(icon),
       filled: true,
       fillColor: const Color(0xFFF7F8F8),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 16,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(
-          color: Color(0xFFE1E5E3),
-        ),
+        borderSide: const BorderSide(color: Color(0xFFE1E5E3)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(
-          color: primaryGreen,
-          width: 1.5,
-        ),
+        borderSide: BorderSide(color: primaryGreen, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(
-          color: Color(0xFFD64545),
-        ),
+        borderSide: const BorderSide(color: Color(0xFFD64545)),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(
-          color: Color(0xFFD64545),
-          width: 1.5,
-        ),
+        borderSide: const BorderSide(color: Color(0xFFD64545), width: 1.5),
       ),
     );
   }

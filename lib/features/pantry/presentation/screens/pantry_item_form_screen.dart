@@ -259,12 +259,14 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
     final existingItems =
         ref.watch(pantryItemsProvider).asData?.value ?? const <PantryItem>[];
 
+    final pageBackground = Theme.of(context).scaffoldBackgroundColor;
+
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: pageBackground,
       appBar: AppBar(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: pageBackground,
         foregroundColor: colorScheme.onSurface,
-        surfaceTintColor: colorScheme.surface,
+        surfaceTintColor: pageBackground,
         title: Text(isEditing ? 'Edit Item' : 'Add Item'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),

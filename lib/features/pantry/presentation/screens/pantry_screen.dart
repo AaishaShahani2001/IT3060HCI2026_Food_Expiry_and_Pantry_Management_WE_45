@@ -84,7 +84,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => openPantryAddItem(context),
         backgroundColor: colorScheme.primary,
