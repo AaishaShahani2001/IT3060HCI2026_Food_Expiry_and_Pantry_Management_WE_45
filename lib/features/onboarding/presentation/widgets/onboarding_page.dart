@@ -23,7 +23,7 @@ class OnboardingPage extends StatelessWidget {
               builder: (context, constraints) {
                 final side = math.min(
                   constraints.maxWidth,
-                  constraints.maxHeight,
+                  constraints.maxHeight * 2,
                 );
 
                 return Center(

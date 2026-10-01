@@ -23,9 +23,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   void initState() {
     super.initState();
+
     _pageController = PageController();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+
       ref.read(onboardingPageIndexProvider.notifier).setPage(0);
     });
   }
@@ -36,7 +39,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
-  // Existing completion path: onboarding ends on the login route.
   void _goLogin() {
     context.go(AppRoutes.login);
   }
@@ -55,80 +57,148 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(onboardingPageIndexProvider);
-    final isLastPage = currentIndex == OnboardingData.items.length - 1;
+    final isLastPage =
+        currentIndex == OnboardingData.items.length - 1;
+
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark;
+
+    // Background for each onboarding page
+    const backgroundImages = [
+      'assets/images/onboarding1.1.png',
+      'assets/images/onboarding2.1.png',
+      'assets/images/onboarding3.1.png',
+    ];
 
     return Scaffold(
       backgroundColor: isDark
           ? colorScheme.surface
           : FreshPalette.pageBackground,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
-          child: Column(
-            children: [
-              SizedBox(
-                height: 44,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: isLastPage
-                      ? const SizedBox.shrink()
-                      : TextButton(
-                          onPressed: _goLogin,
-                          child: const Text(AppStrings.skip),
-                        ),
-                ),
-              ),
-              Expanded(
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: OnboardingData.items.length,
-                  onPageChanged: (index) {
-                    ref
-                        .read(onboardingPageIndexProvider.notifier)
-                        .setPage(index);
-                  },
-                  itemBuilder: (context, index) {
-                    return OnboardingPage(item: OnboardingData.items[index]);
-                  },
-                ),
-              ),
-              const SizedBox(height: 16),
-              PageIndicator(
-                count: OnboardingData.items.length,
-                currentIndex: currentIndex,
-              ),
-              const SizedBox(height: 22),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: isLastPage ? _goLogin : _onNext,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: isDark
-                        ? colorScheme.primary
-                        : FreshPalette.primaryButton,
-                    foregroundColor: isDark
-                        ? colorScheme.onPrimary
-                        : FreshPalette.card,
-                    minimumSize: const Size.fromHeight(54),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  child: Text(
-                    isLastPage ? AppStrings.getStarted : AppStrings.next,
-                  ),
-                ),
-              ),
-            ],
+
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // ============================================================
+          // ONBOARDING BACKGROUND
+          // ============================================================
+
+          Image.asset(
+            backgroundImages[currentIndex],
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.high,
           ),
-        ),
+
+          // ============================================================
+          // EXISTING ONBOARDING UI
+          // ============================================================
+
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                24,
+                4,
+                24,
+                20,
+              ),
+              child: Column(
+                children: [
+                  // ==================================================
+                  // SKIP
+                  // ==================================================
+
+                  SizedBox(
+                    height: 44,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: isLastPage
+                          ? const SizedBox.shrink()
+                          : TextButton(
+                        onPressed: _goLogin,
+                        child: const Text(
+                          AppStrings.skip,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // ==================================================
+                  // ONBOARDING CONTENT
+                  // ==================================================
+
+                  Expanded(
+                    child: PageView.builder(
+                      controller: _pageController,
+                      itemCount: OnboardingData.items.length,
+                      onPageChanged: (index) {
+                        ref
+                            .read(
+                          onboardingPageIndexProvider
+                              .notifier,
+                        )
+                            .setPage(index);
+                      },
+                      itemBuilder: (context, index) {
+                        return OnboardingPage(
+                          item: OnboardingData.items[index],
+                        );
+                      },
+                    ),
+                  ),
+
+                  // ==================================================
+                  // PAGE INDICATOR
+                  // ==================================================
+
+                  const SizedBox(height: 16),
+
+                  PageIndicator(
+                    count: OnboardingData.items.length,
+                    currentIndex: currentIndex,
+                  ),
+
+                  // ==================================================
+                  // NEXT / GET STARTED
+                  // ==================================================
+
+                  const SizedBox(height: 22),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed:
+                      isLastPage ? _goLogin : _onNext,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: isDark
+                            ? colorScheme.primary
+                            : FreshPalette.primaryButton,
+                        foregroundColor: isDark
+                            ? colorScheme.onPrimary
+                            : FreshPalette.card,
+                        minimumSize:
+                        const Size.fromHeight(54),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                          BorderRadius.circular(16),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      child: Text(
+                        isLastPage
+                            ? AppStrings.getStarted
+                            : AppStrings.next,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
