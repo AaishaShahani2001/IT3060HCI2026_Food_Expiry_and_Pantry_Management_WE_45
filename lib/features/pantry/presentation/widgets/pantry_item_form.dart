@@ -4,9 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../data/local/pantry_food_catalog.dart';
-import '../../data/services/pantry_photo_storage_service.dart';
+import '../../data/services/cloudinary_config.dart';
 import '../../domain/models/pantry_food_suggestion.dart';
 import '../../domain/models/pantry_item.dart';
+import '../../domain/utils/pantry_image_url.dart';
 import '../utils/pantry_snackbar.dart';
 import 'pantry_item_autocomplete_field.dart';
 import 'pantry_item_photo_field.dart';
@@ -35,8 +36,8 @@ class PantryItemFormData {
   /// Local file chosen in this session. Not uploaded until Save.
   final XFile? selectedPhoto;
 
-  /// True when the user removed an existing Storage photo and did not pick a
-  /// replacement. Save then clears Firestore photo fields.
+  /// True when the user removed an existing photo and did not pick a
+  /// replacement. Save then clears the Firestore photo fields.
   final bool removeExistingPhoto;
 }
 
@@ -98,6 +99,7 @@ class _PantryItemFormState extends State<PantryItemForm> {
   XFile? _selectedPhoto;
   Uint8List? _previewBytes;
   bool _removeExistingPhoto = false;
+  bool _submitting = false;
 
   @override
   void initState() {
@@ -209,8 +211,13 @@ class _PantryItemFormState extends State<PantryItemForm> {
   }
 
   Future<void> _handleSubmit() async {
+    if (widget.isSaving || _submitting) return;
+    setState(() => _submitting = true);
     FocusScope.of(context).unfocus();
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      if (mounted) setState(() => _submitting = false);
+      return;
+    }
 
     final quantity = double.tryParse(_quantityController.text.trim());
     final price = _parsePrice(_priceController.text);
@@ -222,22 +229,27 @@ class _PantryItemFormState extends State<PantryItemForm> {
         price == null ||
         price < 0) {
       _formKey.currentState?.validate();
+      if (mounted) setState(() => _submitting = false);
       return;
     }
 
-    await widget.onSubmit(
-      PantryItemFormData(
-        name: _nameController.text.trim(),
-        category: category,
-        location: _location,
-        quantity: quantity,
-        unit: _unit,
-        price: price,
-        expiryDate: _expiryDate,
-        selectedPhoto: _selectedPhoto,
-        removeExistingPhoto: _removeExistingPhoto,
-      ),
-    );
+    try {
+      await widget.onSubmit(
+        PantryItemFormData(
+          name: _nameController.text.trim(),
+          category: category,
+          location: _location,
+          quantity: quantity,
+          unit: _unit,
+          price: price,
+          expiryDate: _expiryDate,
+          selectedPhoto: _selectedPhoto,
+          removeExistingPhoto: _removeExistingPhoto,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   bool get _hasPhotoPreview {
@@ -264,7 +276,10 @@ class _PantryItemFormState extends State<PantryItemForm> {
         existingUrl != null &&
         existingUrl.trim().isNotEmpty) {
       return Image.network(
-        existingUrl,
+        pantryDisplayImageUrl(
+          existingUrl,
+          delivery: PantryImageDelivery.details,
+        ),
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
@@ -302,20 +317,14 @@ class _PantryItemFormState extends State<PantryItemForm> {
       const allowed = {'jpg', 'jpeg', 'png', 'webp'};
       final extension = _fileExtension(name.isNotEmpty ? name : path);
       if (extension != null && !allowed.contains(extension)) {
-        PantrySnackBar.error(
-          context,
-          'Please choose a JPEG, PNG, or WebP image.',
-        );
+        PantrySnackBar.error(context, kPantryImageTypeMessage);
         return;
       }
 
       final bytes = await picked.readAsBytes();
       if (!mounted) return;
-      if (bytes.length > PantryPhotoStorageService.maxBytes) {
-        PantrySnackBar.error(
-          context,
-          'This photo is too large. Choose an image under 5 MB.',
-        );
+      if (bytes.length > kPantryImageMaxBytes) {
+        PantrySnackBar.error(context, kPantryImageTooLargeMessage);
         return;
       }
 
@@ -633,33 +642,37 @@ class _PantryItemFormState extends State<PantryItemForm> {
           ),
           const SizedBox(height: 24),
           FilledButton(
-            onPressed: widget.isSaving ? null : _handleSubmit,
+            onPressed: widget.isSaving || _submitting ? null : _handleSubmit,
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
-            child: widget.isSaving
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Theme.of(context).colorScheme.onPrimary,
-                        ),
-                      ),
-                      if (widget.savingMessage != null) ...[
-                        const SizedBox(width: 12),
-                        Flexible(
-                          child: Text(
-                            widget.savingMessage!,
-                            overflow: TextOverflow.ellipsis,
+            child: widget.isSaving || _submitting
+                ? Semantics(
+                    liveRegion: true,
+                    label: widget.savingMessage ?? 'Saving item…',
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Theme.of(context).colorScheme.onPrimary,
                           ),
                         ),
+                        if (widget.savingMessage != null) ...[
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Text(
+                              widget.savingMessage!,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   )
                 : Text(
                     widget.initialItem == null ? 'Save item' : 'Update item',

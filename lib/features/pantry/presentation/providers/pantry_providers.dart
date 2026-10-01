@@ -3,10 +3,11 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 
+import '../../data/services/cloudinary_image_service.dart';
 import '../../data/services/pantry_firestore_service.dart';
-import '../../data/services/pantry_photo_storage_service.dart';
+import '../../data/services/pantry_item_photo_save.dart';
 import '../../domain/models/pantry_item.dart';
 import '../../domain/models/removed_pantry_item.dart';
 import '../../domain/utils/pantry_duplicate_lookup.dart';
@@ -18,10 +19,14 @@ final pantryFirestoreServiceProvider = Provider<PantryFirestoreService>((ref) {
   return PantryFirestoreService();
 });
 
-final pantryPhotoStorageServiceProvider = Provider<PantryPhotoStorageService>((
-  ref,
-) {
-  return PantryPhotoStorageService();
+final cloudinaryImageServiceProvider = Provider<CloudinaryImageService>((ref) {
+  final client = http.Client();
+  ref.onDispose(client.close);
+  return CloudinaryImageService(httpClient: client);
+});
+
+final pantryItemPhotoSaveProvider = Provider<PantryItemPhotoSave>((ref) {
+  return PantryItemPhotoSave(ref.watch(cloudinaryImageServiceProvider));
 });
 
 /// Item IDs with Used Up or Delete in progress.
@@ -222,22 +227,6 @@ class PantryItemsNotifier extends StreamNotifier<List<PantryItem>> {
     return ref.read(pantryFirestoreServiceProvider).newItemDocumentId(userId);
   }
 
-  Future<PantryPhotoUpload> uploadItemPhoto({
-    required String userId,
-    required String itemId,
-    required XFile photo,
-  }) {
-    return ref
-        .read(pantryPhotoStorageServiceProvider)
-        .uploadItemPhoto(userId: userId, itemId: itemId, photo: photo);
-  }
-
-  Future<void> deleteItemPhoto({required String storagePath}) {
-    return ref
-        .read(pantryPhotoStorageServiceProvider)
-        .deleteItemPhoto(storagePath: storagePath);
-  }
-
   /// Returns the first current pantry item whose name matches [name]
   /// (trimmed, case-insensitive). Pass [excludeItemId] when editing so the
   /// item being saved is not treated as its own duplicate.
@@ -299,10 +288,8 @@ class PantryItemsNotifier extends StreamNotifier<List<PantryItem>> {
     busyNotifier.start(item.id);
     try {
       await deleteItem(item);
-      final storagePath = item.photoStoragePath;
-      if (storagePath != null && storagePath.trim().isNotEmpty) {
-        await deleteItemPhoto(storagePath: storagePath);
-      }
+      // Remote photos are left in place. Cloudinary deletion needs a signed
+      // backend, and a failed image cleanup must not fail item deletion.
     } on PantryFirestoreException {
       rethrow;
     } catch (error, stackTrace) {

@@ -25,9 +25,7 @@ void main() {
         GoRoute(
           path: '/',
           builder: (_, _) => const Scaffold(
-            body: SingleChildScrollView(
-              child: HomePantrySummaryCard(),
-            ),
+            body: SingleChildScrollView(child: HomePantrySummaryCard()),
           ),
         ),
         GoRoute(
@@ -62,26 +60,25 @@ void main() {
       ProviderScope(
         overrides: [
           pantryItemsProvider.overrideWith(_TestPantryItemsNotifier.new),
-          pantrySummaryProvider.overrideWithValue(
-            (total: totalItems, lowStock: 0),
-          ),
-          expirySummaryProvider.overrideWithValue(
-            (
-              total: totalItems,
-              expired: 0,
-              expiringSoon: expiringSoonItems,
-              fresh: totalItems - expiringSoonItems,
-              unknown: 0,
-            ),
-          ),
+          pantrySummaryProvider.overrideWithValue((
+            total: totalItems,
+            lowStock: 0,
+          )),
+          expirySummaryProvider.overrideWithValue((
+            total: totalItems,
+            expired: 0,
+            expiringSoon: expiringSoonItems,
+            fresh: totalItems - expiringSoonItems,
+            unknown: 0,
+          )),
         ],
         child: MaterialApp.router(
           theme: theme ?? AppTheme.light,
           routerConfig: router,
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: TextScaler.linear(textScale),
-            ),
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
           ),
         ),
@@ -90,21 +87,22 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('HomePantrySummaryCard renders Your Pantry header and 2 stat cards', (
-    tester,
-  ) async {
-    await pumpPantryCard(tester, totalItems: 24, expiringSoonItems: 5);
+  testWidgets(
+    'HomePantrySummaryCard renders Your Pantry header and 2 stat cards',
+    (tester) async {
+      await pumpPantryCard(tester, totalItems: 24, expiringSoonItems: 5);
 
-    expect(find.byType(HomePantrySummaryCard), findsOneWidget);
-    expect(find.text('Your Pantry'), findsOneWidget);
-    expect(find.text('Keep track of your food items'), findsOneWidget);
+      expect(find.byType(HomePantrySummaryCard), findsOneWidget);
+      expect(find.text('Your Pantry'), findsOneWidget);
+      expect(find.text('Keep track of your food items'), findsOneWidget);
 
-    expect(find.text('24'), findsOneWidget);
-    expect(find.text('Total Items'), findsOneWidget);
+      expect(find.text('24'), findsOneWidget);
+      expect(find.text('Total Items'), findsOneWidget);
 
-    expect(find.text('5'), findsOneWidget);
-    expect(find.text('Expiring Soon'), findsOneWidget);
-  });
+      expect(find.text('5'), findsOneWidget);
+      expect(find.text('Expiring Soon'), findsOneWidget);
+    },
+  );
 
   testWidgets('HomePantrySummaryCard correctly shows 0 when pantry is empty', (
     tester,
@@ -116,17 +114,18 @@ void main() {
     expect(find.text('Expiring Soon'), findsOneWidget);
   });
 
-  testWidgets('Tapping HomePantrySummaryCard navigates to pantry management screen', (
-    tester,
-  ) async {
-    await pumpPantryCard(tester);
+  testWidgets(
+    'Tapping HomePantrySummaryCard navigates to pantry management screen',
+    (tester) async {
+      await pumpPantryCard(tester);
 
-    await tester.tap(find.byType(HomePantrySummaryCard));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byType(HomePantrySummaryCard));
+      await tester.pumpAndSettle();
 
-    expect(navigatedToPantry, isTrue);
-    expect(find.text('Pantry Screen'), findsOneWidget);
-  });
+      expect(navigatedToPantry, isTrue);
+      expect(find.text('Pantry Screen'), findsOneWidget);
+    },
+  );
 
   testWidgets('Renders properly in dark mode without crashing', (tester) async {
     await pumpPantryCard(

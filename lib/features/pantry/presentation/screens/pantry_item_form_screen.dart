@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../data/services/cloudinary_image_service.dart';
 import '../../data/services/pantry_firestore_service.dart';
-import '../../data/services/pantry_photo_storage_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../providers/pantry_providers.dart';
 import '../utils/pantry_snackbar.dart';
@@ -34,7 +34,7 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
     setState(() {
       _isSaving = true;
       _savingMessage = data.selectedPhoto != null
-          ? 'Uploading photo and saving item…'
+          ? 'Uploading photo…'
           : 'Saving item…';
     });
 
@@ -113,42 +113,36 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
       throw const PantryFirestoreException('Please log in before continuing.');
     }
 
-    // Generate the document ID first so Storage and Firestore share it.
     final itemId = notifier.generateNewItemId(user.uid);
-    PantryPhotoUpload? photo;
-    if (data.selectedPhoto != null) {
-      photo = await _uploadWithRecovery(
-        notifier: notifier,
-        userId: user.uid,
-        itemId: itemId,
-        photo: data.selectedPhoto!,
-      );
-      if (photo == null && !mounted) return false;
-    }
+    final draft = PantryItem(
+      id: itemId,
+      firestoreId: itemId,
+      name: data.name,
+      category: data.category,
+      location: data.location,
+      quantity: data.quantity,
+      unit: data.unit,
+      price: data.price,
+      expiryDate: data.expiryDate,
+    );
 
-    try {
-      await notifier.addItem(
-        PantryItem(
-          id: itemId,
-          firestoreId: itemId,
-          name: data.name,
-          category: data.category,
-          location: data.location,
-          quantity: data.quantity,
-          unit: data.unit,
-          price: data.price,
-          expiryDate: data.expiryDate,
-          photoUrl: photo?.downloadUrl,
-          photoStoragePath: photo?.storagePath,
-        ),
-      );
-      return true;
-    } catch (error) {
-      if (photo != null) {
-        await notifier.deleteItemPhoto(storagePath: photo.storagePath);
-      }
-      rethrow;
-    }
+    await ref
+        .read(pantryItemPhotoSaveProvider)
+        .createItem(
+          item: draft,
+          userId: user.uid,
+          photo: data.selectedPhoto,
+          upload: data.selectedPhoto == null
+              ? null
+              : (photo) => _uploadWithRecovery(photo),
+          save: (item) async {
+            if (mounted) {
+              setState(() => _savingMessage = 'Saving item…');
+            }
+            await notifier.addItem(item);
+          },
+        );
+    return true;
   }
 
   Future<bool> _updateItem(
@@ -167,24 +161,7 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
       );
     }
 
-    final itemId = existing.firestoreId!;
-    final previousPath = existing.photoStoragePath;
-    PantryPhotoUpload? replacement;
-    var clearPhoto = data.removeExistingPhoto && data.selectedPhoto == null;
-
-    if (data.selectedPhoto != null) {
-      replacement = await _uploadWithRecovery(
-        notifier: notifier,
-        userId: user.uid,
-        itemId: itemId,
-        photo: data.selectedPhoto!,
-      );
-      if (replacement == null) {
-        clearPhoto = false;
-      }
-    }
-
-    final updatedItem = existing.copyWith(
+    final draft = existing.copyWith(
       name: data.name,
       category: data.category,
       location: data.location,
@@ -193,44 +170,42 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
       price: data.price,
       expiryDate: data.expiryDate,
       clearExpiryDate: data.expiryDate == null,
-      photoUrl: replacement?.downloadUrl,
-      photoStoragePath: replacement?.storagePath,
-      clearPhoto: clearPhoto,
     );
-
-    await notifier.updateItem(updatedItem);
-
-    if (clearPhoto && previousPath != null && previousPath.trim().isNotEmpty) {
-      await notifier.deleteItemPhoto(storagePath: previousPath);
-    } else if (replacement != null &&
-        previousPath != null &&
-        previousPath.trim().isNotEmpty &&
-        previousPath != replacement.storagePath) {
-      // Keep the previous Storage object until the replacement URL is saved.
-      await notifier.deleteItemPhoto(storagePath: previousPath);
+    final updatedItem = await ref
+        .read(pantryItemPhotoSaveProvider)
+        .prepareEdit(
+          item: draft,
+          userId: user.uid,
+          selectedPhoto: data.selectedPhoto,
+          removeExistingPhoto:
+              data.removeExistingPhoto && data.selectedPhoto == null,
+          upload: data.selectedPhoto == null
+              ? null
+              : (photo) => _uploadWithRecovery(photo),
+        );
+    if (mounted && data.selectedPhoto != null) {
+      setState(() => _savingMessage = 'Saving item…');
     }
-
+    await notifier.updateItem(updatedItem);
     return true;
   }
 
   /// Returns the upload result, or null when the user chose Save Without Photo.
-  Future<PantryPhotoUpload?> _uploadWithRecovery({
-    required PantryItemsNotifier notifier,
-    required String userId,
-    required String itemId,
-    required XFile photo,
-  }) async {
+  ///
+  /// A failed upload does not clear the form or the selected preview.
+  Future<PantryImageUploadResult?> _uploadWithRecovery(XFile photo) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw const PantryFirestoreException(kPantrySignInRequiredMessage);
+    }
+
     while (mounted) {
       try {
-        setState(() {
-          _savingMessage = 'Uploading photo and saving item…';
-        });
-        return await notifier.uploadItemPhoto(
-          userId: userId,
-          itemId: itemId,
-          photo: photo,
-        );
-      } catch (error, stackTrace) {
+        setState(() => _savingMessage = 'Uploading photo…');
+        return await ref
+            .read(cloudinaryImageServiceProvider)
+            .uploadPantryImage(userId: user.uid, photo: photo);
+      } on PantryImageUploadException catch (error, stackTrace) {
         debugPrint('Pantry photo upload failed: $error');
         debugPrint('$stackTrace');
         if (!mounted) throw const _PhotoSaveCancelled();
@@ -261,49 +236,52 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
 
     final pageBackground = Theme.of(context).scaffoldBackgroundColor;
 
-    return Scaffold(
-      backgroundColor: pageBackground,
-      appBar: AppBar(
+    return PopScope(
+      canPop: !_isSaving,
+      child: Scaffold(
         backgroundColor: pageBackground,
-        foregroundColor: colorScheme.onSurface,
-        surfaceTintColor: pageBackground,
-        title: Text(isEditing ? 'Edit Item' : 'Add Item'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+        appBar: AppBar(
+          backgroundColor: pageBackground,
+          foregroundColor: colorScheme.onSurface,
+          surfaceTintColor: pageBackground,
+          title: Text(isEditing ? 'Edit Item' : 'Add Item'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+          ),
         ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: colorScheme.outline),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: Theme.of(context).brightness == Brightness.dark
-                            ? 0.24
-                            : 0.03,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: colorScheme.outline),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: Theme.of(context).brightness == Brightness.dark
+                              ? 0.24
+                              : 0.03,
+                        ),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: PantryItemForm(
-                  initialItem: widget.item,
-                  prefill: widget.prefill,
-                  existingItems: existingItems,
-                  isSaving: _isSaving,
-                  savingMessage: _savingMessage,
-                  onSubmit: _handleSubmit,
+                    ],
+                  ),
+                  child: PantryItemForm(
+                    initialItem: widget.item,
+                    prefill: widget.prefill,
+                    existingItems: existingItems,
+                    isSaving: _isSaving,
+                    savingMessage: _savingMessage,
+                    onSubmit: _handleSubmit,
+                  ),
                 ),
               ),
             ),
