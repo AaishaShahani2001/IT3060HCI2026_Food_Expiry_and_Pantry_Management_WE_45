@@ -15,8 +15,9 @@ PantryItem _milk({required String id, double quantity = 2}) {
     price: 450,
     expiryDate: DateTime(2026, 10, 1),
     createdAt: DateTime(2026, 9, 1),
-    photoUrl: 'https://example.com/milk.jpg',
-    photoStoragePath: 'users/uid/pantryItems/doc-milk/photo.jpg',
+    photoUrl: 'https://res.cloudinary.com/demo/image/upload/v1/milk.jpg',
+    imagePublicId: 'freshtrack/pantry/uid/milk',
+    imageProvider: 'cloudinary',
   );
 }
 
@@ -34,11 +35,12 @@ void main() {
       expect(removed.item.price, 450);
       expect(removed.item.expiryDate, DateTime(2026, 10, 1));
       expect(removed.item.createdAt, DateTime(2026, 9, 1));
-      expect(removed.item.photoUrl, 'https://example.com/milk.jpg');
       expect(
-        removed.item.photoStoragePath,
-        'users/uid/pantryItems/doc-milk/photo.jpg',
+        removed.item.photoUrl,
+        'https://res.cloudinary.com/demo/image/upload/v1/milk.jpg',
       );
+      expect(removed.item.imagePublicId, 'freshtrack/pantry/uid/milk');
+      expect(removed.item.imageProvider, 'cloudinary');
       expect(removed.originalQuantity, 2);
 
       final remaining = await repository.fetchItems();
@@ -50,11 +52,12 @@ void main() {
       expect(restored.price, 450);
       expect(restored.quantity, 2);
       expect(restored.expiryDate, DateTime(2026, 10, 1));
-      expect(restored.photoUrl, 'https://example.com/milk.jpg');
       expect(
-        restored.photoStoragePath,
-        'users/uid/pantryItems/doc-milk/photo.jpg',
+        restored.photoUrl,
+        'https://res.cloudinary.com/demo/image/upload/v1/milk.jpg',
       );
+      expect(restored.imagePublicId, 'freshtrack/pantry/uid/milk');
+      expect(restored.imageProvider, 'cloudinary');
 
       final afterRestore = await repository.fetchItems();
       expect(afterRestore.single.id, 'doc-milk');

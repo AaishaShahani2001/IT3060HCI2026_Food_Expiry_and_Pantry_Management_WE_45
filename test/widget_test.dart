@@ -123,11 +123,7 @@ void main() {
       final spaceAbove = image.top - pageTop;
       final spaceBelow = title.top - image.bottom;
       expect(spaceAbove, greaterThan(24), reason: item.title);
-      expect(
-        (spaceAbove - spaceBelow).abs(),
-        lessThan(48),
-        reason: item.title,
-      );
+      expect((spaceAbove - spaceBelow).abs(), lessThan(48), reason: item.title);
 
       centers.add(image.center.dy);
 

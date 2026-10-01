@@ -28,8 +28,9 @@ PantryItem _sampleItem({
 }
 
 void main() {
-  testWidgets('PantryItemCard renders 2-column grid visual layout details',
-      (tester) async {
+  testWidgets('PantryItemCard renders 2-column grid visual layout details', (
+    tester,
+  ) async {
     final item = _sampleItem(isLowStock: true);
     await tester.pumpWidget(
       MaterialApp(
@@ -57,46 +58,45 @@ void main() {
     expect(find.byIcon(Icons.more_vert_rounded), findsOneWidget);
   });
 
-  testWidgets('PantryItemListTile renders compact horizontal list row details',
-      (tester) async {
-    final item = _sampleItem();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SizedBox(
-            width: 360,
-            height: 84,
-            child: PantryItemListTile(
-              item: item,
-              onEdit: () {},
-              onUsedUp: () {},
-              onDelete: () {},
-              onIncrement: () {},
-              onDecrement: () {},
+  testWidgets(
+    'PantryItemListTile renders compact horizontal list row details',
+    (tester) async {
+      final item = _sampleItem();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 360,
+              height: 84,
+              child: PantryItemListTile(
+                item: item,
+                onEdit: () {},
+                onUsedUp: () {},
+                onDelete: () {},
+                onIncrement: () {},
+                onDecrement: () {},
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    expect(find.text('Milk'), findsOneWidget);
-    expect(find.text('Dairy • Refrigerator'), findsOneWidget);
-    expect(find.text('Qty: 2'), findsOneWidget);
-    expect(find.byIcon(Icons.local_drink_rounded), findsOneWidget);
-  });
+      expect(find.text('Milk'), findsOneWidget);
+      expect(find.text('Dairy • Refrigerator'), findsOneWidget);
+      expect(find.text('Qty: 2'), findsOneWidget);
+      expect(find.byIcon(Icons.local_drink_rounded), findsOneWidget);
+    },
+  );
 
-  testWidgets('PantryViewModeToggle updates provider immediately',
-      (tester) async {
+  testWidgets('PantryViewModeToggle updates provider immediately', (
+    tester,
+  ) async {
     late ProviderContainer container;
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container = ProviderContainer(),
-        child: const MaterialApp(
-          home: Scaffold(
-            body: PantryViewModeToggle(),
-          ),
-        ),
+        child: const MaterialApp(home: Scaffold(body: PantryViewModeToggle())),
       ),
     );
 
@@ -115,42 +115,53 @@ void main() {
     expect(container.read(pantryViewModeProvider), PantryViewMode.cards);
   });
 
-  testWidgets('PantryItemsSliver renders Grid in Card mode and SliverList in List mode',
-      (tester) async {
-    final items = [_sampleItem(id: '1', name: 'Milk'), _sampleItem(id: '2', name: 'Cheese')];
+  testWidgets(
+    'PantryItemsSliver renders Grid in Card mode and SliverList in List mode',
+    (tester) async {
+      final items = [
+        _sampleItem(id: '1', name: 'Milk'),
+        _sampleItem(id: '2', name: 'Cheese'),
+      ];
 
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          home: Scaffold(
-            body: CustomScrollView(
-              slivers: [
-                PantryItemsSliver(items: items, viewMode: PantryViewMode.cards),
-              ],
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: CustomScrollView(
+                slivers: [
+                  PantryItemsSliver(
+                    items: items,
+                    viewMode: PantryViewMode.cards,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    expect(find.byType(SliverGrid), findsOneWidget);
-    expect(find.byType(PantryItemCard), findsNWidgets(2));
+      expect(find.byType(SliverGrid), findsOneWidget);
+      expect(find.byType(PantryItemCard), findsNWidgets(2));
 
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          home: Scaffold(
-            body: CustomScrollView(
-              slivers: [
-                PantryItemsSliver(items: items, viewMode: PantryViewMode.list),
-              ],
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: CustomScrollView(
+                slivers: [
+                  PantryItemsSliver(
+                    items: items,
+                    viewMode: PantryViewMode.list,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    expect(find.byType(SliverList), findsOneWidget);
-    expect(find.byType(PantryItemListTile), findsNWidgets(2));
-  });
+      expect(find.byType(SliverList), findsOneWidget);
+      expect(find.byType(PantryItemListTile), findsNWidgets(2));
+    },
+  );
 }

@@ -98,16 +98,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('Home displays This Month Waste Tracker card directly below My Profile', (
-    tester,
-  ) async {
-    await open(tester);
-    expect(find.byType(HomeWasteSummaryCard), findsOneWidget);
-    expect(find.text('This Month'), findsOneWidget);
-    expect(find.text('View All'), findsOneWidget);
-    expect(find.text('Food Wasted'), findsOneWidget);
-    expect(find.text('Estimated Loss'), findsOneWidget);
-  });
+  testWidgets(
+    'Home displays This Month Waste Tracker card directly below My Profile',
+    (tester) async {
+      await open(tester);
+      expect(find.byType(HomeWasteSummaryCard), findsOneWidget);
+      expect(find.text('This Month'), findsOneWidget);
+      expect(find.text('View All'), findsOneWidget);
+      expect(find.text('Food Wasted'), findsOneWidget);
+      expect(find.text('Estimated Loss'), findsOneWidget);
+    },
+  );
 
   testWidgets('Monthly count and estimated loss display active user records', (
     tester,
@@ -143,4 +144,3 @@ void main() {
     },
   );
 }
-
