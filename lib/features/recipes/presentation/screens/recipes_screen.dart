@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/models/recipe.dart';
 import '../providers/recipe_providers.dart';
+import '../utils/recipe_image.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
 
@@ -40,6 +42,19 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
       _isDark ? Theme.of(context).colorScheme.surface : FreshPalette.card;
 
   final TextEditingController _searchController = TextEditingController();
+  bool _openedRoutedRecipe = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_openedRoutedRecipe) return;
+    final extra = GoRouterState.of(context).extra;
+    if (extra is! Recipe) return;
+    _openedRoutedRecipe = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showRecipeDetails(extra);
+    });
+  }
 
   @override
   void dispose() {
@@ -1010,35 +1025,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
   // IMAGE SELECTION
   // ============================================================
 
-  String _imageForRecipe(Recipe recipe) {
-    final name = recipe.name.toLowerCase();
-
-    if (name.contains('fried rice')) {
-      return 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=1000&q=85';
-    }
-
-    if (name.contains('pasta')) {
-      return 'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=1000&q=85';
-    }
-
-    if (name.contains('salad')) {
-      return 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1000&q=85';
-    }
-
-    if (name.contains('chicken')) {
-      return 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?auto=format&fit=crop&w=1000&q=85';
-    }
-
-    if (name.contains('soup')) {
-      return 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1000&q=85';
-    }
-
-    if (name.contains('sandwich')) {
-      return 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=1000&q=85';
-    }
-
-    return 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=1000&q=85';
-  }
+  String _imageForRecipe(Recipe recipe) => recipeDisplayImageUrl(recipe);
 
   // ============================================================
   // RECIPE METADATA
