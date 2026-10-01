@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/recipe.dart';
@@ -638,10 +639,10 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return SafeArea(
-          top: false,
           child: Container(
             height: MediaQuery.of(sheetContext).size.height * 0.97,
             decoration: BoxDecoration(
@@ -699,13 +700,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                       _detailIconButton(
                         icon: Icons.share_outlined,
                         onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Recipe sharing will be connected here.',
-                              ),
-                            ),
-                          );
+                          _shareRecipe(recipe);
                         },
                       ),
                     ],
@@ -1665,6 +1660,52 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
     );
   }
 
+  Future<void> _shareRecipe(Recipe recipe) async {
+    final ingredients = recipe.ingredients
+        .map((ingredient) => '• $ingredient')
+        .join('\n');
+
+    final instructions = recipe.instructions
+        .asMap()
+        .entries
+        .map((entry) => '${entry.key + 1}. ${entry.value}')
+        .join('\n');
+
+    final shareText = '''
+🍽️ ${recipe.name}
+
+${recipe.description}
+
+⏱️ Preparation: ${recipe.preparationTime} minutes
+📂 Category: ${recipe.category.label}
+
+Ingredients:
+$ingredients
+
+Instructions:
+$instructions
+
+Shared from PantryPal 🌿
+''';
+
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: shareText,
+          subject: 'PantryPal Recipe - ${recipe.name}',
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not share recipe: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
   // ============================================================
   // COOKING MODE
   // ============================================================
