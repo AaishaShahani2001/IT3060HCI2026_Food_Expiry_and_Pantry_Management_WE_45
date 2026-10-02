@@ -8,9 +8,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../expiry/presentation/providers/expiry_provider.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
+import 'home_section_header.dart';
 
 /// Home dashboard overview card for the user's pantry.
-
+///
 /// Displays real-time counts for Total Items and Expiring Soon items by
 /// consuming the existing [pantrySummaryProvider] and [expirySummaryProvider].
 class HomePantrySummaryCard extends ConsumerWidget {
@@ -39,8 +40,6 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    //final colorScheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
 
     // Watch raw pantry items stream state to handle loading and error states gracefully
     final pantryAsync = ref.watch(pantryItemsProvider);
@@ -64,17 +63,53 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
         : (isDark
               ? FreshPalette.darkSecondaryText
               : FreshPalette.secondaryText);
-    final iconWell = usePhoto
-        ? onPhoto.withValues(alpha: 0.18)
-        : (isDark
-              ? FreshPalette.darkAccentSurface
-              : FreshPalette.accentSurface);
-    final iconColor = usePhoto
-        ? onPhoto
-        : (isDark ? FreshPalette.highlight : FreshPalette.primaryButton);
+    final pantryIconBackground = isDark
+        ? FreshPalette.selected
+        : FreshPalette.primaryButton;
+    final pantryIconBorder = isDark
+        ? FreshPalette.highlight.withValues(alpha: 0.75)
+        : Colors.white.withValues(alpha: 0.62);
     final overlay = const Color(
       0xFF0E2F25,
     ).withValues(alpha: isDark ? 0.62 : 0.55);
+
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final shouldStack = textScale > 1.4 || screenWidth < 300;
+
+    final totalBox = _PantryStatBox(
+      icon: Icons.inventory_2_outlined,
+      iconColor: isDark ? FreshPalette.highlight : FreshPalette.primaryButton,
+      iconBgColor:
+          (isDark ? FreshPalette.highlight : FreshPalette.primaryButton)
+              .withValues(alpha: 0.14),
+      bgColor: isDark
+          ? FreshPalette.darkAccentSurface
+          : FreshPalette.accentSurface,
+      borderColor:
+          (isDark ? FreshPalette.highlight : FreshPalette.primaryButton)
+              .withValues(alpha: 0.2),
+      count: totalCount,
+      label: 'Total Items',
+      isLoading: isLoading,
+      isDark: isDark,
+      imageAssetPath: 'assets/images/vector-pantry.avif',
+      fallbackIcon: Icons.inventory_2_outlined,
+    );
+
+    final expiringBox = _PantryStatBox(
+      icon: Icons.schedule_outlined,
+      iconColor: AppColors.statusAmber,
+      iconBgColor: AppColors.statusAmber.withValues(alpha: 0.15),
+      bgColor: isDark ? const Color(0xFF2C2216) : AppColors.statusAmberBg,
+      borderColor: AppColors.statusAmber.withValues(alpha: 0.25),
+      count: expiringCount,
+      label: 'Expiring Soon',
+      isLoading: isLoading,
+      isDark: isDark,
+      imageAssetPath: 'assets/images/expiry-icon.jpg',
+      fallbackIcon: Icons.schedule_outlined,
+    );
 
     return Material(
       color: fallbackColor,
@@ -145,109 +180,49 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // PANTRY HEADER — Open full pantry screen on tap
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: iconWell,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.kitchen_rounded,
-                            size: 22,
-                            color: iconColor,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Your Pantry',
-                                style: textTheme.titleMedium?.copyWith(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: titleColor,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Keep track of your food items',
-                                style: textTheme.bodySmall?.copyWith(
-                                  fontSize: 12,
-                                  color: subtitleColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 22,
-                          color: subtitleColor,
-                        ),
-                      ],
+                    // PANTRY HEADER — Reusable HomeSectionHeader
+                    HomeSectionHeader(
+                      title: 'Your Pantry',
+                      subtitle: 'Keep track of your food items',
+                      assetPath: 'assets/images/food-pantry.png',
+                      fallbackIcon: Icons.kitchen_outlined,
+                      titleColor: titleColor,
+                      subtitleColor: subtitleColor,
+                      iconBgColor: pantryIconBackground,
+                      iconBorderColor: pantryIconBorder,
+                      iconSize: 36,
+                      iconPadding: const EdgeInsets.all(6),
+                      iconFit: BoxFit.contain,
+                      semanticLabel: 'Your Pantry, view pantry items',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 22,
+                        color: subtitleColor,
+                      ),
                     ),
 
                     const SizedBox(height: 16),
 
-                    // STATISTIC CARDS ROW — Total Items & Expiring Soon side by side
-                    Row(
-                      children: [
-                        // STAT CARD 1: Total Items (Subtle green tint)
-                        Expanded(
-                          child: _PantryStatBox(
-                            icon: Icons.inventory_2_outlined,
-                            iconColor: isDark
-                                ? FreshPalette.highlight
-                                : FreshPalette.primaryButton,
-                            iconBgColor:
-                                (isDark
-                                        ? FreshPalette.highlight
-                                        : FreshPalette.primaryButton)
-                                    .withValues(alpha: 0.14),
-                            bgColor: isDark
-                                ? FreshPalette.darkAccentSurface
-                                : FreshPalette.accentSurface,
-                            borderColor:
-                                (isDark
-                                        ? FreshPalette.highlight
-                                        : FreshPalette.primaryButton)
-                                    .withValues(alpha: 0.2),
-                            count: totalCount,
-                            label: 'Total Items',
-                            isLoading: isLoading,
-                            isDark: isDark,
-                          ),
+                    // STATISTIC CARDS ROW OR COLUMN
+                    if (shouldStack)
+                      Column(
+                        children: [
+                          totalBox,
+                          const SizedBox(height: 10),
+                          expiringBox,
+                        ],
+                      )
+                    else
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: totalBox),
+                            const SizedBox(width: 12),
+                            Expanded(child: expiringBox),
+                          ],
                         ),
-
-                        const SizedBox(width: 12),
-
-                        // STAT CARD 2: Expiring Soon (Subtle warm/orange tint)
-                        Expanded(
-                          child: _PantryStatBox(
-                            icon: Icons.access_time_rounded,
-                            iconColor: AppColors.statusAmber,
-                            iconBgColor: AppColors.statusAmber.withValues(
-                              alpha: 0.15,
-                            ),
-                            bgColor: isDark
-                                ? const Color(0xFF2C2216)
-                                : AppColors.statusAmberBg,
-                            borderColor: AppColors.statusAmber.withValues(
-                              alpha: 0.25,
-                            ),
-                            count: expiringCount,
-                            label: 'Expiring Soon',
-                            isLoading: isLoading,
-                            isDark: isDark,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
                   ],
                 ),
               ),
@@ -271,7 +246,11 @@ class _PantryStatBox extends StatelessWidget {
     required this.label,
     required this.isLoading,
     required this.isDark,
+    required this.imageAssetPath,
+    required this.fallbackIcon,
   });
+
+  static const _radius = 14.0;
 
   final IconData icon;
   final Color iconColor;
@@ -282,74 +261,163 @@ class _PantryStatBox extends StatelessWidget {
   final String label;
   final bool isLoading;
   final bool isDark;
+  final String imageAssetPath;
+  final IconData fallbackIcon;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final countColor = isDark ? FreshPalette.darkHeading : FreshPalette.heading;
+    final labelColor = isDark
+        ? FreshPalette.darkSecondaryText
+        : FreshPalette.secondaryText;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(_radius),
         border: Border.all(color: borderColor),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
         children: [
-          // Stat Icon Well
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: iconBgColor,
-              shape: BoxShape.circle,
+          Positioned.fill(
+            child: _BlurredCardImage(
+              assetPath: imageAssetPath,
+              fallbackIcon: fallbackIcon,
+              iconColor: iconColor,
+              overlayColor: bgColor,
             ),
-            child: Icon(icon, size: 16, color: iconColor),
           ),
-          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Stat Icon Well
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, size: 16, color: iconColor),
+                ),
+                const SizedBox(height: 10),
 
-          // Count or Loading Shimmer
-          if (isLoading)
-            SizedBox(
-              height: 26,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(iconColor),
+                // Count or Loading Indicator
+                if (isLoading)
+                  SizedBox(
+                    height: 26,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(iconColor),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Text(
+                    '$count',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      height: 1.1,
+                      color: countColor,
+                    ),
+                  ),
+
+                const SizedBox(height: 4),
+
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: labelColor,
                   ),
                 ),
-              ),
-            )
-          else
-            Text(
-              '$count',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                height: 1.1,
-                color: isDark ? FreshPalette.darkHeading : FreshPalette.heading,
-              ),
-            ),
-
-          const SizedBox(height: 4),
-
-          // Metric Label
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: isDark
-                  ? FreshPalette.darkSecondaryText
-                  : FreshPalette.secondaryText,
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _BlurredCardImage extends StatelessWidget {
+  const _BlurredCardImage({
+    required this.assetPath,
+    required this.fallbackIcon,
+    required this.iconColor,
+    required this.overlayColor,
+  });
+
+  final String assetPath;
+  final IconData fallbackIcon;
+  final Color iconColor;
+  final Color overlayColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: ExcludeSemantics(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final widthCap = constraints.maxWidth * 0.42;
+            final heightCap = constraints.maxHeight * 0.72;
+            var side = widthCap < heightCap ? widthCap : heightCap;
+            if (side > 62) side = 62;
+            if (side < 40) side = 40;
+
+            final tint = overlayColor.computeLuminance() < 0.45
+                ? Color.lerp(overlayColor, Colors.white, 0.58)!
+                : overlayColor;
+
+            return Align(
+              alignment: const Alignment(0.92, -0.05),
+              child: ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 1.4, sigmaY: 1.4),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: ColorFiltered(
+                    colorFilter: ColorFilter.mode(tint, BlendMode.darken),
+                    child: Image.asset(
+                      assetPath,
+                      width: side,
+                      height: side,
+                      fit: BoxFit.contain,
+                      excludeFromSemantics: true,
+                      filterQuality: FilterQuality.medium,
+                      cacheWidth: (side * 3).round(),
+                      errorBuilder: (context, error, stackTrace) {
+                        return SizedBox.square(
+                          dimension: side,
+                          child: Icon(
+                            fallbackIcon,
+                            size: side * 0.46,
+                            color: iconColor.withValues(alpha: 0.45),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
