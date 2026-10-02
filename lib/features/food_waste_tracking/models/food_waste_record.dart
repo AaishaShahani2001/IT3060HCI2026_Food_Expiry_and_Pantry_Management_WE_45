@@ -17,7 +17,11 @@ const wasteUnits = [
   'pack',
   'slice',
   'portion',
+  'box',
 ];
+
+const manualPantryWasteSource = 'pantry';
+const automaticExpiryWasteSource = 'automatic_expiry';
 
 class FoodWasteRecord {
   const FoodWasteRecord({
@@ -30,6 +34,8 @@ class FoodWasteRecord {
     required this.wastedAt,
     this.source,
     this.sourcePantryItemId,
+    this.sourceExpiryDate,
+    this.notWasted = false,
   });
 
   final String? id;
@@ -41,6 +47,10 @@ class FoodWasteRecord {
   final DateTime wastedAt;
   final String? source;
   final String? sourcePantryItemId;
+  final DateTime? sourceExpiryDate;
+  final bool notWasted;
+
+  bool get isAutomaticExpiry => source == automaticExpiryWasteSource;
 
   void validate() {
     if (itemName.trim().isEmpty ||
@@ -50,8 +60,12 @@ class FoodWasteRecord {
         estimatedValue < 0 ||
         !wasteUnits.contains(unit) ||
         !wasteReasons.contains(reason) ||
-        (source != null && source != 'pantry') ||
+        (source != null &&
+            source != manualPantryWasteSource &&
+            source != automaticExpiryWasteSource) ||
         ((source == null) != (sourcePantryItemId == null)) ||
+        (isAutomaticExpiry != (sourceExpiryDate != null)) ||
+        (notWasted && !isAutomaticExpiry) ||
         (sourcePantryItemId != null &&
             (sourcePantryItemId!.trim().isEmpty ||
                 sourcePantryItemId!.contains('/')))) {
@@ -67,6 +81,7 @@ class FoodWasteRecord {
     String? reason,
     double? estimatedValue,
     DateTime? wastedAt,
+    bool? notWasted,
   }) => FoodWasteRecord(
     id: id ?? this.id,
     itemName: itemName ?? this.itemName,
@@ -77,6 +92,8 @@ class FoodWasteRecord {
     wastedAt: wastedAt ?? this.wastedAt,
     source: source,
     sourcePantryItemId: sourcePantryItemId,
+    sourceExpiryDate: sourceExpiryDate,
+    notWasted: notWasted ?? this.notWasted,
   );
 
   Map<String, dynamic> toMap() {
@@ -90,6 +107,9 @@ class FoodWasteRecord {
       'wastedAt': Timestamp.fromDate(wastedAt),
       if (source != null) 'source': source,
       if (sourcePantryItemId != null) 'sourcePantryItemId': sourcePantryItemId,
+      if (sourceExpiryDate != null)
+        'sourceExpiryDate': Timestamp.fromDate(sourceExpiryDate!),
+      if (notWasted) 'notWasted': true,
     };
   }
 
@@ -109,7 +129,10 @@ class FoodWasteRecord {
         date is! Timestamp ||
         (data['source'] != null && data['source'] is! String) ||
         (data['sourcePantryItemId'] != null &&
-            data['sourcePantryItemId'] is! String)) {
+            data['sourcePantryItemId'] is! String) ||
+        (data['sourceExpiryDate'] != null &&
+            data['sourceExpiryDate'] is! Timestamp) ||
+        (data['notWasted'] != null && data['notWasted'] is! bool)) {
       throw const FormatException('Invalid waste record.');
     }
     final record = FoodWasteRecord(
@@ -122,6 +145,8 @@ class FoodWasteRecord {
       wastedAt: date.toDate(),
       source: data['source'] as String?,
       sourcePantryItemId: data['sourcePantryItemId'] as String?,
+      sourceExpiryDate: (data['sourceExpiryDate'] as Timestamp?)?.toDate(),
+      notWasted: data['notWasted'] as bool? ?? false,
     );
     try {
       record.validate();
