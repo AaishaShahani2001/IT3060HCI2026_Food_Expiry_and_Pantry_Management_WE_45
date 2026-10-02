@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:food_expiry_and_pantry_management/core/constants/app_colors.dart';
 import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
 import 'package:food_expiry_and_pantry_management/core/providers/current_user_provider.dart';
+import 'package:food_expiry_and_pantry_management/features/notifications/presentation/widgets/notification_bell.dart';
 
 /// Greeting for the device's local hour.
 ///
@@ -71,31 +71,8 @@ class HomeHeader extends ConsumerWidget {
           icon: Icon(Icons.search, color: colorScheme.onSurface),
           tooltip: AppStrings.searchTooltip,
         ),
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            IconButton(
-              onPressed: () {},
-              icon: Icon(
-                Icons.notifications_outlined,
-                color: colorScheme.onSurface,
-              ),
-              tooltip: AppStrings.notificationsTooltip,
-            ),
-            Positioned(
-              right: 8,
-              top: 8,
-              child: Container(
-                width: 9,
-                height: 9,
-                decoration: const BoxDecoration(
-                  color: AppColors.unreadBadge,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-          ],
-        ),
+        const NotificationSyncHost(),
+        const NotificationBell(),
       ],
     );
   }
