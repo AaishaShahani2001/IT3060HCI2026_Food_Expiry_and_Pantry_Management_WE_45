@@ -109,9 +109,7 @@ PantryFirestoreException _quantityFailure(Object error) {
   }
 
   if (text.contains('invalid-consumed-quantity')) {
-    return const PantryFirestoreException(
-      'Enter a quantity greater than 0.',
-    );
+    return const PantryFirestoreException('Enter a quantity greater than 0.');
   }
 
   return const PantryFirestoreException(
@@ -127,11 +125,9 @@ PantryFirestoreException _quantityFailure(Object error) {
 /// Family / Hostel / Shared:
 /// pantries/{pantryId}/items/{itemId}
 class PantryFirestoreService {
-  PantryFirestoreService({
-    FirebaseFirestore? firestore,
-    FirebaseAuth? auth,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance;
+  PantryFirestoreService({FirebaseFirestore? firestore, FirebaseAuth? auth})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _auth = auth ?? FirebaseAuth.instance;
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
@@ -143,18 +139,14 @@ class PantryFirestoreService {
   ///
   /// Family / Shared:
   /// pantries/{pantryId}/items
-  Future<CollectionReference<Map<String, dynamic>>>
-  _itemsCollection() async {
+  Future<CollectionReference<Map<String, dynamic>>> _itemsCollection() async {
     final user = _auth.currentUser;
 
     if (user == null) {
-      throw const PantryFirestoreException(
-        kPantrySignInRequiredMessage,
-      );
+      throw const PantryFirestoreException(kPantrySignInRequiredMessage);
     }
 
-    final context =
-    await SharedPantryService.instance.getActivePantryContext();
+    final context = await SharedPantryService.instance.getActivePantryContext();
 
     if (context.pantryType == 'personal') {
       return _firestore
@@ -163,8 +155,7 @@ class PantryFirestoreService {
           .collection('pantryItems');
     }
 
-    if ((context.pantryType == 'family' ||
-        context.pantryType == 'shared') &&
+    if ((context.pantryType == 'family' || context.pantryType == 'shared') &&
         context.pantryId != null &&
         context.pantryId!.isNotEmpty) {
       return _firestore
@@ -187,13 +178,10 @@ class PantryFirestoreService {
   }
 
   /// Live list of the active pantry's items.
-  Stream<List<PantryItem>> watchPantryItems({
-    required String userId,
-  }) {
+  Stream<List<PantryItem>> watchPantryItems({required String userId}) {
     late final StreamController<List<PantryItem>> controller;
 
-    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-    subscription;
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? subscription;
 
     controller = StreamController<List<PantryItem>>(
       onListen: () async {
@@ -201,31 +189,28 @@ class PantryFirestoreService {
           final collection = await _itemsCollection();
 
           subscription = collection.snapshots().listen(
-                (snapshot) {
+            (snapshot) {
               final items = <PantryItem>[];
 
               for (final document in snapshot.docs) {
                 try {
                   items.add(
-                    PantryItem.fromFirestore(
-                      document.id,
-                      document.data(),
-                    ),
+                    PantryItem.fromFirestore(document.id, document.data()),
                   );
                 } catch (error, stackTrace) {
                   debugPrint(
                     'Skipping pantry document '
-                        '${document.id}: $error',
+                    '${document.id}: $error',
                   );
                   debugPrint('$stackTrace');
                 }
               }
 
               items.sort((a, b) {
-                final aDate = a.createdAt ??
-                    DateTime.fromMillisecondsSinceEpoch(0);
-                final bDate = b.createdAt ??
-                    DateTime.fromMillisecondsSinceEpoch(0);
+                final aDate =
+                    a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                final bDate =
+                    b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
 
                 return bDate.compareTo(aDate);
               });
@@ -240,9 +225,7 @@ class PantryFirestoreService {
 
               if (!controller.isClosed) {
                 controller.addError(
-                  PantryFirestoreException(
-                    mapPantryLoadError(error),
-                  ),
+                  PantryFirestoreException(mapPantryLoadError(error)),
                   stackTrace,
                 );
               }
@@ -254,9 +237,7 @@ class PantryFirestoreService {
 
           if (!controller.isClosed) {
             controller.addError(
-              PantryFirestoreException(
-                mapPantryLoadError(error),
-              ),
+              PantryFirestoreException(mapPantryLoadError(error)),
               stackTrace,
             );
           }
@@ -279,9 +260,7 @@ class PantryFirestoreService {
     final user = _auth.currentUser;
 
     if (user == null) {
-      throw const PantryFirestoreException(
-        kPantrySignInRequiredMessage,
-      );
+      throw const PantryFirestoreException(kPantrySignInRequiredMessage);
     }
 
     final now = DateTime.now();
@@ -294,9 +273,7 @@ class PantryFirestoreService {
         : newItemDocumentId(user.uid);
 
     try {
-      final itemReference = await _itemDoc(
-        itemId: itemId,
-      );
+      final itemReference = await _itemDoc(itemId: itemId);
 
       await itemReference.set(itemData);
 
@@ -309,12 +286,10 @@ class PantryFirestoreService {
     } on FirebaseException catch (error) {
       debugPrint(
         'Pantry Firestore add failed: '
-            '${error.code} ${error.message}',
+        '${error.code} ${error.message}',
       );
 
-      throw PantryFirestoreException(
-        _friendlyFirebaseMessage(error.code),
-      );
+      throw PantryFirestoreException(_friendlyFirebaseMessage(error.code));
     }
   }
 
@@ -343,15 +318,9 @@ class PantryFirestoreService {
       );
     }
 
-    await deletePantryItem(
-      userId: userId,
-      itemId: itemId,
-    );
+    await deletePantryItem(userId: userId, itemId: itemId);
 
-    return RemovedPantryItem(
-      item: item,
-      originalIndex: originalIndex,
-    );
+    return RemovedPantryItem(item: item, originalIndex: originalIndex);
   }
 
   /// Restores a Used Up item with the same document ID.
@@ -368,55 +337,42 @@ class PantryFirestoreService {
     }
 
     try {
-      final itemReference = await _itemDoc(
-        itemId: itemId,
-      );
+      final itemReference = await _itemDoc(itemId: itemId);
 
       await itemReference.set(
-        removedItem.item.toFirestore(
-          userId: userId,
-          preserveCreatedAt: true,
-        ),
+        removedItem.item.toFirestore(userId: userId, preserveCreatedAt: true),
       );
     } on FirebaseException catch (error) {
       debugPrint(
         'Pantry Used Up restore failed: '
-            '${error.code} ${error.message}',
+        '${error.code} ${error.message}',
       );
 
-      throw PantryFirestoreException(
-        _friendlyFirebaseMessage(error.code),
-      );
+      throw PantryFirestoreException(_friendlyFirebaseMessage(error.code));
     }
   }
 
-  /// Writes an absolute quantity.
+  /// Writes the remaining quantity only. Original quantity and price stay put.
   Future<void> updateQuantity({
     required String userId,
     required String itemId,
     required double quantity,
   }) async {
     if (quantity < 0) {
-      throw const PantryFirestoreException(
-        'Quantity cannot be negative.',
-      );
+      throw const PantryFirestoreException('Quantity cannot be negative.');
     }
 
     try {
-      final itemReference = await _itemDoc(
-        itemId: itemId,
-      );
+      final itemReference = await _itemDoc(itemId: itemId);
 
       await itemReference.update({
-        'quantity': double.parse(
-          quantity.toStringAsFixed(2),
-        ),
+        'quantity': double.parse(quantity.toStringAsFixed(2)),
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } on FirebaseException catch (error) {
       debugPrint(
         'Pantry quantity update failed: '
-            '${error.code} ${error.message}',
+        '${error.code} ${error.message}',
       );
 
       throw PantryFirestoreException(
@@ -432,17 +388,18 @@ class PantryFirestoreService {
     required PantryItem item,
   }) async {
     try {
-      final itemReference = await _itemDoc(
-        itemId: itemId,
-      );
+      final itemReference = await _itemDoc(itemId: itemId);
 
       await itemReference.update({
         'name': item.name,
         'category': item.category.name,
         'location': item.location.name,
         'quantity': item.quantity,
+        'originalQuantity': item.originalQuantity,
         'unit': item.unit.name,
-        'price': item.unitPrice,
+        'priceType': item.priceType.name,
+        'priceAmount': item.priceAmount,
+        'price': item.priceAmount,
         'expiryDate': item.expiryDate == null
             ? null
             : Timestamp.fromDate(item.expiryDate!),
@@ -461,12 +418,10 @@ class PantryFirestoreService {
     } on FirebaseException catch (error) {
       debugPrint(
         'Pantry Firestore update failed: '
-            '${error.code} ${error.message}',
+        '${error.code} ${error.message}',
       );
 
-      throw PantryFirestoreException(
-        _friendlyFirebaseMessage(error.code),
-      );
+      throw PantryFirestoreException(_friendlyFirebaseMessage(error.code));
     }
   }
 
@@ -476,20 +431,16 @@ class PantryFirestoreService {
     required String itemId,
   }) async {
     try {
-      final itemReference = await _itemDoc(
-        itemId: itemId,
-      );
+      final itemReference = await _itemDoc(itemId: itemId);
 
       await itemReference.delete();
     } on FirebaseException catch (error) {
       debugPrint(
         'Pantry Firestore delete failed: '
-            '${error.code} ${error.message}',
+        '${error.code} ${error.message}',
       );
 
-      throw PantryFirestoreException(
-        _friendlyFirebaseMessage(error.code),
-      );
+      throw PantryFirestoreException(_friendlyFirebaseMessage(error.code));
     }
   }
 
@@ -500,9 +451,7 @@ class PantryFirestoreService {
     required double change,
   }) async {
     try {
-      final reference = await _itemDoc(
-        itemId: itemId,
-      );
+      final reference = await _itemDoc(itemId: itemId);
 
       final snapshot = await reference.get();
 
@@ -532,7 +481,7 @@ class PantryFirestoreService {
     } on FirebaseException catch (error) {
       debugPrint(
         'Pantry quantity change failed: '
-            '${error.code} ${error.message}',
+        '${error.code} ${error.message}',
       );
 
       final text = '${error.code} ${error.message}';
@@ -546,9 +495,7 @@ class PantryFirestoreService {
         _friendlyQuantityFirebaseMessage(error.code),
       );
     } catch (error) {
-      debugPrint(
-        'Pantry quantity change failed: $error',
-      );
+      debugPrint('Pantry quantity change failed: $error');
 
       throw _quantityFailure(error);
     }
@@ -562,14 +509,10 @@ class PantryFirestoreService {
   }) async {
     try {
       if (consumedQuantity <= 0) {
-        throw ArgumentError(
-          'invalid-consumed-quantity',
-        );
+        throw ArgumentError('invalid-consumed-quantity');
       }
 
-      final reference = await _itemDoc(
-        itemId: itemId,
-      );
+      final reference = await _itemDoc(itemId: itemId);
 
       final snapshot = await reference.get();
 
@@ -585,8 +528,7 @@ class PantryFirestoreService {
       }
 
       final remainingQuantity = double.parse(
-        (currentQuantity - consumedQuantity)
-            .toStringAsFixed(2),
+        (currentQuantity - consumedQuantity).toStringAsFixed(2),
       );
 
       await reference.update({
@@ -600,7 +542,7 @@ class PantryFirestoreService {
     } on FirebaseException catch (error) {
       debugPrint(
         'Pantry mark consumed failed: '
-            '${error.code} ${error.message}',
+        '${error.code} ${error.message}',
       );
 
       final text = '${error.code} ${error.message}';
@@ -615,9 +557,7 @@ class PantryFirestoreService {
         _friendlyQuantityFirebaseMessage(error.code),
       );
     } catch (error) {
-      debugPrint(
-        'Pantry mark consumed failed: $error',
-      );
+      debugPrint('Pantry mark consumed failed: $error');
 
       throw _quantityFailure(error);
     }

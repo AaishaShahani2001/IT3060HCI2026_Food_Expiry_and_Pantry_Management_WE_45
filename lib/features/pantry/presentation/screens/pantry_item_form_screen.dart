@@ -121,8 +121,10 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
       category: data.category,
       location: data.location,
       quantity: data.quantity,
+      originalQuantity: data.originalQuantity,
       unit: data.unit,
       price: data.price,
+      priceType: data.priceType,
       expiryDate: data.expiryDate,
     );
 
@@ -166,8 +168,10 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
       category: data.category,
       location: data.location,
       quantity: data.quantity,
+      originalQuantity: data.originalQuantity,
       unit: data.unit,
       price: data.price,
+      priceType: data.priceType,
       expiryDate: data.expiryDate,
       clearExpiryDate: data.expiryDate == null,
     );
