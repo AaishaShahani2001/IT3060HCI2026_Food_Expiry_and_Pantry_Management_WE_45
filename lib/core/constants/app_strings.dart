@@ -18,13 +18,16 @@ abstract final class AppStrings {
   static const String next = 'Next';
   static const String getStarted = 'Get Started';
 
-  static const String homeWelcome = 'Welcome to FreshTrack';
+  static const String homeWelcome = 'Welcome to PantryPal';
   static const String homePlaceholder =
       'Home screen development will continue later';
   static const String homeWelcomeMessage =
       'Manage your pantry, track expiry dates and reduce food waste.';
 
   static const String goodMorning = 'Good Morning';
+  static const String goodAfternoon = 'Good Afternoon';
+  static const String goodEvening = 'Good Evening';
+  static const String goodNight = 'Good Night';
   static const String userFallback = 'User';
   static const String searchTooltip = 'Search';
   static const String notificationsTooltip = 'Notifications';

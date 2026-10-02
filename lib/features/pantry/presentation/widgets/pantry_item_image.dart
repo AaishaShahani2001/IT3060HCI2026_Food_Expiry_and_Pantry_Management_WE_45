@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/models/pantry_item.dart';
+import '../../domain/utils/pantry_image_url.dart';
 
 /// Item thumbnail with display priority:
-/// 1. User-uploaded Storage photo
+/// 1. User-uploaded photo (Cloudinary or a legacy Firebase Storage URL)
 /// 2. Category symbol (always the fallback; also used when the network image fails)
 ///
 /// There is no product-API image field on this model.
@@ -16,6 +17,7 @@ class PantryItemImage extends StatelessWidget {
     this.iconSize = 32,
     this.backgroundColor,
     this.iconColor,
+    this.delivery = PantryImageDelivery.card,
     super.key,
   });
 
@@ -26,6 +28,7 @@ class PantryItemImage extends StatelessWidget {
   final double iconSize;
   final Color? backgroundColor;
   final Color? iconColor;
+  final PantryImageDelivery delivery;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +44,7 @@ class PantryItemImage extends StatelessWidget {
     Widget child;
     if (item.hasUserPhoto) {
       child = Image.network(
-        item.photoUrl!,
+        pantryDisplayImageUrl(item.photoUrl!, delivery: delivery),
         width: width,
         height: height,
         fit: BoxFit.cover,

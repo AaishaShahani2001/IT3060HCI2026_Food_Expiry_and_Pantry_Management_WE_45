@@ -1,24 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:food_expiry_and_pantry_management/core/constants/app_strings.dart';
 import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../expiry/presentation/providers/expiry_provider.dart';
+import 'widgets/home_expiry_soon_section.dart';
 import 'widgets/home_header.dart';
+import 'widgets/home_quick_actions.dart';
 import 'widgets/home_pantry_summary_card.dart';
-import 'widgets/summary_card.dart';
+import 'widgets/home_recent_recipes_section.dart';
 import 'widgets/welcome_section.dart';
 import 'widgets/home_waste_summary_card.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final textTheme = Theme.of(context).textTheme;
+  Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final expirySummary = ref.watch(expirySummaryProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -30,6 +27,10 @@ class HomeScreen extends ConsumerWidget {
               const HomeHeader(),
 
               const SizedBox(height: 16),
+
+              const WelcomeSection(),
+
+              const SizedBox(height: 20),
 
               // PROFILE BUTTON
               InkWell(
@@ -87,14 +88,14 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
               // THIS MONTH WASTE TRACKER SUMMARY CARD
               const HomeWasteSummaryCard(),
 
               const SizedBox(height: 20),
 
-              const WelcomeSection(),
+              const HomeQuickActions(),
 
               const SizedBox(height: 20),
 
@@ -103,50 +104,15 @@ class HomeScreen extends ConsumerWidget {
 
               const SizedBox(height: 24),
 
-              Text(
-                'Overview',
-                style: textTheme.headlineMedium?.copyWith(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
-              ),
+              const HomeExpirySoonSection(),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 24),
 
-              SummaryCard(
-                title: AppStrings.expiringSoon,
-                value: _itemCountLabel(expirySummary.expiringSoon),
-                icon: Icons.event_busy_outlined,
-                iconColor: Colors.orange.shade700,
-                onTap: () => context.go(AppRoutes.expiry),
-              ),
-
-              const SizedBox(height: 10),
-
-              SummaryCard(
-                title: AppStrings.shoppingList,
-                value: '5 Needed',
-                icon: Icons.shopping_cart_outlined,
-                onTap: () => context.go(AppRoutes.shopping),
-              ),
-
-              const SizedBox(height: 10),
-
-              SummaryCard(
-                title: AppStrings.recipeSuggestions,
-                value: '8 Ready',
-                icon: Icons.restaurant_menu_outlined,
-                onTap: () => context.go(AppRoutes.recipes),
-              ),
+              const HomeRecentRecipesSection(),
             ],
           ),
         ),
       ),
     );
-  }
-
-  String _itemCountLabel(int count) {
-    return count == 1 ? '1 Item' : '$count Items';
   }
 }

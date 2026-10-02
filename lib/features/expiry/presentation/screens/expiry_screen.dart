@@ -4,13 +4,15 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/app_routes.dart';
-
-import '../providers/expiry_provider.dart';
-import '../../domain/repositories/expiry_repository.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../pantry/domain/models/pantry_item.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
-
-import '../widgets/expiry_summary_card.dart';
+import '../../domain/repositories/expiry_repository.dart';
+import '../../domain/services/expiry_service.dart';
+import '../providers/expiry_provider.dart';
+import '../widgets/empty_expiry_state.dart';
 import '../widgets/expiry_alert_card.dart';
+import '../widgets/expiry_status_filter_bar.dart';
 import '../widgets/stop_tracking_dialog.dart';
 import '../widgets/empty_expiry_state.dart';
 
@@ -89,59 +91,31 @@ class ExpiryScreen extends ConsumerWidget {
   const ExpiryScreen({super.key});
 
   @override
-  Widget build(
-    BuildContext context,
-    WidgetRef ref,
-  ) {
-    final summary =
-        ref.watch(expirySummaryProvider);
-
-    final expiredItems =
-        ref.watch(expiredItemsProvider);
-
-    final expiringSoonItems =
-        ref.watch(expiringSoonItemsProvider);
-
-    final freshItems =
-        ref.watch(freshItemsProvider);
-
-    final unknownItems =
-        ref.watch(unknownExpiryItemsProvider);
-
-    // ----------------------------------------------------------
-    // FIRESTORE ALERT MAP
-    // ----------------------------------------------------------
-
-    final alertByItemId =
-        ref.watch(expiryAlertByItemIdProvider);
-
-    final expiryService =
-        ref.read(expiryServiceProvider);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final backgroundColor = featurePageBackground(context);
+    final itemsAsync = ref.watch(pantryItemsProvider);
+    final headingColor = isDark ? colorScheme.onSurface : FreshPalette.heading;
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
-
-      // ========================================================
-      // APP BAR
-      // ========================================================
-
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.cream,
+        backgroundColor: backgroundColor,
+        foregroundColor: headingColor,
         elevation: 0,
-
-        title: const Text(
+        title: Text(
           'Expiry Monitoring',
-          style: TextStyle(
-            color: AppColors.darkGreen,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: headingColor, fontWeight: FontWeight.bold),
         ),
 
         actions: [
           IconButton(
-            icon: const Icon(
+            tooltip: 'Expiry Notifications',
+            icon: Icon(
               Icons.notifications_active_outlined,
-              color: AppColors.darkGreen,
+              color: headingColor,
             ),
 
             onPressed: () {
@@ -152,276 +126,282 @@ class ExpiryScreen extends ConsumerWidget {
           ),
         ],
       ),
+      body: itemsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, _) => ExpiryLoadError(
+          onRetry: () {
+            ref.read(pantryItemsProvider.notifier).refreshItems();
+          },
+        ),
+        data: (_) => const _ExpiryDashboard(),
+      ),
+    );
+  }
+}
 
-      // ========================================================
-      // CREATE
-      // ========================================================
+class _ExpiryDashboard extends ConsumerWidget {
+  const _ExpiryDashboard();
 
-      floatingActionButtonLocation:
-          FloatingActionButtonLocation.centerFloat,
-      floatingActionButton:
-          const ExpiryTrackingActions(),
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    // Derive status counts from the full expiry list so filtering does
+    // not change the numbers shown in the summary labels.
+    final summary = ref.watch(expirySummaryProvider);
+    final selectedFilter = ref.watch(expiryStatusFilterProvider);
+    final items = ref.watch(filteredExpiryItemsProvider);
+    final groups = ref.watch(groupedExpiryItemsProvider);
+    final expiryService = ref.read(expiryServiceProvider);
+    final secondaryColor = isDark
+        ? colorScheme.onSurfaceVariant
+        : FreshPalette.secondaryText;
+    final trackedCount = expiryStatusFilterCount(
+      summary,
+      ExpiryStatusFilter.all,
+    );
 
-      // ========================================================
-      // BODY
-      // ========================================================
-
-      body: ListView(
-        padding: const EdgeInsets.all(18),
-
-        children: [
-
-          const Text(
-            'Monitor your products and take action before food expires.',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ====================================================
-          // SUMMARY ROW 1
-          // ====================================================
-
-          Row(
-            children: [
-              Expanded(
-                child: ExpirySummaryCard(
-                  title: 'Expired',
-                  value:
-                      summary.expired.toString(),
-                  icon:
-                      Icons.error_outline,
-                  color:
-                      AppColors.statusRed,
-                  backgroundColor:
-                      AppColors.statusRedBg,
-                ),
-              ),
-
-              const SizedBox(width: 10),
-
-              Expanded(
-                child: ExpirySummaryCard(
-                  title: 'Expiring Soon',
-                  value:
-                      summary.expiringSoon.toString(),
-                  icon:
-                      Icons.warning,
-                  color:
-                      AppColors.statusOrange,
-                  backgroundColor:
-                      AppColors.statusOrangeBg,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-
-          // ====================================================
-          // SUMMARY ROW 2
-          // ====================================================
-
-          Row(
-            children: [
-              Expanded(
-                child: ExpirySummaryCard(
-                  title: 'Fresh',
-                  value:
-                      summary.fresh.toString(),
-                  icon:
-                      Icons.check_circle,
-                  color:
-                      AppColors.statusFresh,
-                  backgroundColor:
-                      AppColors.statusFreshBg,
-                ),
-              ),
-
-              const SizedBox(width: 10),
-
-              Expanded(
-                child: ExpirySummaryCard(
-                  title: 'No Expiry',
-                  value:
-                      summary.unknown.toString(),
-                  icon:
-                      Icons.help_outline,
-                  color:
-                      AppColors.textSecondary,
-                  backgroundColor:
-                      Colors.white,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 30),
-
-          // ====================================================
-          // EXPIRED ITEMS
-          // ====================================================
-
-          _sectionHeader(
-            title: 'EXPIRED ITEMS',
-            count: expiredItems.length,
-            color: AppColors.statusRed,
-          ),
-
-          const SizedBox(height: 12),
-
-          if (expiredItems.isEmpty)
-            const EmptyExpiryState(
-              message: 'No expired items',
-            )
-          else
-            ...expiredItems.map(
-              (item) {
-                final alert =
-                    alertByItemId[item.id];
-
-                return _buildTrackedCard(
-                  context: context,
-                  ref: ref,
-                  item: item,
-                  alert: alert,
-                  priority: 'critical',
-                  message:
-                      expiryService.expiryMessage(
-                    item,
-                  ),
-                );
-              },
-            ),
-
-          const SizedBox(height: 25),
-
-          // ====================================================
-          // EXPIRING SOON
-          // ====================================================
-
-          _sectionHeader(
-            title: 'EXPIRING SOON',
-            count:
-                expiringSoonItems.length,
-            color:
-                AppColors.statusOrange,
-          ),
-
-          const SizedBox(height: 12),
-
-          if (expiringSoonItems.isEmpty)
-            const EmptyExpiryState(
-              message:
-                  'No items expiring soon',
-            )
-          else
-            ...expiringSoonItems.map(
-              (item) {
-                final alert =
-                    alertByItemId[item.id];
-
-                return _buildTrackedCard(
-                  context: context,
-                  ref: ref,
-                  item: item,
-                  alert: alert,
-                  priority:
-                      expiryService
-                          .alertPriority(item),
-                  message:
-                      expiryService.expiryMessage(
-                    item,
-                  ),
-                );
-              },
-            ),
-
-          const SizedBox(height: 25),
-
-          // ====================================================
-          // FRESH ITEMS
-          // ====================================================
-
-          _sectionHeader(
-            title: 'FRESH ITEMS',
-            count: freshItems.length,
-            color:
-                AppColors.statusFresh,
-          ),
-
-          const SizedBox(height: 12),
-
-          if (freshItems.isEmpty)
-            const EmptyExpiryState(
-              message: 'No fresh items',
-            )
-          else
-            ...freshItems.map(
-              (item) {
-                final alert =
-                    alertByItemId[item.id];
-
-                return _buildTrackedCard(
-                  context: context,
-                  ref: ref,
-                  item: item,
-                  alert: alert,
-                  priority: 'fresh',
-                  message:
-                      expiryService.expiryMessage(
-                    item,
-                  ),
-                );
-              },
-            ),
-
-          const SizedBox(height: 25),
-
-          // ====================================================
-          // NO EXPIRY
-          // ====================================================
-
-          _sectionHeader(
-            title: 'NO EXPIRY DATE',
-            count: unknownItems.length,
-            color:
-                AppColors.textSecondary,
-          ),
-
-          const SizedBox(height: 12),
-
-          if (unknownItems.isEmpty)
-            const EmptyExpiryState(
-              message:
-                  'All pantry items have expiry dates',
-            )
-          else
-            ...unknownItems.map(
-              (item) {
-                return _NoExpiryCard(
-                  name: item.name,
-                  quantity:
-                      item.quantityLabel,
-
-                  // IMPORTANT:
-                  // Only here does the user
-                  // need to select/create tracking.
-
-                  onTrack: () {
-                    context.push(
-                      AppRoutes.addExpiryTracking,
-                    );
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      children: [
+        Text(
+          'Monitor your products and take action before food expires.',
+          style: theme.textTheme.bodyMedium?.copyWith(color: secondaryColor),
+        ),
+        const SizedBox(height: 16),
+        ExpiryStatusFilterBar(
+          selected: selectedFilter,
+          counts: summary,
+          onSelected: (filter) {
+            ref.read(expiryStatusFilterProvider.notifier).select(filter);
+          },
+        ),
+        const SizedBox(height: 16),
+        const ExpiryTrackingActions(),
+        const SizedBox(height: 16),
+        if (items.isEmpty)
+          EmptyExpiryState(
+            message: _emptyMessage(selectedFilter, trackedCount),
+            detail:
+                selectedFilter == ExpiryStatusFilter.all || trackedCount == 0
+                ? 'Track a pantry item to monitor its expiry date.'
+                : null,
+            actionLabel:
+                selectedFilter == ExpiryStatusFilter.all || trackedCount == 0
+                ? null
+                : 'Show All',
+            onAction:
+                selectedFilter == ExpiryStatusFilter.all || trackedCount == 0
+                ? null
+                : () {
+                    ref
+                        .read(expiryStatusFilterProvider.notifier)
+                        .select(ExpiryStatusFilter.all);
                   },
-                );
-              },
-            ),
-
-          const SizedBox(height: 110),
+          )
+        else ...[
+          ..._prioritySection(
+            context,
+            ref,
+            expiryService,
+            title: 'USE FIRST',
+            badge: 'HIGH PRIORITY',
+            accent: AppColors.statusOrange,
+            badgeBackground: AppColors.statusOrangeBg,
+            items: groups.useFirst,
+            itemBadge: 'USE FIRST',
+          ),
+          ..._prioritySection(
+            context,
+            ref,
+            expiryService,
+            title: 'EXPIRING SOON',
+            accent: AppColors.statusAmber,
+            items: groups.expiringSoon,
+          ),
+          ..._prioritySection(
+            context,
+            ref,
+            expiryService,
+            title: 'EXPIRED ITEMS',
+            badge: 'Action Needed',
+            accent: AppColors.statusRed,
+            badgeBackground: AppColors.statusRedBg,
+            items: groups.expired,
+          ),
+          for (final item in groups.outsidePriority)
+            _expiryItemCard(context, ref, expiryService, item),
         ],
+      ],
+    );
+  }
+}
+
+List<Widget> _prioritySection(
+  BuildContext context,
+  WidgetRef ref,
+  ExpiryService expiryService, {
+  required String title,
+  required Color accent,
+  required List<PantryItem> items,
+  String? badge,
+  Color? badgeBackground,
+  String? itemBadge,
+}) {
+  if (items.isEmpty) return const [];
+
+  final countLabel = items.length == 1 ? '1 item' : '${items.length} items';
+
+  return [
+    _ExpirySectionHeader(
+      title: title,
+      badge: badge,
+      accent: accent,
+      badgeBackground: badgeBackground,
+      countLabel: countLabel,
+    ),
+    for (final item in items)
+      _expiryItemCard(context, ref, expiryService, item, badgeText: itemBadge),
+  ];
+}
+
+Widget _expiryItemCard(
+  BuildContext context,
+  WidgetRef ref,
+  ExpiryService expiryService,
+  PantryItem item, {
+  String? badgeText,
+}) {
+  final alert = _alertFor(item, expiryService);
+
+  return ExpiryAlertCard(
+    key: ValueKey(item.id),
+    name: item.name,
+    quantity: item.quantityLabel,
+    message: expiryService.expiryMessage(item),
+    status: item.expiryStatus,
+    badgeText: badgeText,
+    onUpdate: () {
+      context.push(AppRoutes.editExpiryTracking, extra: alert);
+    },
+    onStopTracking: () async {
+      final confirm = await showStopTrackingDialog(context);
+      if (confirm != true || !context.mounted) return;
+      await ref.read(stopTrackingProvider)(alert.id);
+    },
+  );
+}
+
+String _emptyMessage(ExpiryStatusFilter filter, int trackedCount) {
+  return switch (filter) {
+    ExpiryStatusFilter.all => 'No expiry items',
+    ExpiryStatusFilter.fresh =>
+      trackedCount == 0 ? 'No expiry items' : 'No fresh items found',
+    ExpiryStatusFilter.expiringSoon =>
+      trackedCount == 0 ? 'No expiry items' : 'No items expiring soon',
+    ExpiryStatusFilter.expired =>
+      trackedCount == 0 ? 'No expiry items' : 'No expired items',
+  };
+}
+
+ExpiryAlert _alertFor(PantryItem item, ExpiryService service) {
+  final expiryDate = item.expiryDate ?? DateTime.now();
+  return ExpiryAlert(
+    id: item.id,
+    userId: '',
+    itemId: item.id,
+    itemName: item.name,
+    expiryDate: expiryDate,
+    daysUntilExpiry: service.daysUntilExpiry(item) ?? 0,
+    status: 'active',
+    priority: service.alertPriority(item),
+    message: service.expiryMessage(item),
+    isRead: false,
+    createdAt: DateTime.now(),
+  );
+}
+
+class _ExpirySectionHeader extends StatelessWidget {
+  const _ExpirySectionHeader({
+    required this.title,
+    required this.accent,
+    required this.countLabel,
+    this.badge,
+    this.badgeBackground,
+  });
+
+  final String title;
+  final String? badge;
+  final Color accent;
+  final Color? badgeBackground;
+  final String countLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final headingColor = isDark
+        ? theme.colorScheme.onSurface
+        : FreshPalette.heading;
+    final countColor = isDark
+        ? theme.colorScheme.onSurfaceVariant
+        : FreshPalette.secondaryText;
+    final badgeFill = isDark
+        ? accent.withValues(alpha: 0.2)
+        : (badgeBackground ?? accent.withValues(alpha: 0.12));
+
+    return Semantics(
+      header: true,
+      label: badge == null
+          ? '$title, $countLabel'
+          : '$title, $badge, $countLabel',
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Icon(Icons.circle, size: 8, color: accent),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: headingColor,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.3,
+              ),
+            ),
+            if (badge != null) ...[
+              const SizedBox(width: 8),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: badgeFill,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    badge!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: accent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            const Spacer(),
+            Text(
+              countLabel,
+              style: theme.textTheme.bodyMedium?.copyWith(color: countColor),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -592,125 +572,94 @@ class _NoExpiryCard
   final VoidCallback onTrack;
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    return Container(
-      margin:
-          const EdgeInsets.only(
-        bottom: 12,
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width - 32;
+        final textScale = MediaQuery.textScalerOf(context).scale(1);
+        final stack = available < 340 || textScale > 1.25;
+
+        final expiryButton = _trackExpiryButton(context);
+        final wasteButton = _trackWasteButton(context);
+
+        if (stack) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [expiryButton, const SizedBox(height: 12), wasteButton],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: expiryButton),
+            const SizedBox(width: 12),
+            Expanded(child: wasteButton),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _trackExpiryButton(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return FilledButton(
+      key: const ValueKey('track-item-expiry-button'),
+      style: FilledButton.styleFrom(
+        backgroundColor: isDark
+            ? colorScheme.primary
+            : FreshPalette.primaryButton,
+        foregroundColor: isDark ? colorScheme.onPrimary : FreshPalette.card,
+        minimumSize: const Size(0, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        tapTargetSize: MaterialTapTargetSize.padded,
       ),
-
-      padding:
-          const EdgeInsets.all(16),
-
-      decoration: BoxDecoration(
-        color: Colors.white,
-
-        borderRadius:
-            BorderRadius.circular(18),
-
-        border: Border.all(
-          color: Colors.grey
-              .withValues(alpha: 0.15),
-        ),
-
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black
-                .withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset:
-                const Offset(0, 3),
+      onPressed: () {
+        context.push(AppRoutes.addExpiryTracking);
+      },
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.add_alarm_outlined, size: 20),
+          SizedBox(width: 8),
+          Flexible(
+            child: Text('Track Item Expiry', textAlign: TextAlign.center),
           ),
         ],
       ),
+    );
+  }
 
+  Widget _trackWasteButton(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final accent = isDark ? colorScheme.primary : FreshPalette.primaryButton;
+
+    return OutlinedButton(
+      key: const ValueKey('track-waste-button'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: accent,
+        backgroundColor: isDark ? colorScheme.surface : FreshPalette.card,
+        side: BorderSide(color: accent),
+        minimumSize: const Size(0, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        tapTargetSize: MaterialTapTargetSize.padded,
+      ),
+      onPressed: () {
+        context.push(AppRoutes.wasteTracker);
+      },
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 45,
-            height: 45,
-
-            decoration:
-                BoxDecoration(
-              color: Colors.grey
-                  .withValues(alpha: 0.08),
-
-              borderRadius:
-                  BorderRadius.circular(
-                12,
-              ),
-            ),
-
-            child: const Icon(
-              Icons.inventory_2_outlined,
-              color:
-                  AppColors.textSecondary,
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-
-              children: [
-                Text(
-                  name,
-                  style:
-                      const TextStyle(
-                    fontSize: 15,
-                    fontWeight:
-                        FontWeight.bold,
-                    color:
-                        Color(0xFF263238),
-                  ),
-                ),
-
-                const SizedBox(height: 4),
-
-                Text(
-                  quantity,
-                  style:
-                      const TextStyle(
-                    color:
-                        AppColors
-                            .textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-
-                const SizedBox(height: 5),
-
-                const Text(
-                  'No expiry date',
-                  style:
-                      TextStyle(
-                    color:
-                        AppColors
-                            .textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          TextButton(
-            onPressed: onTrack,
-
-            child: const Text(
-              'Track',
-              style: TextStyle(
-                color:
-                    AppColors.primaryGreen,
-                fontWeight:
-                    FontWeight.bold,
-              ),
-            ),
+          Icon(Icons.delete_sweep_outlined, size: 20, color: accent),
+          const SizedBox(width: 8),
+          const Flexible(
+            child: Text('Track Waste', textAlign: TextAlign.center),
           ),
         ],
       ),

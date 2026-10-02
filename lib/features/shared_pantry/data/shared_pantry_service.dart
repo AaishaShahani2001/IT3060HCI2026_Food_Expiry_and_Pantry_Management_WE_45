@@ -6,32 +6,26 @@ import 'package:firebase_auth/firebase_auth.dart';
 class SharedPantryService {
   SharedPantryService._();
 
-  static final SharedPantryService instance =
-  SharedPantryService._();
+  static final SharedPantryService instance = SharedPantryService._();
 
-  final FirebaseFirestore _firestore =
-      FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  final FirebaseAuth _auth =
-      FirebaseAuth.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  String? get currentUserId =>
-      _auth.currentUser?.uid;
+  String? get currentUserId => _auth.currentUser?.uid;
 
   // ------------------------------------------------------------
   // GENERATE INVITE CODE
   // ------------------------------------------------------------
 
   String _generateInviteCode() {
-    const characters =
-        'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
     final random = Random();
 
     return List.generate(
       6,
-          (_) => characters[
-      random.nextInt(characters.length)],
+      (_) => characters[random.nextInt(characters.length)],
     ).join();
   }
 
@@ -39,96 +33,64 @@ class SharedPantryService {
   // CREATE PANTRY
   // ------------------------------------------------------------
 
-  Future<String> createPantry({
-    required String pantryName,
-  }) async {
+  Future<String> createPantry({required String pantryName}) async {
     final user = _auth.currentUser;
 
     if (user == null) {
-      throw Exception(
-        'You must be logged in to create a pantry.',
-      );
+      throw Exception('You must be logged in to create a pantry.');
     }
 
     final name = pantryName.trim();
 
     if (name.isEmpty) {
-      throw Exception(
-        'Please enter a pantry name.',
-      );
+      throw Exception('Please enter a pantry name.');
     }
 
     // Check whether the user already belongs
     // to a pantry.
-    final existingMemberships =
-    await _firestore
+    final existingMemberships = await _firestore
         .collectionGroup('members')
-        .where(
-      'uid',
-      isEqualTo: user.uid,
-    )
+        .where('uid', isEqualTo: user.uid)
         .limit(1)
         .get();
 
     if (existingMemberships.docs.isNotEmpty) {
       throw Exception(
         'You are already a member of a pantry. '
-            'Leave your current pantry before creating a new one.',
+        'Leave your current pantry before creating a new one.',
       );
     }
 
-    final pantryRef =
-    _firestore.collection('pantries').doc();
+    final pantryRef = _firestore.collection('pantries').doc();
 
-    final inviteCode =
-    _generateInviteCode();
+    final inviteCode = _generateInviteCode();
 
-    final batch =
-    _firestore.batch();
+    final batch = _firestore.batch();
 
     // Create pantry
-    batch.set(
-      pantryRef,
-      {
-        'name': name,
-        'type': 'shared',
-        'inviteCode': inviteCode,
-        'ownerId': user.uid,
-        'createdAt':
-        FieldValue.serverTimestamp(),
-      },
-    );
+    batch.set(pantryRef, {
+      'name': name,
+      'type': 'shared',
+      'inviteCode': inviteCode,
+      'ownerId': user.uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
 
     // Add creator as owner
-    batch.set(
-      pantryRef
-          .collection('members')
-          .doc(user.uid),
-      {
-        'uid': user.uid,
-        'name':
-        user.displayName ?? '',
-        'email':
-        user.email ?? '',
-        'role': 'owner',
-        'joinedAt':
-        FieldValue.serverTimestamp(),
-      },
-    );
+    batch.set(pantryRef.collection('members').doc(user.uid), {
+      'uid': user.uid,
+      'name': user.displayName ?? '',
+      'email': user.email ?? '',
+      'role': 'owner',
+      'joinedAt': FieldValue.serverTimestamp(),
+    });
 
     // Link user to pantry
-    batch.set(
-      _firestore
-          .collection('users')
-          .doc(user.uid),
-      {
-        'pantryId': pantryRef.id,
-        'pantryType': 'shared',
-        'updatedAt':
-        FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    batch.set(_firestore.collection('users').doc(user.uid), {
+      'pantryId': pantryRef.id,
+      'pantryType': 'shared',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
     await batch.commit();
 
@@ -139,102 +101,67 @@ class SharedPantryService {
   // JOIN PANTRY
   // ------------------------------------------------------------
 
-  Future<String> joinPantry({
-    required String inviteCode,
-  }) async {
+  Future<String> joinPantry({required String inviteCode}) async {
     final user = _auth.currentUser;
 
     if (user == null) {
-      throw Exception(
-        'You must be logged in to join a pantry.',
-      );
+      throw Exception('You must be logged in to join a pantry.');
     }
 
-    final code =
-    inviteCode.trim().toUpperCase();
+    final code = inviteCode.trim().toUpperCase();
 
     if (code.isEmpty) {
-      throw Exception(
-        'Please enter an invite code.',
-      );
+      throw Exception('Please enter an invite code.');
     }
 
     final query = await _firestore
         .collection('pantries')
-        .where(
-      'inviteCode',
-      isEqualTo: code,
-    )
+        .where('inviteCode', isEqualTo: code)
         .limit(1)
         .get();
 
     if (query.docs.isEmpty) {
-      throw Exception(
-        'Invalid invite code.',
-      );
+      throw Exception('Invalid invite code.');
     }
 
-    final pantryDoc =
-        query.docs.first;
+    final pantryDoc = query.docs.first;
 
-    final pantryId =
-        pantryDoc.id;
+    final pantryId = pantryDoc.id;
 
     // Check whether user already belongs
     // to any pantry.
-    final existingMemberships =
-    await _firestore
+    final existingMemberships = await _firestore
         .collectionGroup('members')
-        .where(
-      'uid',
-      isEqualTo: user.uid,
-    )
+        .where('uid', isEqualTo: user.uid)
         .limit(1)
         .get();
 
     if (existingMemberships.docs.isNotEmpty) {
       throw Exception(
         'You are already a member of a pantry. '
-            'Leave your current pantry before joining another one.',
+        'Leave your current pantry before joining another one.',
       );
     }
 
-    final memberRef =
-    pantryDoc.reference
-        .collection('members')
-        .doc(user.uid);
+    final memberRef = pantryDoc.reference.collection('members').doc(user.uid);
 
-    final batch =
-    _firestore.batch();
+    final batch = _firestore.batch();
 
     // Add user as member
-    batch.set(
-      memberRef,
-      {
-        'uid': user.uid,
-        'name':
-        user.displayName ?? '',
-        'email':
-        user.email ?? '',
-        'role': 'member',
-        'joinedAt':
-        FieldValue.serverTimestamp(),
-      },
-    );
+    batch.set(memberRef, {
+      'uid': user.uid,
+      'name': user.displayName ?? '',
+      'email': user.email ?? '',
+      'role': 'member',
+      'joinedAt': FieldValue.serverTimestamp(),
+    });
 
     // Link user to pantry
-    batch.set(
-      _firestore
-          .collection('users')
-          .doc(user.uid),
-      {
-        'pantryId': pantryId,
-        'pantryType': 'shared',
-        'updatedAt':
-        FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    batch.set(_firestore.collection('users').doc(user.uid), {
+      'pantryId': pantryId,
+      'pantryType': 'shared',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
     await batch.commit();
 
@@ -245,33 +172,22 @@ class SharedPantryService {
   // GET CURRENT USER'S PANTRY
   // ------------------------------------------------------------
 
-  Future<
-      DocumentSnapshot<Map<String, dynamic>>>
-  getCurrentUserPantry() async {
+  Future<DocumentSnapshot<Map<String, dynamic>>> getCurrentUserPantry() async {
     final user = _auth.currentUser;
 
     if (user == null) {
-      throw Exception(
-        'You must be logged in.',
-      );
+      throw Exception('You must be logged in.');
     }
 
     // First check the users document.
-    final userDoc = await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .get();
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
 
-    final userData =
-    userDoc.data();
+    final userData = userDoc.data();
 
-    final pantryId =
-    userData?['pantryId'];
+    final pantryId = userData?['pantryId'];
 
-    if (pantryId is String &&
-        pantryId.isNotEmpty) {
-      final pantryDoc =
-      await _firestore
+    if (pantryId is String && pantryId.isNotEmpty) {
+      final pantryDoc = await _firestore
           .collection('pantries')
           .doc(pantryId)
           .get();
@@ -282,13 +198,9 @@ class SharedPantryService {
     }
 
     // Fallback: search membership records.
-    final memberships =
-    await _firestore
+    final memberships = await _firestore
         .collectionGroup('members')
-        .where(
-      'uid',
-      isEqualTo: user.uid,
-    )
+        .where('uid', isEqualTo: user.uid)
         .limit(1)
         .get();
 
@@ -296,25 +208,18 @@ class SharedPantryService {
       throw Exception('NO_PANTRY');
     }
 
-    final memberDoc =
-        memberships.docs.first;
+    final memberDoc = memberships.docs.first;
 
-    final pantryReference =
-        memberDoc.reference.parent.parent;
+    final pantryReference = memberDoc.reference.parent.parent;
 
     if (pantryReference == null) {
-      throw Exception(
-        'Pantry not found.',
-      );
+      throw Exception('Pantry not found.');
     }
 
-    final pantryDoc =
-    await pantryReference.get();
+    final pantryDoc = await pantryReference.get();
 
     if (!pantryDoc.exists) {
-      throw Exception(
-        'Pantry not found.',
-      );
+      throw Exception('Pantry not found.');
     }
 
     return pantryDoc;
@@ -324,26 +229,17 @@ class SharedPantryService {
   // GET PANTRY
   // ------------------------------------------------------------
 
-  Future<
-      DocumentSnapshot<Map<String, dynamic>>>
-  getPantry(
-      String pantryId,
-      ) async {
-    return _firestore
-        .collection('pantries')
-        .doc(pantryId)
-        .get();
+  Future<DocumentSnapshot<Map<String, dynamic>>> getPantry(
+    String pantryId,
+  ) async {
+    return _firestore.collection('pantries').doc(pantryId).get();
   }
 
   // ------------------------------------------------------------
   // GET MEMBERS
   // ------------------------------------------------------------
 
-  Stream<
-      QuerySnapshot<Map<String, dynamic>>>
-  getMembers(
-      String pantryId,
-      ) {
+  Stream<QuerySnapshot<Map<String, dynamic>>> getMembers(String pantryId) {
     return _firestore
         .collection('pantries')
         .doc(pantryId)
@@ -356,67 +252,39 @@ class SharedPantryService {
   // LEAVE PANTRY
   // ------------------------------------------------------------
 
-  Future<void> leavePantry(
-      String pantryId,
-      ) async {
+  Future<void> leavePantry(String pantryId) async {
     final user = _auth.currentUser;
 
     if (user == null) {
-      throw Exception(
-        'You must be logged in.',
-      );
+      throw Exception('You must be logged in.');
     }
 
-    final pantryRef =
-    _firestore
-        .collection('pantries')
-        .doc(pantryId);
+    final pantryRef = _firestore.collection('pantries').doc(pantryId);
 
-    final pantryDoc =
-    await pantryRef.get();
+    final pantryDoc = await pantryRef.get();
 
     if (!pantryDoc.exists) {
-      throw Exception(
-        'Pantry not found.',
-      );
+      throw Exception('Pantry not found.');
     }
 
-    final data =
-    pantryDoc.data();
+    final data = pantryDoc.data();
 
     // Owner cannot leave.
-    if (data?['ownerId'] ==
-        user.uid) {
-      throw Exception(
-        'The pantry owner cannot leave the pantry.',
-      );
+    if (data?['ownerId'] == user.uid) {
+      throw Exception('The pantry owner cannot leave the pantry.');
     }
 
-    final batch =
-    _firestore.batch();
+    final batch = _firestore.batch();
 
     // Remove membership.
-    batch.delete(
-      pantryRef
-          .collection('members')
-          .doc(user.uid),
-    );
+    batch.delete(pantryRef.collection('members').doc(user.uid));
 
     // Reset user's pantry information.
-    batch.set(
-      _firestore
-          .collection('users')
-          .doc(user.uid),
-      {
-        'pantryId':
-        FieldValue.delete(),
-        'pantryType':
-        'personal',
-        'updatedAt':
-        FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    batch.set(_firestore.collection('users').doc(user.uid), {
+      'pantryId': FieldValue.delete(),
+      'pantryType': 'personal',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
     await batch.commit();
   }

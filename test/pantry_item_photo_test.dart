@@ -29,6 +29,8 @@ void main() {
 
     expect(item.photoUrl, isNull);
     expect(item.photoStoragePath, isNull);
+    expect(item.imagePublicId, isNull);
+    expect(item.imageProvider, isNull);
     expect(item.hasUserPhoto, isFalse);
   });
 
@@ -58,6 +60,8 @@ void main() {
     final cleared = item.copyWith(clearPhoto: true);
     expect(cleared.photoUrl, isNull);
     expect(cleared.photoStoragePath, isNull);
+    expect(cleared.imagePublicId, isNull);
+    expect(cleared.imageProvider, isNull);
     expect(cleared.hasUserPhoto, isFalse);
     expect(item.hasUserPhoto, isTrue);
   });

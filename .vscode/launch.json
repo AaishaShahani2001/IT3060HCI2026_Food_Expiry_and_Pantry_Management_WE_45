@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "PantryPal (main.dart)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=CLOUDINARY_CLOUD_NAME=dyeuonham",
+        "--dart-define=CLOUDINARY_UPLOAD_PRESET=hci_pantrypal"
+      ]
+    }
+  ]
+}

@@ -16,11 +16,11 @@ class AuthService {
     required String pantryType,
   }) async {
     // 1. Create Firebase Authentication account
-    final UserCredential credential =
-    await _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
+    final UserCredential credential = await _auth
+        .createUserWithEmailAndPassword(
+          email: email.trim(),
+          password: password,
+        );
 
     final User? user = credential.user;
 

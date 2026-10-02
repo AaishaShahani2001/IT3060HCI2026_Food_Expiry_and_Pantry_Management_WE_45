@@ -202,6 +202,8 @@ class PantryItem {
     this.firestoreId,
     this.photoUrl,
     this.photoStoragePath,
+    this.imagePublicId,
+    this.imageProvider,
   }) : price = price ?? 0.0;
 
   final String id;
@@ -221,17 +223,24 @@ class PantryItem {
   /// Null until the item has been written to Firestore.
   final String? firestoreId;
 
+  /// Network photo URL. Cloudinary `secure_url` for new uploads, or a legacy
   /// Firebase Storage download URL. Never image bytes or a local file path.
   final String? photoUrl;
 
-  /// Storage object path: users/{uid}/pantryItems/{itemId}/photo.jpg.
+  /// Legacy Firebase Storage object path. New Cloudinary photos leave this null.
   final String? photoStoragePath;
+
+  /// Cloudinary `public_id`. Null for items without a Cloudinary photo.
+  final String? imagePublicId;
+
+  /// `cloudinary` when [photoUrl] came from Cloudinary. Null for legacy photos.
+  final String? imageProvider;
 
   /// True when this item can be updated or deleted in Cloud Firestore.
   bool get isConnectedToFirestore =>
       firestoreId != null && firestoreId!.trim().isNotEmpty;
 
-  /// True when a user-uploaded Storage photo should be shown instead of the
+  /// True when a user-uploaded photo should be shown instead of the
   /// category icon. Empty strings from older documents are treated as absent.
   bool get hasUserPhoto {
     final url = photoUrl;
@@ -321,7 +330,10 @@ class PantryItem {
     String? firestoreId,
     String? photoUrl,
     String? photoStoragePath,
+    String? imagePublicId,
+    String? imageProvider,
     bool clearPhoto = false,
+    bool clearPhotoStoragePath = false,
   }) {
     return PantryItem(
       id: id ?? this.id,
@@ -339,7 +351,11 @@ class PantryItem {
       photoUrl: clearPhoto ? null : (photoUrl ?? this.photoUrl),
       photoStoragePath: clearPhoto
           ? null
+          : clearPhotoStoragePath
+          ? photoStoragePath
           : (photoStoragePath ?? this.photoStoragePath),
+      imagePublicId: clearPhoto ? null : (imagePublicId ?? this.imagePublicId),
+      imageProvider: clearPhoto ? null : (imageProvider ?? this.imageProvider),
     );
   }
 
@@ -356,6 +372,8 @@ class PantryItem {
       'updatedAt': updatedAt?.toIso8601String(),
       'photoUrl': photoUrl,
       'photoStoragePath': photoStoragePath,
+      'imagePublicId': imagePublicId,
+      'imageProvider': imageProvider,
     };
   }
 
@@ -381,10 +399,15 @@ class PantryItem {
           : FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
-    // Download URL only — Used Up Undo restores the same Storage object.
+    // URL only — Used Up Undo restores the same photo fields. Cloudinary
+    // files are not deleted from this client.
     if (hasUserPhoto) {
       data['photoUrl'] = photoUrl;
-      data['photoStoragePath'] = photoStoragePath;
+      if (photoStoragePath != null) {
+        data['photoStoragePath'] = photoStoragePath;
+      }
+      if (imagePublicId != null) data['imagePublicId'] = imagePublicId;
+      if (imageProvider != null) data['imageProvider'] = imageProvider;
     }
     return data;
   }
@@ -403,8 +426,12 @@ class PantryItem {
       expiryDate: _parseDate(data['expiryDate']),
       createdAt: _parseDate(data['createdAt']),
       updatedAt: _parseDate(data['updatedAt']),
-      photoUrl: _optionalString(data['photoUrl']),
+      photoUrl:
+          _optionalString(data['photoUrl']) ??
+          _optionalString(data['imageUrl']),
       photoStoragePath: _optionalString(data['photoStoragePath']),
+      imagePublicId: _optionalString(data['imagePublicId']),
+      imageProvider: _optionalString(data['imageProvider']),
     );
   }
 

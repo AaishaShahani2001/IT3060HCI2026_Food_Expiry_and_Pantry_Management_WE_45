@@ -38,6 +38,6 @@ class CurrentUserNameNotifier extends AsyncNotifier<String> {
 }
 
 final currentUserNameProvider =
-AsyncNotifierProvider<CurrentUserNameNotifier, String>(
-  CurrentUserNameNotifier.new,
-);
+    AsyncNotifierProvider<CurrentUserNameNotifier, String>(
+      CurrentUserNameNotifier.new,
+    );

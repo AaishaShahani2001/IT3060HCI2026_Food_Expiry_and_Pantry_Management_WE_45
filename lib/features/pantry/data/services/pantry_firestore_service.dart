@@ -162,8 +162,8 @@ class PantryFirestoreService {
 
   /// Creates a new document and returns the item with [PantryItem.firestoreId] set.
   ///
-  /// Uses a pre-assigned ID when [item] already has one so a photo can be
-  /// uploaded to the matching Storage path before this write.
+  /// Uses a pre-assigned ID when [item] already has one so the photo upload
+  /// and this Firestore document share the same item ID.
   Future<PantryItem> addItem(PantryItem item) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -192,8 +192,8 @@ class PantryFirestoreService {
     }
   }
 
-  /// Firestore document ID generated before a Storage upload, so both use
-  /// the same users/{uid}/pantryItems/{itemId} identifier.
+  /// Firestore document ID generated before a photo upload, so the pantry
+  /// document and the saved image metadata use the same item ID.
   String newItemDocumentId(String userId) {
     return _itemsCollection(userId).doc().id;
   }
@@ -201,9 +201,9 @@ class PantryFirestoreService {
   /// Removes [item] because it was consumed. The Firestore document is deleted
   /// using its current ID so Undo can recreate the same document.
   ///
-  /// Storage photos are left in place during Used Up so Undo can restore the
-  /// same photoUrl/photoStoragePath. There is no delayed cleanup after the
-  /// Undo window; deleting Storage here would break Undo.
+  /// Photos stay in Cloudinary or legacy Storage during Used Up so Undo can
+  /// restore photoUrl, imagePublicId, and imageProvider. This client does not
+  /// delete the remote file.
   Future<RemovedPantryItem> markAsUsedUp({
     required String userId,
     required PantryItem item,
@@ -292,8 +292,14 @@ class PantryFirestoreService {
             ? null
             : Timestamp.fromDate(item.expiryDate!),
         'photoUrl': item.hasUserPhoto ? item.photoUrl : FieldValue.delete(),
-        'photoStoragePath': item.hasUserPhoto
+        'photoStoragePath': item.hasUserPhoto && item.photoStoragePath != null
             ? item.photoStoragePath
+            : FieldValue.delete(),
+        'imagePublicId': item.hasUserPhoto && item.imagePublicId != null
+            ? item.imagePublicId
+            : FieldValue.delete(),
+        'imageProvider': item.hasUserPhoto && item.imageProvider != null
+            ? item.imageProvider
             : FieldValue.delete(),
         'updatedAt': FieldValue.serverTimestamp(),
       });

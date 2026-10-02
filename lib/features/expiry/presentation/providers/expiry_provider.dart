@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../pantry/domain/models/pantry_item.dart';
+import '../../../pantry/domain/utils/expiry_status.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
 
 import '../../data/repositories/firestore_expiry_repository.dart';
@@ -145,32 +146,90 @@ final unknownExpiryItemsProvider =
 
 final expirySummaryProvider =
     Provider<
-        ({
-          int total,
-          int expired,
-          int expiringSoon,
-          int fresh,
-          int unknown,
-        })>((ref) {
-  final items = ref
-      .watch(pantryItemsProvider)
-      .maybeWhen(
-        data: (items) => items,
-        orElse: () => const <PantryItem>[],
-      );
+      ({int total, int expired, int expiringSoon, int fresh, int unknown})
+    >((ref) {
+      final items = ref
+          .watch(pantryItemsProvider)
+          .maybeWhen(
+            data: (items) => items,
+            orElse: () => const <PantryItem>[],
+          );
 
-  return ref
-      .read(expiryServiceProvider)
-      .buildSummary(items);
+      return ref.read(expiryServiceProvider).buildSummary(items);
+    });
+
+/// Status filter for the expiry list. This is separate from urgency sorting.
+enum ExpiryStatusFilter { all, fresh, expiringSoon, expired }
+
+class ExpiryStatusFilterNotifier extends Notifier<ExpiryStatusFilter> {
+  @override
+  ExpiryStatusFilter build() => ExpiryStatusFilter.all;
+
+  void select(ExpiryStatusFilter filter) {
+    state = state == filter ? ExpiryStatusFilter.all : filter;
+  }
+}
+
+final expiryStatusFilterProvider =
+    NotifierProvider<ExpiryStatusFilterNotifier, ExpiryStatusFilter>(
+      ExpiryStatusFilterNotifier.new,
+    );
+
+// Apply the selected status filter without modifying the original
+// Firestore-backed expiry list.
+final filteredExpiryItemsProvider = Provider<List<PantryItem>>((ref) {
+  final loadedItems = ref.watch(expiryItemsProvider);
+  final statusFilter = ref.watch(expiryStatusFilterProvider);
+  final statusMatched = loadedItems
+      .where((item) => item.matchesExpiryStatusFilter(statusFilter))
+      .toList(growable: false);
+
+  return ref.read(expiryServiceProvider).sortByExpiryUrgency(statusMatched);
 });
 
+// Group the already filtered expiry list into priority sections without
+// modifying the Firestore-backed items.
+final groupedExpiryItemsProvider = Provider<ExpiryPriorityGroups>((ref) {
+  final filteredItems = ref.watch(filteredExpiryItemsProvider);
+  return ref.read(expiryServiceProvider).groupByPriority(filteredItems);
+});
 
-// ============================================================
-// SMART ALERT ITEMS
-// ============================================================
+/// Counts shown on the status labels, taken from the full summary so a
+/// selected filter cannot change them.
+int expiryStatusFilterCount(
+  ({int total, int expired, int expiringSoon, int fresh, int unknown}) summary,
+  ExpiryStatusFilter filter,
+) {
+  return switch (filter) {
+    ExpiryStatusFilter.all =>
+      summary.fresh + summary.expiringSoon + summary.expired,
+    ExpiryStatusFilter.fresh => summary.fresh,
+    ExpiryStatusFilter.expiringSoon => summary.expiringSoon,
+    ExpiryStatusFilter.expired => summary.expired,
+  };
+}
 
-final smartAlertItemsProvider =
-    Provider<List<PantryItem>>((ref) {
+extension on PantryItem {
+  bool matchesExpiryStatusFilter(ExpiryStatusFilter filter) {
+    return switch (filter) {
+      ExpiryStatusFilter.all => expiryDate != null,
+      ExpiryStatusFilter.fresh => expiryStatus == ExpiryStatus.fresh,
+      ExpiryStatusFilter.expiringSoon =>
+        expiryStatus == ExpiryStatus.expiringSoon,
+      ExpiryStatusFilter.expired => expiryStatus == ExpiryStatus.expired,
+    };
+  }
+}
+
+/// Items that require smart-alert attention.
+///
+/// Includes:
+/// - expired items
+/// - items expiring today
+/// - items expiring within 3 days
+///
+/// They are sorted by urgency so the most urgent item appears first.
+final smartAlertItemsProvider = Provider<List<PantryItem>>((ref) {
   final items = ref
       .watch(pantryItemsProvider)
       .maybeWhen(

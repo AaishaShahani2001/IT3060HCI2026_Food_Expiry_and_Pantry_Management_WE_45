@@ -86,54 +86,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
 
     try {
-      final document = await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      final document = await _firestore.collection('users').doc(user.uid).get();
 
       final data = document.data();
 
       if (data != null) {
         _nameController.text =
-            (data['name'] as String?) ??
-                user.displayName ??
-                '';
+            (data['name'] as String?) ?? user.displayName ?? '';
 
-        _email =
-            (data['email'] as String?) ??
-                user.email ??
-                '';
+        _email = (data['email'] as String?) ?? user.email ?? '';
 
-        _pantryType =
-            (data['pantryType'] as String?) ??
-                'personal';
+        _pantryType = (data['pantryType'] as String?) ?? 'personal';
 
         _selectedPreferences
           ..clear()
-          ..addAll(
-            _convertToList(
-              data['foodPreferences'],
-            ),
-          );
+          ..addAll(_convertToList(data['foodPreferences']));
 
         _selectedAllergies
           ..clear()
-          ..addAll(
-            _convertToList(
-              data['allergies'],
-            ),
-          );
+          ..addAll(_convertToList(data['allergies']));
       } else {
-        _nameController.text =
-            user.displayName ?? '';
+        _nameController.text = user.displayName ?? '';
 
         _email = user.email ?? '';
       }
     } catch (e) {
       if (mounted) {
-        _showMessage(
-          'Unable to load your profile.',
-        );
+        _showMessage('Unable to load your profile.');
       }
     } finally {
       if (mounted) {
@@ -155,24 +134,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     if (value is List) {
       return value
-          .map(
-            (item) => item.toString().trim(),
-      )
-          .where(
-            (item) => item.isNotEmpty,
-      )
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
           .toList();
     }
 
     if (value is String) {
       return value
           .split(',')
-          .map(
-            (item) => item.trim(),
-      )
-          .where(
-            (item) => item.isNotEmpty,
-      )
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
           .toList();
     }
 
@@ -191,9 +162,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final user = _auth.currentUser;
 
     if (user == null) {
-      _showMessage(
-        'You are not logged in.',
-      );
+      _showMessage('You are not logged in.');
       return;
     }
 
@@ -206,56 +175,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     try {
       final name = _nameController.text.trim();
 
-      final preferences =
-      List<String>.from(
-        _selectedPreferences,
-      );
+      final preferences = List<String>.from(_selectedPreferences);
 
-      final allergies =
-      List<String>.from(
-        _selectedAllergies,
-      );
+      final allergies = List<String>.from(_selectedAllergies);
 
       // Update Firebase Authentication display name.
       await user.updateDisplayName(name);
 
       // Update Firestore profile.
-      await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .set(
-        {
-          'uid': user.uid,
-          'name': name,
-          'email': user.email ?? _email,
-          'pantryType': _pantryType,
-          'foodPreferences': preferences,
-          'allergies': allergies,
-          'updatedAt':
-          FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
+      await _firestore.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'name': name,
+        'email': user.email ?? _email,
+        'pantryType': _pantryType,
+        'foodPreferences': preferences,
+        'allergies': allergies,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
       ref.invalidate(userDietaryProfileProvider);
 
       if (!mounted) return;
 
-      _showMessage(
-        'Profile updated successfully.',
-      );
+      _showMessage('Profile updated successfully.');
     } on FirebaseException catch (e) {
       if (!mounted) return;
 
-      _showMessage(
-        e.message ??
-            'Unable to save your profile.',
-      );
+      _showMessage(e.message ?? 'Unable to save your profile.');
     } catch (e) {
       if (!mounted) return;
 
-      _showMessage(
-        'Something went wrong. Please try again.',
-      );
+      _showMessage('Something went wrong. Please try again.');
     } finally {
       if (mounted) {
         setState(() {
@@ -270,37 +219,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // ================================================================
 
   Future<void> _logout() async {
-    final shouldLogout =
-    await showDialog<bool>(
+    final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: Text(
-            'Log out?',
-          ),
-          content: Text(
-            'Are you sure you want to log out of PantryPal?',
-          ),
+          title: Text('Log out?'),
+          content: Text('Are you sure you want to log out of PantryPal?'),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(
-                  dialogContext,
-                ).pop(false);
+                Navigator.of(dialogContext).pop(false);
               },
-              child: Text(
-                'Cancel',
-              ),
+              child: Text('Cancel'),
             ),
             FilledButton(
               onPressed: () {
-                Navigator.of(
-                  dialogContext,
-                ).pop(true);
+                Navigator.of(dialogContext).pop(true);
               },
-              child: Text(
-                'Log out',
-              ),
+              child: Text('Log out'),
             ),
           ],
         );
@@ -316,22 +252,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
       if (!mounted) return;
 
-      context.go(
-        AppRoutes.login,
-      );
+      context.go(AppRoutes.login);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
-      _showMessage(
-        e.message ??
-            'Unable to log out. Please try again.',
-      );
+      _showMessage(e.message ?? 'Unable to log out. Please try again.');
     } catch (e) {
       if (!mounted) return;
 
-      _showMessage(
-        'Something went wrong. Please try again.',
-      );
+      _showMessage('Something went wrong. Please try again.');
     }
   }
 
@@ -340,13 +269,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // ================================================================
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior:
-        SnackBarBehavior.floating,
-      ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 
@@ -354,13 +278,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // PANTRY TYPE ICON
   // ================================================================
 
-  IconData _pantryTypeIcon(
-      String value,
-      ) {
+  IconData _pantryTypeIcon(String value) {
     switch (value) {
       case 'family':
-        return Icons
-            .family_restroom_rounded;
+        return Icons.family_restroom_rounded;
 
       case 'shared':
       case 'hostel':
@@ -368,8 +289,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
       case 'personal':
       default:
-        return Icons
-            .person_outline_rounded;
+        return Icons.person_outline_rounded;
     }
   }
 
@@ -392,21 +312,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ? const Color(0xFF1E3A2C)
         : const Color(0xFFEAF4EE);
 
-    final textDark = isDark
-        ? const Color(0xFFF1F5F3)
-        : const Color(0xFF1F2933);
+    final textDark = isDark ? const Color(0xFFF1F5F3) : const Color(0xFF1F2933);
 
-    final textGrey = isDark
-        ? const Color(0xFFB8C2BD)
-        : const Color(0xFF6B7280);
+    final textGrey = isDark ? const Color(0xFFB8C2BD) : const Color(0xFF6B7280);
 
-    final backgroundColor = isDark
-        ? const Color(0xFF121815)
-        : const Color(0xFFF8FAF9);
+    final backgroundColor = theme.scaffoldBackgroundColor;
 
-    final cardColor = isDark
-        ? const Color(0xFF1B2420)
-        : Colors.white;
+    final cardColor = isDark ? const Color(0xFF1B2420) : Colors.white;
 
     final borderColor = isDark
         ? const Color(0xFF34423B)
@@ -432,8 +344,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ? const Color(0xFF351E20)
         : const Color(0xFFFFF1F1);
 
-    final user =
-        _auth.currentUser;
+    final user = _auth.currentUser;
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -441,9 +352,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       // ============================================================
       // APP BAR
       // ============================================================
-
       appBar: AppBar(
-        backgroundColor: cardColor,
+        backgroundColor: backgroundColor,
         elevation: 0,
         centerTitle: false,
         title: Text(
@@ -451,1065 +361,644 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           style: TextStyle(
             color: darkGreen,
             fontSize: 20,
-            fontWeight:
-            FontWeight.w700,
+            fontWeight: FontWeight.w700,
           ),
         ),
-        iconTheme:
-        IconThemeData(
-          color: textDark,
-        ),
+        iconTheme: IconThemeData(color: textDark),
       ),
 
       // ============================================================
       // BODY
       // ============================================================
-
       body: _isLoading
-          ? const Center(
-        child:
-        CircularProgressIndicator(),
-      )
+          ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-        padding:
-        const EdgeInsets.fromLTRB(
-          20,
-          20,
-          20,
-          32,
-        ),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.stretch,
-            children: [
-
-              // ==================================================
-              // PROFILE HEADER
-              // ==================================================
-
-              Container(
-                padding:
-                const EdgeInsets.all(
-                  20,
-                ),
-                decoration:
-                BoxDecoration(
-                  color: cardColor,
-                  borderRadius:
-                  BorderRadius
-                      .circular(
-                    18,
-                  ),
-                  border:
-                  Border.all(
-                    color: borderColor,
-                  ),
-                ),
-                child: Row(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // ==================================================
+                    // PROFILE HEADER
+                    // ==================================================
                     Container(
-                      width: 64,
-                      height: 64,
-                      decoration:
-                      BoxDecoration(
-                        color:
-                        lightGreen,
-                        borderRadius:
-                        BorderRadius
-                            .circular(
-                          18,
-                        ),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: cardColor,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: borderColor),
                       ),
-                      child:
-                      const Icon(
-                        Icons
-                            .person_rounded,
-                        size: 34,
-                        color:
-                        primaryGreen,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      width: 16,
-                    ),
-
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment
-                            .start,
+                      child: Row(
                         children: [
-                          Text(
-                            _nameController
-                                .text
-                                .isEmpty
-                                ? 'PantryPal User'
-                                : _nameController
-                                .text,
-                            maxLines: 1,
-                            overflow:
-                            TextOverflow
-                                .ellipsis,
-                            style:
-                            TextStyle(
-                              fontSize: 18,
-                              fontWeight:
-                              FontWeight
-                                  .w700,
-                              color:
-                              textDark,
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: lightGreen,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: const Icon(
+                              Icons.person_rounded,
+                              size: 34,
+                              color: primaryGreen,
                             ),
                           ),
 
-                          const SizedBox(
-                            height: 4,
-                          ),
+                          const SizedBox(width: 16),
 
-                          Text(
-                            user?.email ??
-                                _email,
-                            maxLines: 1,
-                            overflow:
-                            TextOverflow
-                                .ellipsis,
-                            style:
-                            TextStyle(
-                              fontSize: 13,
-                              color:
-                              textGrey,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _nameController.text.isEmpty
+                                      ? 'PantryPal User'
+                                      : _nameController.text,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: textDark,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 4),
+
+                                Text(
+                                  user?.email ?? _email,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: textGrey,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
 
-              const SizedBox(
-                height: 24,
-              ),
+                    const SizedBox(height: 24),
 
-              // ==================================================
-              // PERSONAL INFORMATION
-              // ==================================================
-
-              Text(
-                'Personal information',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight:
-                  FontWeight.w700,
-                  color: darkGreen,
-                ),
-              ),
-
-              const SizedBox(
-                height: 14,
-              ),
-
-              _sectionCard(
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment
-                      .stretch,
-                  children: [
-                    _fieldLabel(
-                      'Full name',
-                      textDark,
-                    ),
-
-                    const SizedBox(
-                      height: 8,
-                    ),
-
-                    TextFormField(
-                      controller:
-                      _nameController,
-                      textInputAction:
-                      TextInputAction
-                          .next,
-                      decoration:
-                      _inputDecoration(
-                        hintText:
-                        'Enter your name',
-                        icon: Icons
-                            .person_outline_rounded,
-                        primaryGreen:
-                        primaryGreen,
-                      ),
-                      onChanged:
-                          (_) {
-                        setState(
-                              () {},
-                        );
-                      },
-                      validator:
-                          (value) {
-                        final name =
-                            value
-                                ?.trim() ??
-                                '';
-
-                        if (name
-                            .isEmpty) {
-                          return 'Please enter your name';
-                        }
-
-                        if (name
-                            .length <
-                            2) {
-                          return 'Name must be at least 2 characters';
-                        }
-
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(
-                      height: 18,
-                    ),
-
-                    _fieldLabel(
-                      'Email address',
-                      textDark,
-                    ),
-
-                    const SizedBox(
-                      height: 8,
-                    ),
-
-                    TextFormField(
-                      initialValue:
-                      user?.email ??
-                          _email,
-                      readOnly: true,
-                      decoration:
-                      _inputDecoration(
-                        hintText:
-                        'Your email address',
-                        icon: Icons
-                            .email_outlined,
-                        primaryGreen:
-                        primaryGreen,
+                    // ==================================================
+                    // PERSONAL INFORMATION
+                    // ==================================================
+                    Text(
+                      'Personal information',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: darkGreen,
                       ),
                     ),
-                  ],
-                ),
-              ),
 
-              const SizedBox(
-                height: 24,
-              ),
+                    const SizedBox(height: 14),
 
-              // ==================================================
-              // PANTRY TYPE
-              // ==================================================
+                    _sectionCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _fieldLabel('Full name', textDark),
 
-              Text(
-                'Pantry type',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight:
-                  FontWeight.w700,
-                  color: darkGreen,
-                ),
-              ),
+                          const SizedBox(height: 8),
 
-              const SizedBox(
-                height: 6,
-              ),
-
-              Text(
-                'Choose how you manage your pantry.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: textGrey,
-                ),
-              ),
-
-              const SizedBox(
-                height: 14,
-              ),
-
-              _pantryOption(
-                title:
-                'Personal',
-                subtitle:
-                'Only you manage the pantry.',
-                value:
-                'personal',
-                primaryGreen:
-                primaryGreen,
-              ),
-
-              const SizedBox(
-                height: 10,
-              ),
-
-              _pantryOption(
-                title:
-                'Family',
-                subtitle:
-                'Manage food with your family.',
-                value:
-                'family',
-                primaryGreen:
-                primaryGreen,
-              ),
-
-              const SizedBox(
-                height: 10,
-              ),
-
-              _pantryOption(
-                title:
-                'Hostel / Shared',
-                subtitle:
-                'Share the pantry with roommates or a group.',
-                value:
-                'shared',
-                primaryGreen:
-                primaryGreen,
-              ),
-
-              const SizedBox(
-                height: 24,
-              ),
-
-              // ==================================================
-              // FOOD PREFERENCES
-              // ==================================================
-
-              Text(
-                'Food preferences',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight:
-                  FontWeight.w700,
-                  color: darkGreen,
-                ),
-              ),
-
-              const SizedBox(
-                height: 6,
-              ),
-
-              Text(
-                'Select the foods and dietary preferences that suit you.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: textGrey,
-                ),
-              ),
-
-              const SizedBox(
-                height: 14,
-              ),
-
-              _sectionCard(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children:
-                  _preferenceOptions
-                      .map(
-                        (
-                        preference,
-                        ) {
-                      final selected =
-                      _selectedPreferences
-                          .contains(
-                        preference,
-                      );
-
-                      return FilterChip(
-                        label:
-                        Text(
-                          preference,
-                        ),
-                        selected:
-                        selected,
-                        onSelected:
-                        _isSaving
-                            ? null
-                            : (value) {
-                          setState(
-                                () {
-                              if (value) {
-                                _selectedPreferences
-                                    .add(
-                                  preference,
-                                );
-                              } else {
-                                _selectedPreferences
-                                    .remove(
-                                  preference,
-                                );
-                              }
+                          TextFormField(
+                            controller: _nameController,
+                            textInputAction: TextInputAction.next,
+                            decoration: _inputDecoration(
+                              hintText: 'Enter your name',
+                              icon: Icons.person_outline_rounded,
+                              primaryGreen: primaryGreen,
+                            ),
+                            onChanged: (_) {
+                              setState(() {});
                             },
-                          );
-                        },
-                        selectedColor:
-                        lightGreen,
-                        checkmarkColor:
-                        primaryGreen,
-                        labelStyle:
-                        TextStyle(
-                          color:
-                          selected
-                              ? darkGreen
-                              : textDark,
-                          fontWeight:
-                          selected
-                              ? FontWeight
-                              .w600
-                              : FontWeight
-                              .w400,
-                        ),
-                        shape:
-                        RoundedRectangleBorder(
-                          borderRadius:
-                          BorderRadius
-                              .circular(
-                            10,
-                          ),
-                          side:
-                          BorderSide(
-                            color: selected
-                                ? primaryGreen
-                                : subtleBorderColor,
-                          ),
-                        ),
-                      );
-                    },
-                  ).toList(),
-                ),
-              ),
+                            validator: (value) {
+                              final name = value?.trim() ?? '';
 
-              const SizedBox(
-                height: 24,
-              ),
-
-              // ==================================================
-              // ALLERGIES
-              // ==================================================
-
-              Text(
-                'Food allergies',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight:
-                  FontWeight.w700,
-                  color: darkGreen,
-                ),
-              ),
-
-              const SizedBox(
-                height: 6,
-              ),
-
-              Text(
-                'Select any ingredients you need to avoid.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: textGrey,
-                ),
-              ),
-
-              const SizedBox(
-                height: 14,
-              ),
-
-              _sectionCard(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children:
-                  _allergyOptions
-                      .map(
-                        (
-                        allergy,
-                        ) {
-                      final selected =
-                      _selectedAllergies
-                          .contains(
-                        allergy,
-                      );
-
-                      return FilterChip(
-                        label:
-                        Text(
-                          allergy,
-                        ),
-                        selected:
-                        selected,
-                        onSelected:
-                        _isSaving
-                            ? null
-                            : (value) {
-                          setState(
-                                () {
-                              if (value) {
-                                _selectedAllergies
-                                    .add(
-                                  allergy,
-                                );
-                              } else {
-                                _selectedAllergies
-                                    .remove(
-                                  allergy,
-                                );
+                              if (name.isEmpty) {
+                                return 'Please enter your name';
                               }
+
+                              if (name.length < 2) {
+                                return 'Name must be at least 2 characters';
+                              }
+
+                              return null;
                             },
+                          ),
+
+                          const SizedBox(height: 18),
+
+                          _fieldLabel('Email address', textDark),
+
+                          const SizedBox(height: 8),
+
+                          TextFormField(
+                            initialValue: user?.email ?? _email,
+                            readOnly: true,
+                            decoration: _inputDecoration(
+                              hintText: 'Your email address',
+                              icon: Icons.email_outlined,
+                              primaryGreen: primaryGreen,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // ==================================================
+                    // PANTRY TYPE
+                    // ==================================================
+                    Text(
+                      'Pantry type',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: darkGreen,
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    Text(
+                      'Choose how you manage your pantry.',
+                      style: TextStyle(fontSize: 13, color: textGrey),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    _pantryOption(
+                      title: 'Personal',
+                      subtitle: 'Only you manage the pantry.',
+                      value: 'personal',
+                      primaryGreen: primaryGreen,
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    _pantryOption(
+                      title: 'Family',
+                      subtitle: 'Manage food with your family.',
+                      value: 'family',
+                      primaryGreen: primaryGreen,
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    _pantryOption(
+                      title: 'Hostel / Shared',
+                      subtitle: 'Share the pantry with roommates or a group.',
+                      value: 'shared',
+                      primaryGreen: primaryGreen,
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // ==================================================
+                    // FOOD PREFERENCES
+                    // ==================================================
+                    Text(
+                      'Food preferences',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: darkGreen,
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    Text(
+                      'Select the foods and dietary preferences that suit you.',
+                      style: TextStyle(fontSize: 13, color: textGrey),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    _sectionCard(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _preferenceOptions.map((preference) {
+                          final selected = _selectedPreferences.contains(
+                            preference,
                           );
-                        },
-                        selectedColor: allergySelectedBackground,
-                        checkmarkColor: allergySelectedBorder,
-                        labelStyle:
-                        TextStyle(
-                          color:
-                          selected
-                              ? allergySelectedText
-                              : textDark,
-                          fontWeight:
-                          selected
-                              ? FontWeight
-                              .w600
-                              : FontWeight
-                              .w400,
-                        ),
-                        shape:
-                        RoundedRectangleBorder(
-                          borderRadius:
-                          BorderRadius
-                              .circular(
-                            10,
-                          ),
-                          side:
-                          BorderSide(
-                            color:
-                            selected
-                                ? allergySelectedBorder
-                                : subtleBorderColor,
-                          ),
-                        ),
-                      );
-                    },
-                  ).toList(),
-                ),
-              ),
 
-              const SizedBox(
-                height: 28,
-              ),
-
-              // ==================================================
-              // SAVE BUTTON
-              // ==================================================
-
-              SizedBox(
-                height: 54,
-                child:
-                ElevatedButton(
-                  onPressed:
-                  _isSaving
-                      ? null
-                      : _saveProfile,
-                  style:
-                  ElevatedButton
-                      .styleFrom(
-                    backgroundColor:
-                    primaryGreen,
-                    foregroundColor:
-                    Colors.white,
-                    disabledBackgroundColor:
-                    primaryGreen
-                        .withValues(
-                      alpha: 0.5,
-                    ),
-                    elevation: 0,
-                    shape:
-                    RoundedRectangleBorder(
-                      borderRadius:
-                      BorderRadius
-                          .circular(
-                        12,
-                      ),
-                    ),
-                  ),
-                  child: _isSaving
-                      ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child:
-                    CircularProgressIndicator(
-                      strokeWidth:
-                      2.5,
-                      valueColor:
-                      AlwaysStoppedAnimation<
-                          Color>(
-                        Colors
-                            .white,
-                      ),
-                    ),
-                  )
-                      : const Row(
-                    mainAxisAlignment:
-                    MainAxisAlignment
-                        .center,
-                    children: [
-                      Icon(
-                        Icons
-                            .save_outlined,
-                        size: 20,
-                      ),
-                      SizedBox(
-                        width: 8,
-                      ),
-                      Text(
-                        'Save changes',
-                        style:
-                        TextStyle(
-                          fontSize:
-                          16,
-                          fontWeight:
-                          FontWeight
-                              .w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(
-                height: 18,
-              ),
-
-              // ==================================================
-              // INFO
-              // ==================================================
-
-              Container(
-                padding:
-                const EdgeInsets.all(
-                  16,
-                ),
-                decoration:
-                BoxDecoration(
-                  color:
-                  lightGreen,
-                  borderRadius:
-                  BorderRadius
-                      .circular(
-                    14,
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment:
-                  CrossAxisAlignment
-                      .start,
-                  children: [
-                    const Icon(
-                      Icons
-                          .info_outline_rounded,
-                      color:
-                      primaryGreen,
-                    ),
-
-                    const SizedBox(
-                      width: 12,
-                    ),
-
-                    Expanded(
-                      child: Text(
-                        'Your profile preferences will be used later to provide more relevant pantry and recipe suggestions.',
-                        style:
-                        TextStyle(
-                          fontSize: 13,
-                          height: 1.45,
-                          color:
-                          darkGreen,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(
-                height: 24,
-              ),
-
-              // ==================================================
-              // ACCOUNT
-              // ==================================================
-
-              Text(
-                'Account',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight:
-                  FontWeight.w700,
-                  color: darkGreen,
-                ),
-              ),
-
-              const SizedBox(
-                height: 14,
-              ),
-
-              // ==================================================
-              // SHARED PANTRY
-              // ==================================================
-
-              InkWell(
-                borderRadius:
-                BorderRadius.circular(
-                  14,
-                ),
-                onTap: _isSaving
-                    ? null
-                    : () => context.push(
-                  AppRoutes
-                      .sharedPantry,
-                ),
-                child: Container(
-                  padding:
-                  const EdgeInsets.all(
-                    16,
-                  ),
-                  decoration:
-                  BoxDecoration(
-                    color: cardColor,
-                    borderRadius:
-                    BorderRadius
-                        .circular(
-                      14,
-                    ),
-                    border:
-                    Border.all(
-                      color: borderColor,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration:
-                        BoxDecoration(
-                          color: lightGreen,
-                          borderRadius:
-                          BorderRadius
-                              .circular(
-                            12,
-                          ),
-                        ),
-                        child:
-                        const Icon(
-                          Icons
-                              .people_alt_outlined,
-                          color:
-                          Color(
-                            0xFF2E6B4E,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(
-                        width: 12,
-                      ),
-
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
-                          children: [
-                            Text(
-                              'Shared Pantry',
-                              style:
-                              TextStyle(
-                                fontSize:
-                                14,
-                                fontWeight:
-                                FontWeight
-                                    .w700,
-                                color: textDark,
+                          return FilterChip(
+                            label: Text(preference),
+                            selected: selected,
+                            onSelected: _isSaving
+                                ? null
+                                : (value) {
+                                    setState(() {
+                                      if (value) {
+                                        _selectedPreferences.add(preference);
+                                      } else {
+                                        _selectedPreferences.remove(preference);
+                                      }
+                                    });
+                                  },
+                            selectedColor: lightGreen,
+                            checkmarkColor: primaryGreen,
+                            labelStyle: TextStyle(
+                              color: selected ? darkGreen : textDark,
+                              fontWeight: selected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              side: BorderSide(
+                                color: selected
+                                    ? primaryGreen
+                                    : subtleBorderColor,
                               ),
                             ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
 
-                            SizedBox(
-                              height: 3,
+                    const SizedBox(height: 24),
+
+                    // ==================================================
+                    // ALLERGIES
+                    // ==================================================
+                    Text(
+                      'Food allergies',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: darkGreen,
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    Text(
+                      'Select any ingredients you need to avoid.',
+                      style: TextStyle(fontSize: 13, color: textGrey),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    _sectionCard(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _allergyOptions.map((allergy) {
+                          final selected = _selectedAllergies.contains(allergy);
+
+                          return FilterChip(
+                            label: Text(allergy),
+                            selected: selected,
+                            onSelected: _isSaving
+                                ? null
+                                : (value) {
+                                    setState(() {
+                                      if (value) {
+                                        _selectedAllergies.add(allergy);
+                                      } else {
+                                        _selectedAllergies.remove(allergy);
+                                      }
+                                    });
+                                  },
+                            selectedColor: allergySelectedBackground,
+                            checkmarkColor: allergySelectedBorder,
+                            labelStyle: TextStyle(
+                              color: selected ? allergySelectedText : textDark,
+                              fontWeight: selected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
                             ),
-
-                            Text(
-                              'Manage your shared pantry and members.',
-                              style:
-                              TextStyle(
-                                fontSize:
-                                12,
-                                color: textGrey,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              side: BorderSide(
+                                color: selected
+                                    ? allergySelectedBorder
+                                    : subtleBorderColor,
                               ),
                             ),
-                          ],
-                        ),
+                          );
+                        }).toList(),
                       ),
-
-                      const Icon(
-                        Icons
-                            .arrow_forward_ios_rounded,
-                        size: 16,
-                        color:
-                        Color(
-                          0xFF2E6B4E,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(
-                height: 12,
-              ),
-
-              // ==================================================
-              // CHANGE PASSWORD
-              // ==================================================
-
-              InkWell(
-                borderRadius:
-                BorderRadius.circular(
-                  14,
-                ),
-                onTap: _isSaving
-                    ? null
-                    : () => context.push(
-                  AppRoutes
-                      .changePassword,
-                ),
-                child: Container(
-                  padding:
-                  const EdgeInsets.all(
-                    16,
-                  ),
-                  decoration:
-                  BoxDecoration(
-                    color: cardColor,
-                    borderRadius:
-                    BorderRadius
-                        .circular(
-                      14,
                     ),
-                    border:
-                    Border.all(
-                      color: borderColor,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration:
-                        BoxDecoration(
-                          color: lightGreen,
-                          borderRadius:
-                          BorderRadius
-                              .circular(
-                            12,
+
+                    const SizedBox(height: 28),
+
+                    // ==================================================
+                    // SAVE BUTTON
+                    // ==================================================
+                    SizedBox(
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: _isSaving ? null : _saveProfile,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryGreen,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: primaryGreen.withValues(
+                            alpha: 0.5,
+                          ),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child:
-                        const Icon(
-                          Icons
-                              .lock_reset_rounded,
-                          color:
-                          Color(
-                            0xFF2E6B4E,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(
-                        width: 12,
-                      ),
-
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
-                          children: [
-                            Text(
-                              'Change Password',
-                              style:
-                              TextStyle(
-                                fontSize:
-                                14,
-                                fontWeight:
-                                FontWeight
-                                    .w700,
-                                color: textDark,
-                              ),
-                            ),
-
-                            SizedBox(
-                              height: 3,
-                            ),
-
-                            Text(
-                              'Update your account password.',
-                              style:
-                              TextStyle(
-                                fontSize:
-                                12,
-                                color: textGrey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const Icon(
-                        Icons
-                            .arrow_forward_ios_rounded,
-                        size: 16,
-                        color:
-                        Color(
-                          0xFF2E6B4E,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(
-                height: 12,
-              ),
-
-              // ==================================================
-              // LOGOUT
-              // ==================================================
-
-              InkWell(
-                borderRadius:
-                BorderRadius.circular(
-                  14,
-                ),
-                onTap: _isSaving
-                    ? null
-                    : _logout,
-                child: Container(
-                  padding:
-                  const EdgeInsets.all(
-                    16,
-                  ),
-                  decoration:
-                  BoxDecoration(
-                    color: cardColor,
-                    borderRadius:
-                    BorderRadius
-                        .circular(
-                      14,
-                    ),
-                    border:
-                    Border.all(
-                      color: borderColor,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration:
-                        BoxDecoration(
-                          color: logoutBackground,
-                          borderRadius:
-                          BorderRadius
-                              .circular(
-                            12,
-                          ),
-                        ),
-                        child:
-                        const Icon(
-                          Icons
-                              .logout_rounded,
-                          color:
-                          Color(
-                            0xFFD64545,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(
-                        width: 12,
-                      ),
-
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
-                          children: [
-                            Text(
-                              'Log out',
-                              style:
-                              TextStyle(
-                                fontSize:
-                                14,
-                                fontWeight:
-                                FontWeight
-                                    .w700,
-                                color:
-                                Color(
-                                  0xFFD64545,
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
+                              )
+                            : const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.save_outlined, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Save changes',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    // ==================================================
+                    // INFO
+                    // ==================================================
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: lightGreen,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.info_outline_rounded,
+                            color: primaryGreen,
+                          ),
+
+                          const SizedBox(width: 12),
+
+                          Expanded(
+                            child: Text(
+                              'Your profile preferences will be used later to provide more relevant pantry and recipe suggestions.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.45,
+                                color: darkGreen,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // ==================================================
+                    // ACCOUNT
+                    // ==================================================
+                    Text(
+                      'Account',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: darkGreen,
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // ==================================================
+                    // SHARED PANTRY
+                    // ==================================================
+                    InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: _isSaving
+                          ? null
+                          : () => context.push(AppRoutes.sharedPantry),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: lightGreen,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.people_alt_outlined,
+                                color: Color(0xFF2E6B4E),
                               ),
                             ),
 
-                            SizedBox(
-                              height: 3,
+                            const SizedBox(width: 12),
+
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Shared Pantry',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: textDark,
+                                    ),
+                                  ),
+
+                                  SizedBox(height: 3),
+
+                                  Text(
+                                    'Manage your shared pantry and members.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: textGrey,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
 
-                            Text(
-                              'Sign out of your PantryPal account.',
-                              style:
-                              TextStyle(
-                                fontSize:
-                                12,
-                                color: textGrey,
-                              ),
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 16,
+                              color: Color(0xFF2E6B4E),
                             ),
                           ],
                         ),
                       ),
+                    ),
 
-                      const Icon(
-                        Icons
-                            .arrow_forward_ios_rounded,
-                        size: 16,
-                        color:
-                        Color(
-                          0xFFD64545,
+                    const SizedBox(height: 12),
+
+                    // ==================================================
+                    // CHANGE PASSWORD
+                    // ==================================================
+                    InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: _isSaving
+                          ? null
+                          : () => context.push(AppRoutes.changePassword),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: lightGreen,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.lock_reset_rounded,
+                                color: Color(0xFF2E6B4E),
+                              ),
+                            ),
+
+                            const SizedBox(width: 12),
+
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Change Password',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: textDark,
+                                    ),
+                                  ),
+
+                                  SizedBox(height: 3),
+
+                                  Text(
+                                    'Update your account password.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: textGrey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 16,
+                              color: Color(0xFF2E6B4E),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // ==================================================
+                    // LOGOUT
+                    // ==================================================
+                    InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: _isSaving ? null : _logout,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: logoutBackground,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.logout_rounded,
+                                color: Color(0xFFD64545),
+                              ),
+                            ),
+
+                            const SizedBox(width: 12),
+
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Log out',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFFD64545),
+                                    ),
+                                  ),
+
+                                  SizedBox(height: 3),
+
+                                  Text(
+                                    'Sign out of your PantryPal account.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: textGrey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 16,
+                              color: Color(0xFFD64545),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 
@@ -1526,9 +1015,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final cardColor = isDark
-        ? const Color(0xFF1B2420)
-        : Colors.white;
+    final cardColor = isDark ? const Color(0xFF1B2420) : Colors.white;
 
     final selectedBackground = isDark
         ? const Color(0xFF1E3A2C)
@@ -1538,13 +1025,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ? const Color(0xFF34423B)
         : const Color(0xFFE1E5E3);
 
-    final textDark = isDark
-        ? const Color(0xFFF1F5F3)
-        : const Color(0xFF1F2933);
+    final textDark = isDark ? const Color(0xFFF1F5F3) : const Color(0xFF1F2933);
 
-    final textGrey = isDark
-        ? const Color(0xFFB8C2BD)
-        : const Color(0xFF6B7280);
+    final textGrey = isDark ? const Color(0xFFB8C2BD) : const Color(0xFF6B7280);
 
     final selected = _pantryType == value;
 
@@ -1553,10 +1036,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       onTap: _isSaving
           ? null
           : () {
-        setState(() {
-          _pantryType = value;
-        });
-      },
+              setState(() {
+                _pantryType = value;
+              });
+            },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.all(14),
@@ -1575,19 +1058,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               height: 44,
               decoration: BoxDecoration(
                 color: selected
-                    ? (isDark
-                    ? const Color(0xFF253D32)
-                    : Colors.white)
+                    ? (isDark ? const Color(0xFF253D32) : Colors.white)
                     : (isDark
-                    ? const Color(0xFF252F2B)
-                    : const Color(0xFFF1F3F2)),
+                          ? const Color(0xFF252F2B)
+                          : const Color(0xFFF1F3F2)),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 _pantryTypeIcon(value),
-                color: selected
-                    ? primaryGreen
-                    : textGrey,
+                color: selected ? primaryGreen : textGrey,
               ),
             ),
 
@@ -1610,10 +1089,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: textGrey,
-                    ),
+                    style: TextStyle(fontSize: 12, color: textGrey),
                   ),
                 ],
               ),
@@ -1625,14 +1101,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               onChanged: _isSaving
                   ? null
                   : (newValue) {
-                if (newValue == null) {
-                  return;
-                }
+                      if (newValue == null) {
+                        return;
+                      }
 
-                setState(() {
-                  _pantryType = value;
-                });
-              },
+                      setState(() {
+                        _pantryType = value;
+                      });
+                    },
             ),
           ],
         ),
@@ -1644,23 +1120,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // SECTION CARD
   // ================================================================
 
-  Widget _sectionCard({
-    required Widget child,
-  }) {
-    final isDark =
-        Theme.of(context).brightness == Brightness.dark;
+  Widget _sectionCard({required Widget child}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF1B2420)
-            : Colors.white,
+        color: isDark ? const Color(0xFF1B2420) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark
-              ? const Color(0xFF34423B)
-              : const Color(0xFFE3E9E6),
+          color: isDark ? const Color(0xFF34423B) : const Color(0xFFE3E9E6),
         ),
       ),
       child: child,
@@ -1671,18 +1140,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // FIELD LABEL
   // ================================================================
 
-  Widget _fieldLabel(
-      String text,
-      Color color,
-      ) {
+  Widget _fieldLabel(String text, Color color) {
     return Text(
       text,
-      style: TextStyle(
-        fontSize: 14,
-        fontWeight:
-        FontWeight.w600,
-        color: color,
-      ),
+      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: color),
     );
   }
 
@@ -1702,70 +1163,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       fillColor: Theme.of(context).brightness == Brightness.dark
           ? const Color(0xFF202A25)
           : const Color(0xFFF7F8F8),
-      contentPadding:
-      const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 16,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide.none,
       ),
-      border:
-      OutlineInputBorder(
-        borderRadius:
-        BorderRadius.circular(
-          10,
-        ),
-        borderSide:
-        BorderSide.none,
-      ),
-      enabledBorder:
-      OutlineInputBorder(
-        borderRadius:
-        BorderRadius.circular(
-          10,
-        ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(
           color: Theme.of(context).brightness == Brightness.dark
               ? const Color(0xFF3A4741)
               : const Color(0xFFE1E5E3),
         ),
       ),
-      focusedBorder:
-      OutlineInputBorder(
-        borderRadius:
-        BorderRadius.circular(
-          10,
-        ),
-        borderSide:
-        BorderSide(
-          color: primaryGreen,
-          width: 1.5,
-        ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: primaryGreen, width: 1.5),
       ),
-      errorBorder:
-      OutlineInputBorder(
-        borderRadius:
-        BorderRadius.circular(
-          10,
-        ),
-        borderSide:
-        const BorderSide(
-          color: Color(
-            0xFFD64545,
-          ),
-        ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFD64545)),
       ),
-      focusedErrorBorder:
-      OutlineInputBorder(
-        borderRadius:
-        BorderRadius.circular(
-          10,
-        ),
-        borderSide:
-        const BorderSide(
-          color: Color(
-            0xFFD64545,
-          ),
-          width: 1.5,
-        ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFD64545), width: 1.5),
       ),
     );
   }

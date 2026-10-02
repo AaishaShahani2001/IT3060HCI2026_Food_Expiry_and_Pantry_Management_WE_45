@@ -8,6 +8,7 @@ import '../../../shopping/domain/models/shopping_item.dart';
 import '../../../shopping/presentation/providers/shopping_providers.dart';
 import '../../domain/models/pantry_item.dart';
 import '../../domain/utils/expiry_status.dart';
+import '../../domain/utils/pantry_image_url.dart';
 import '../providers/pantry_providers.dart';
 import '../utils/pantry_item_actions.dart';
 import '../widgets/expiry_status_indicator.dart';
@@ -299,12 +300,14 @@ class _PantryItemDetailsScreenState
     final isUpdating = ref.watch(pantryBusyItemIdsProvider).contains(item.id);
     final canDecrement = !isUpdating;
 
+    final pageBackground = Theme.of(context).scaffoldBackgroundColor;
+
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: pageBackground,
       appBar: AppBar(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: pageBackground,
         foregroundColor: colorScheme.onSurface,
-        surfaceTintColor: colorScheme.surface,
+        surfaceTintColor: pageBackground,
         title: const Text('Item Details'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -444,6 +447,7 @@ class _HeaderCard extends StatelessWidget {
             ),
             child: PantryItemImage(
               item: item,
+              delivery: PantryImageDelivery.details,
               width: 84,
               height: 84,
               borderRadius: BorderRadius.circular(20),

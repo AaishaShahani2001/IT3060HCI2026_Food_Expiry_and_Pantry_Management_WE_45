@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
 import '../../domain/repositories/expiry_repository.dart';
 import '../../domain/services/expiry_notification_provider.dart';
 import '../providers/expiry_provider.dart';
+import '../widgets/empty_expiry_state.dart';
 
 class AddExpiryTrackingScreen extends ConsumerStatefulWidget {
   const AddExpiryTrackingScreen({super.key});
@@ -102,22 +105,44 @@ class _AddExpiryTrackingScreenState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final backgroundColor = featurePageBackground(context);
+    final headingColor = isDark ? colorScheme.onSurface : FreshPalette.heading;
     final pantry = ref.watch(pantryItemsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Track Item Expiry")),
+      backgroundColor: backgroundColor,
+      appBar: AppBar(
+        backgroundColor: backgroundColor,
+        foregroundColor: headingColor,
+        title: Text(
+          'Track Item Expiry',
+          style: TextStyle(color: headingColor, fontWeight: FontWeight.bold),
+        ),
+      ),
 
       body: pantry.when(
         loading: () => const Center(child: CircularProgressIndicator()),
 
-        error: (e, _) => Center(child: Text(e.toString())),
+        error: (_, _) => ExpiryLoadError(
+          onRetry: () {
+            ref.read(pantryItemsProvider.notifier).refreshItems();
+          },
+        ),
 
         data: (items) {
           if (items.isEmpty) {
-            return const Center(
+            return Center(
               child: Text(
-                "No pantry items available.\nAdd items in your pantry first.",
+                'No pantry items available.\nAdd items in your pantry first.',
                 textAlign: TextAlign.center,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: isDark
+                      ? colorScheme.onSurfaceVariant
+                      : FreshPalette.secondaryText,
+                ),
               ),
             );
           }
