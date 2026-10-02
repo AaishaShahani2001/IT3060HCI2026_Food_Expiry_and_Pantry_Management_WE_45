@@ -27,6 +27,7 @@ class AddShoppingItemScreen extends ConsumerStatefulWidget {
 
 class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _itemNameFieldKey = GlobalKey<FormFieldState<String>>();
   late final TextEditingController _itemNameController;
   late final TextEditingController _quantityController;
   final FocusNode _itemNameFocusNode = FocusNode();
@@ -41,6 +42,8 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
   late String _selectedCategory;
   late bool _unitManuallySelected;
   late bool _categoryManuallySelected;
+  bool _applyingSelectedItem = false;
+  String? _selectedCatalogName;
   String? _confirmedPantryName;
 
   bool get _sameUser =>
@@ -96,7 +99,10 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
 
   void _onNameChanged() {
     _confirmedPantryName = null;
-    _refreshFormOptions();
+    if (!_applyingSelectedItem) {
+      _selectedCatalogName = null;
+      _refreshFormOptions();
+    }
   }
 
   void _setQuantity(int quantity) {
@@ -106,11 +112,28 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
     );
   }
 
-  void _pickItem(String name) {
-    _itemNameController.text = name;
-    _itemNameController.selection = TextSelection.collapsed(
-      offset: name.length,
+  void _applySelectedShoppingItem(String name) {
+    final canonicalName = canonicalFoodItemNameFor(name) ?? name.trim();
+    final category = foodItemCategoryFor(canonicalName);
+    final unit = shoppingDefaultUnitForFood(canonicalName);
+
+    _applyingSelectedItem = true;
+    _itemNameController.value = TextEditingValue(
+      text: canonicalName,
+      selection: TextSelection.collapsed(offset: canonicalName.length),
     );
+    final itemNameField = _itemNameFieldKey.currentState;
+    itemNameField?.didChange(canonicalName);
+    itemNameField?.validate();
+    _applyingSelectedItem = false;
+
+    setState(() {
+      _selectedCategory = category;
+      _selectedUnit = unit ?? PantryUnit.items;
+      _categoryManuallySelected = false;
+      _unitManuallySelected = false;
+      _selectedCatalogName = normalizeFoodItemName(canonicalName);
+    });
     _itemNameFocusNode.unfocus();
   }
 
@@ -121,9 +144,7 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
       return const Iterable<String>.empty();
     }
 
-    return foodItemSuggestions.where(
-      (item) => item.toLowerCase().startsWith(query),
-    );
+    return matchFoodItemSuggestions(query);
   }
 
   PantryItem? _matchingPantryItem() {
@@ -134,12 +155,20 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
 
   String _effectiveCategory(PantryItem? pantryMatch) {
     if (_categoryManuallySelected) return _selectedCategory;
+    if (_selectedCatalogName ==
+        normalizeFoodItemName(_itemNameController.text)) {
+      return _selectedCategory;
+    }
     if (pantryMatch != null) return shoppingCategoryForPantryItem(pantryMatch);
     return foodItemCategoryFor(_itemNameController.text);
   }
 
   PantryUnit _effectiveUnit(PantryItem? pantryMatch) {
     if (_unitManuallySelected) return _selectedUnit;
+    if (_selectedCatalogName ==
+        normalizeFoodItemName(_itemNameController.text)) {
+      return _selectedUnit;
+    }
     return pantryMatch?.unit ?? PantryUnit.items;
   }
 
@@ -426,6 +455,8 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
                                               _itemNameController,
                                           focusNode: _itemNameFocusNode,
                                           optionsBuilder: _findFoodSuggestions,
+                                          onSelected:
+                                              _applySelectedShoppingItem,
                                           fieldViewBuilder:
                                               (
                                                 context,
@@ -434,6 +465,7 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
                                                 onSubmitted,
                                               ) {
                                                 return TextFormField(
+                                                  key: _itemNameFieldKey,
                                                   controller: controller,
                                                   focusNode: focusNode,
                                                   autofocus: true,
@@ -605,7 +637,10 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
                                         for (final name in quickPicks)
                                           ActionChip(
                                             label: Text(name),
-                                            onPressed: () => _pickItem(name),
+                                            onPressed: () =>
+                                                _applySelectedShoppingItem(
+                                                  name,
+                                                ),
                                             backgroundColor: colors
                                                 .secondaryContainer
                                                 .withValues(alpha: 0.45),
