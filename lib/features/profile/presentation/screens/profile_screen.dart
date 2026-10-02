@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../features/recipes/presentation/providers/recipe_providers.dart';
+import '../../../../features/pantry/presentation/providers/pantry_providers.dart';
 
 import '../../../../core/router/app_routes.dart';
 
@@ -53,6 +54,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   String _email = '';
   String _pantryType = 'personal';
+  String _selectedPantryType = 'personal';
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -97,6 +99,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         _email = (data['email'] as String?) ?? user.email ?? '';
 
         _pantryType = (data['pantryType'] as String?) ?? 'personal';
+
+        _selectedPantryType = _pantryType;
 
         _selectedPreferences
           ..clear()
@@ -183,16 +187,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       await user.updateDisplayName(name);
 
       // Update Firestore profile.
-      await _firestore.collection('users').doc(user.uid).set({
-        'uid': user.uid,
-        'name': name,
-        'email': user.email ?? _email,
-        'pantryType': _pantryType,
-        'foodPreferences': preferences,
-        'allergies': allergies,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .set(
+        {
+          'uid': user.uid,
+          'name': name,
+          'email': user.email ?? _email,
+          'pantryType': _selectedPantryType,
+
+          // Personal users should not remain linked to a shared pantry.
+          if (_selectedPantryType == 'personal')
+            'pantryId': FieldValue.delete(),
+
+          'foodPreferences': preferences,
+          'allergies': allergies,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+
+// Update the active pantry type only after Firestore saves successfully.
+      _pantryType = _selectedPantryType;
+
       ref.invalidate(userDietaryProfileProvider);
+      ref.invalidate(pantryItemsProvider);
 
       if (!mounted) return;
 
@@ -1029,17 +1049,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     final textGrey = isDark ? const Color(0xFFB8C2BD) : const Color(0xFF6B7280);
 
-    final selected = _pantryType == value;
+    final selected = _selectedPantryType == value;
 
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: _isSaving
           ? null
           : () {
-              setState(() {
-                _pantryType = value;
-              });
-            },
+        setState(() {
+          _selectedPantryType = value;
+        });
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.all(14),
@@ -1101,14 +1121,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               onChanged: _isSaving
                   ? null
                   : (newValue) {
-                      if (newValue == null) {
-                        return;
-                      }
-
-                      setState(() {
-                        _pantryType = value;
-                      });
-                    },
+                if (newValue == null) {
+                  return;
+                }
+                setState(() {
+                  _selectedPantryType = value;
+                });
+              }
             ),
           ],
         ),

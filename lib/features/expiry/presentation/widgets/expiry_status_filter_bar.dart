@@ -18,6 +18,7 @@ class ExpiryStatusFilterBar extends StatelessWidget {
   final ValueChanged<ExpiryStatusFilter> onSelected;
 
   static const _filters = <ExpiryStatusFilter>[
+    ExpiryStatusFilter.all,
     ExpiryStatusFilter.fresh,
     ExpiryStatusFilter.expiringSoon,
     ExpiryStatusFilter.expired,
@@ -135,6 +136,7 @@ String _semanticLabel(ExpiryStatusFilter filter, int count) {
     ExpiryStatusFilter.fresh => 'Show $count fresh expiry $items',
     ExpiryStatusFilter.expiringSoon => 'Show $count $items expiring soon',
     ExpiryStatusFilter.expired => 'Show $count expired $items',
+    ExpiryStatusFilter.unknown => 'Show $count $items with no expiry date',
   };
 }
 
@@ -144,5 +146,6 @@ String _visibleLabel(ExpiryStatusFilter filter) {
     ExpiryStatusFilter.fresh => ExpiryStatus.fresh.badgeLabel,
     ExpiryStatusFilter.expiringSoon => ExpiryStatus.expiringSoon.badgeLabel,
     ExpiryStatusFilter.expired => ExpiryStatus.expired.badgeLabel,
+    ExpiryStatusFilter.unknown => 'No Expiry',
   };
 }

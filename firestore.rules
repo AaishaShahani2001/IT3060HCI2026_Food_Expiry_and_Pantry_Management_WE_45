@@ -2,6 +2,32 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // In-app notification center. Soft delete is an update; hard deletes stay closed.
+    // Publish this block in Firebase Console. The catch-all rule below still
+    // allows any signed-in user until that catch-all is removed or narrowed.
+    match /users/{userId}/notifications/{notificationId} {
+      allow read: if request.auth != null
+                  && request.auth.uid == userId;
+
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.userId == request.auth.uid;
+
+      allow update: if request.auth != null
+                    && request.auth.uid == userId
+                    && resource.data.userId == request.auth.uid
+                    && request.resource.data.userId == resource.data.userId;
+
+      allow delete: if false;
+    }
+
+    // Remembers which pantry items were last seen above the low-stock
+    // threshold so a low-stock alert is created only on a real crossing.
+    match /users/{userId}/notificationMeta/{docId} {
+      allow read, write: if request.auth != null
+                          && request.auth.uid == userId;
+    }
+
     match /{document=**} {
       allow read, write: if request.auth != null;
     }

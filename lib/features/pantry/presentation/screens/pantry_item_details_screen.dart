@@ -7,6 +7,7 @@ import '../../../expiry/presentation/providers/expiry_provider.dart';
 import '../../../shopping/domain/models/shopping_item.dart';
 import '../../../shopping/presentation/providers/shopping_providers.dart';
 import '../../domain/models/pantry_item.dart';
+import '../../domain/utils/pantry_price_display.dart';
 import '../../domain/utils/expiry_status.dart';
 import '../../domain/utils/pantry_image_url.dart';
 import '../providers/pantry_providers.dart';
@@ -269,15 +270,6 @@ class _PantryItemDetailsScreenState
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
-  /// Safe price label for older in-memory items that may still have a null price.
-  String _priceLabelFor(PantryItem item) {
-    try {
-      return item.priceLabel;
-    } catch (_) {
-      return 'Rs. 0.00';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final item = _resolveItem();
@@ -359,7 +351,6 @@ class _PantryItemDetailsScreenState
                   _InfoCard(
                     item: item,
                     isWide: isWide,
-                    priceLabel: _priceLabelFor(item),
                     purchaseDateLabel: item.createdAt == null
                         ? null
                         : _formatDate(item.createdAt!),
@@ -510,14 +501,12 @@ class _InfoCard extends StatelessWidget {
   const _InfoCard({
     required this.item,
     required this.isWide,
-    required this.priceLabel,
     required this.purchaseDateLabel,
     required this.expiryDateLabel,
   });
 
   final PantryItem item;
   final bool isWide;
-  final String priceLabel;
   final String? purchaseDateLabel;
   final String? expiryDateLabel;
 
@@ -525,15 +514,37 @@ class _InfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final rows = <Widget>[
       _InfoRow(
-        icon: Icons.payments_outlined,
-        label: 'Price',
-        value: priceLabel,
+        icon: Icons.inventory_2_outlined,
+        label: 'Original quantity',
+        value: item.originalQuantityLabel,
       ),
       _InfoRow(
-        icon: Icons.inventory_2_outlined,
-        label: 'Quantity',
+        icon: Icons.scale_outlined,
+        label: 'Remaining quantity',
         value: item.quantityLabel,
       ),
+      if (item.hasPrice) ...[
+        _InfoRow(
+          icon: Icons.sell_outlined,
+          label: 'Price type',
+          value: item.priceType.label,
+        ),
+        _InfoRow(
+          icon: Icons.payments_outlined,
+          label: storedPriceDetailLabel(item.unit, item.priceType),
+          value: formatPantryRupees(item.unitPrice),
+        ),
+        _InfoRow(
+          icon: Icons.account_balance_wallet_outlined,
+          label: 'Estimated remaining value',
+          value: formatPantryRupees(item.estimatedRemainingValue),
+        ),
+      ] else
+        const _InfoRow(
+          icon: Icons.payments_outlined,
+          label: 'Price',
+          value: 'Price not provided',
+        ),
       _InfoRow(
         icon: item.location.icon,
         label: 'Storage location',

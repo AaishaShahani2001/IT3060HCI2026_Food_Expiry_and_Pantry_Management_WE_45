@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -620,6 +621,9 @@ class _QuantityEditSession {
   });
 
   final PantryItem item;
+
+  /// Remaining quantity before this +/- burst. Undo writes this back and does
+  /// not change [PantryItem.originalQuantity], price type, or price amount.
   final double originalQuantity;
   double pendingQuantity;
   Timer? debounceTimer;
@@ -638,35 +642,106 @@ final pantryItemsProvider =
       PantryItemsNotifier.new,
     );
 
-/// Switches the pantry stream when the signed-in user changes.
+/// Switches the pantry stream when either the signed-in user OR the
+/// user's active pantry changes.
 ///
-/// Both Pantry screens watch [pantryItemsProvider]; this is the single
-/// users/{uid}/pantryItems listener. The dashboard preview is derived in
-/// memory and does not open a second Firestore query.
+/// The active pantry is determined by the user's Firestore profile:
+/// - personal -> users/{uid}/pantryItems
+/// - family/shared -> pantries/{pantryId}/items
+///
+/// Listening to the user document is important because changing
+/// pantryType/pantryId does not change Firebase Auth state.
 Stream<List<PantryItem>> _watchPantryForSignedInUser(
   PantryFirestoreService service,
 ) {
   late final StreamController<List<PantryItem>> controller;
+
   StreamSubscription<User?>? authSub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? profileSub;
   StreamSubscription<List<PantryItem>>? pantrySub;
+
+  String? lastPantryContextKey;
+
+  Future<void> switchPantryStream(User user) async {
+    await pantrySub?.cancel();
+    pantrySub = null;
+
+    if (controller.isClosed) return;
+
+    // Clear the previous pantry immediately.
+    //
+    // This prevents Personal items from remaining visible for a moment
+    // after switching to Family/Shared, or vice versa.
+    controller.add(const <PantryItem>[]);
+
+    pantrySub = service
+        .watchPantryItems(userId: user.uid)
+        .listen(
+          (items) {
+            if (!controller.isClosed) {
+              controller.add(items);
+            }
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!controller.isClosed) {
+              controller.addError(error, stackTrace);
+            }
+          },
+        );
+  }
 
   controller = StreamController<List<PantryItem>>(
     onListen: () {
       authSub = FirebaseAuth.instance.authStateChanges().listen(
         (user) async {
+          // Cancel everything belonging to the previous user.
+          await profileSub?.cancel();
           await pantrySub?.cancel();
+
+          profileSub = null;
           pantrySub = null;
+          lastPantryContextKey = null;
+
           if (user == null) {
             if (!controller.isClosed) {
               controller.add(const <PantryItem>[]);
             }
             return;
           }
-          pantrySub = service
-              .watchPantryItems(userId: user.uid)
+
+          // Listen to the user's Firestore profile.
+          //
+          // This detects changes such as:
+          // pantryType: personal -> shared
+          // pantryType: shared -> personal
+          // pantryId being added/recovered
+          profileSub = FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .snapshots()
               .listen(
-                (items) {
-                  if (!controller.isClosed) controller.add(items);
+                (snapshot) async {
+                  if (controller.isClosed) return;
+
+                  final data = snapshot.data();
+
+                  final pantryType =
+                      (data?['pantryType'] as String?)?.trim().toLowerCase() ??
+                      'personal';
+
+                  final pantryId = (data?['pantryId'] as String?)?.trim();
+
+                  // Only recreate the pantry stream when the active
+                  // pantry context actually changes.
+                  final contextKey = '$pantryType|${pantryId ?? ''}';
+
+                  if (contextKey == lastPantryContextKey) {
+                    return;
+                  }
+
+                  lastPantryContextKey = contextKey;
+
+                  await switchPantryStream(user);
                 },
                 onError: (Object error, StackTrace stackTrace) {
                   if (!controller.isClosed) {
@@ -684,7 +759,12 @@ Stream<List<PantryItem>> _watchPantryForSignedInUser(
     },
     onCancel: () async {
       await pantrySub?.cancel();
+      await profileSub?.cancel();
       await authSub?.cancel();
+
+      pantrySub = null;
+      profileSub = null;
+      authSub = null;
     },
   );
 

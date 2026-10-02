@@ -137,8 +137,7 @@ class ExpiryService {
   /// - after Use First through [kExpiryExpiringSoonDays] → Expiring Soon
   ///
   /// Items with no expiry date are left out. Later dated items are returned
-  /// in [ExpiryPriorityGroups.outsidePriority] so existing filters can still
-  /// show them without a fourth section.
+  /// in [ExpiryPriorityGroups.outsidePriority] for the Fresh topic.
   ExpiryPriorityGroups groupByPriority(
     Iterable<PantryItem> items, {
     DateTime? referenceDate,

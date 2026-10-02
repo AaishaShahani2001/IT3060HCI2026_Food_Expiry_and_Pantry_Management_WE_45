@@ -108,6 +108,7 @@ String shoppingUnitLabel(PantryUnit unit) => switch (unit) {
   PantryUnit.ml => 'ml',
   PantryUnit.packs => 'packs',
   PantryUnit.bottles => 'bottles',
+  PantryUnit.boxes => 'boxes',
 };
 
 String shoppingCategoryForPantryItem(PantryItem item) {
