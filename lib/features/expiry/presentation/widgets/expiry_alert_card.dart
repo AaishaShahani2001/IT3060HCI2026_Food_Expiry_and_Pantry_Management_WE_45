@@ -88,10 +88,10 @@ class ExpiryAlertCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -14,6 +14,78 @@ import '../widgets/empty_expiry_state.dart';
 import '../widgets/expiry_alert_card.dart';
 import '../widgets/expiry_status_filter_bar.dart';
 import '../widgets/stop_tracking_dialog.dart';
+import '../widgets/empty_expiry_state.dart';
+
+class ExpiryTrackingActions extends StatelessWidget {
+  const ExpiryTrackingActions({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: MediaQuery.sizeOf(context).width - 32,
+      child: Row(
+        children: [
+          Expanded(
+            flex: 5,
+            child: OutlinedButton(
+              key: const ValueKey('track-waste-button'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryGreen,
+                minimumSize: const Size(0, 56),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              onPressed: () {
+                context.push(AppRoutes.wasteTracker);
+              },
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.delete_outline_rounded, size: 20),
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Track Waste'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 6,
+            child: FilledButton(
+              key: const ValueKey('track-item-expiry-button'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 56),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              onPressed: () {
+                context.push(AppRoutes.addExpiryTracking);
+              },
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add, size: 20),
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Track Item Expiry'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class ExpiryScreen extends ConsumerWidget {
   const ExpiryScreen({super.key});
@@ -37,6 +109,7 @@ class ExpiryScreen extends ConsumerWidget {
           'Expiry Monitoring',
           style: TextStyle(color: headingColor, fontWeight: FontWeight.bold),
         ),
+
         actions: [
           IconButton(
             tooltip: 'Expiry Notifications',
@@ -44,8 +117,11 @@ class ExpiryScreen extends ConsumerWidget {
               Icons.notifications_active_outlined,
               color: headingColor,
             ),
+
             onPressed: () {
-              context.push(AppRoutes.expiryNotifications);
+              context.push(
+                AppRoutes.expiryNotifications,
+              );
             },
           ),
         ],
@@ -329,10 +405,171 @@ class _ExpirySectionHeader extends StatelessWidget {
       ),
     );
   }
+
+
+  // ==========================================================
+  // TRACKED EXPIRY CARD
+  // ==========================================================
+
+  static Widget _buildTrackedCard({
+    required BuildContext context,
+    required WidgetRef ref,
+    required dynamic item,
+    required dynamic alert,
+    required String priority,
+    required String message,
+  }) {
+    return ExpiryAlertCard(
+      name: item.name,
+      quantity: item.quantityLabel,
+      message: message,
+      priority: priority,
+      category: item.category,
+
+      // ======================================================
+      // UPDATE
+      // ======================================================
+
+      onUpdate: () {
+        final targetAlert = alert ??
+            ExpiryAlert(
+              id: item.id,
+              userId: '',
+              itemId: item.id,
+              itemName: item.name,
+              expiryDate: item.expiryDate ?? DateTime.now(),
+              daysUntilExpiry:
+                  ref.read(expiryServiceProvider).daysUntilExpiry(item) ?? 0,
+              status: 'active',
+              priority: priority,
+              message: message,
+              isRead: false,
+              createdAt: DateTime.now(),
+            );
+
+        context.push(
+          AppRoutes.editExpiryTracking,
+          extra: targetAlert,
+        );
+      },
+
+      // ======================================================
+      // STOP TRACKING
+      // ======================================================
+
+      onStopTracking: () async {
+        final confirm = await showStopTrackingDialog(context);
+
+        if (confirm != true) {
+          return;
+        }
+
+        try {
+          // 1. Clear expiry date on the PantryItem so it immediately stops being tracked!
+          final updatedItem = item.copyWith(clearExpiryDate: true);
+          await ref
+              .read(pantryItemsProvider.notifier)
+              .updateItem(updatedItem);
+
+          // 2. Delete alert if alert exists
+          final alertId = alert?.id ?? item.id;
+          await ref.read(deleteExpiryAlertProvider)(alertId);
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Stopped tracking expiry for ${item.name}.',
+                ),
+              ),
+            );
+          }
+        } catch (error) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Failed to stop tracking: $error',
+                ),
+              ),
+            );
+          }
+        }
+      },
+    );
+  }
+
+
+  // ==========================================================
+  // SECTION HEADER
+  // ==========================================================
+
+  static Widget _sectionHeader({
+    required String title,
+    required int count,
+    required Color color,
+  }) {
+    return Row(
+      mainAxisAlignment:
+          MainAxisAlignment.spaceBetween,
+
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            Text(
+              title,
+              style: const TextStyle(
+                color:
+                    AppColors.darkGreen,
+                fontSize: 16,
+                fontWeight:
+                    FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+
+        Text(
+          '$count items',
+          style: const TextStyle(
+            color:
+                AppColors.textSecondary,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class ExpiryTrackingActions extends StatelessWidget {
-  const ExpiryTrackingActions({super.key});
+
+// ============================================================
+// NO EXPIRY CARD
+// ============================================================
+
+class _NoExpiryCard
+    extends StatelessWidget {
+  const _NoExpiryCard({
+    required this.name,
+    required this.quantity,
+    required this.onTrack,
+  });
+
+  final String name;
+  final String quantity;
+  final VoidCallback onTrack;
 
   @override
   Widget build(BuildContext context) {
