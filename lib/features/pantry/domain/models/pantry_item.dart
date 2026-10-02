@@ -118,7 +118,8 @@ enum PantryUnit {
   liters,
   ml,
   packs,
-  bottles;
+  bottles,
+  boxes;
 
   String get label {
     switch (this) {
@@ -136,6 +137,8 @@ enum PantryUnit {
         return 'Packs';
       case PantryUnit.bottles:
         return 'Bottles';
+      case PantryUnit.boxes:
+        return 'Boxes';
     }
   }
 
@@ -156,6 +159,8 @@ enum PantryUnit {
         return isSingular ? 'pack' : 'packs';
       case PantryUnit.bottles:
         return isSingular ? 'bottle' : 'bottles';
+      case PantryUnit.boxes:
+        return isSingular ? 'box' : 'boxes';
     }
   }
 
@@ -167,6 +172,60 @@ enum PantryUnit {
       }
     }
     return PantryUnit.items;
+  }
+}
+
+/// How [PantryItem.priceAmount] should be interpreted.
+///
+/// Firestore stores the enum name (`unitPrice` or `totalPrice`), never a
+/// display label.
+enum PantryPriceType {
+  unitPrice,
+  totalPrice;
+
+  String get label {
+    switch (this) {
+      case PantryPriceType.unitPrice:
+        return 'Unit Price';
+      case PantryPriceType.totalPrice:
+        return 'Total Price';
+    }
+  }
+
+  String get explanation {
+    switch (this) {
+      case PantryPriceType.unitPrice:
+        return 'Price for each item or measurement unit';
+      case PantryPriceType.totalPrice:
+        return 'Price paid for the full quantity entered';
+    }
+  }
+
+  /// Suggestion only. The form may keep a choice the user made by hand.
+  static PantryPriceType suggestedFor(PantryUnit unit) {
+    switch (unit) {
+      case PantryUnit.kg:
+      case PantryUnit.g:
+      case PantryUnit.liters:
+      case PantryUnit.ml:
+        return PantryPriceType.unitPrice;
+      case PantryUnit.items:
+      case PantryUnit.packs:
+      case PantryUnit.bottles:
+      case PantryUnit.boxes:
+        return PantryPriceType.totalPrice;
+    }
+  }
+
+  static PantryPriceType fromStorage(Object? value) {
+    final normalized = value is String ? value.trim() : '';
+    for (final type in PantryPriceType.values) {
+      if (type.name == normalized) return type;
+    }
+    // Older documents have no price type. Treat their single price as the
+    // amount paid for the whole quantity so waste estimates are not inflated
+    // by multiplying that total by the remaining quantity.
+    return PantryPriceType.totalPrice;
   }
 }
 
@@ -194,8 +253,11 @@ class PantryItem {
     required this.category,
     required this.location,
     required this.quantity,
+    double? originalQuantity,
     required this.unit,
     double? price,
+    double? priceAmount,
+    PantryPriceType? priceType,
     this.expiryDate,
     this.createdAt,
     this.updatedAt,
@@ -204,17 +266,32 @@ class PantryItem {
     this.photoStoragePath,
     this.imagePublicId,
     this.imageProvider,
-  }) : price = price ?? 0.0;
+  }) : originalQuantity = originalQuantity ?? quantity,
+       priceAmount = priceAmount ?? price,
+       priceType = priceType ?? PantryPriceType.totalPrice;
 
   final String id;
   final String name;
   final PantryCategory category;
   final PantryLocation location;
+
+  /// Quantity still in the pantry. +/- controls and Used Up change this only.
   final double quantity;
+
+  /// Quantity first purchased or entered. Kept so a later remaining quantity
+  /// can be valued as a fraction of the amount paid. Not overwritten by +/-.
+  final double originalQuantity;
   final PantryUnit unit;
 
-  /// Nullable so older in-memory items (hot reload) don't crash when read.
-  final double? price;
+  /// Numeric amount whose meaning comes from [priceType].
+  ///
+  /// `unitPrice` is the price of one reference unit (per kg, per L, or per
+  /// item). `totalPrice` is the amount paid for [originalQuantity].
+  /// Null when the user did not enter a price. The legacy constructor
+  /// argument `price` fills this same field.
+  final double? priceAmount;
+
+  final PantryPriceType priceType;
   final DateTime? expiryDate;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -247,15 +324,25 @@ class PantryItem {
     return url != null && url.trim().isNotEmpty;
   }
 
+  /// Legacy accessor for [priceAmount]. Not necessarily a per-unit price;
+  /// read [priceType] before using it in a formula.
+  double? get price => priceAmount;
+
+  /// Stored amount, or 0 when no price was entered.
   double get unitPrice {
-    try {
-      return price ?? 0.0;
-    } catch (_) {
-      return 0.0;
-    }
+    final amount = priceAmount;
+    if (amount == null || !amount.isFinite || amount < 0) return 0;
+    return amount;
   }
 
+  /// True when a positive price was entered. Zero is treated as not provided
+  /// so the UI does not present `Rs. 0.00` as a real purchase price.
+  bool get hasPrice => unitPrice > 0;
+
   String get priceLabel => 'Rs. ${unitPrice.toStringAsFixed(2)}';
+
+  /// Value of the food still in the pantry. Derived, never stored.
+  double get estimatedRemainingValue => calculateRemainingValue(this);
 
   /// Minimum quantity threshold used for low-stock status.
   double get minQuantity {
@@ -285,6 +372,7 @@ class PantryItem {
       case PantryUnit.items:
       case PantryUnit.packs:
       case PantryUnit.bottles:
+      case PantryUnit.boxes:
         return 1;
     }
   }
@@ -292,6 +380,11 @@ class PantryItem {
   String get quantityLabel {
     final formatted = _formatQuantity(quantity);
     return '$formatted ${unit.displayLabel(quantity)}';
+  }
+
+  String get originalQuantityLabel {
+    final formatted = _formatQuantity(originalQuantity);
+    return '$formatted ${unit.displayLabel(originalQuantity)}';
   }
 
   String get quantityValueLabel => _formatQuantity(quantity);
@@ -306,7 +399,8 @@ class PantryItem {
         .replaceFirst(RegExp(r'\.$'), '');
   }
 
-  /// Returns a copy with quantity adjusted by [delta], never below zero.
+  /// Changes the remaining [quantity] by [delta], never below zero.
+  /// [originalQuantity], [priceType], and [priceAmount] stay as they are.
   PantryItem withAdjustedQuantity(double delta) {
     final next = (quantity + delta).clamp(0.0, double.infinity);
     final rounded = double.parse(next.toStringAsFixed(2));
@@ -321,8 +415,11 @@ class PantryItem {
     PantryCategory? category,
     PantryLocation? location,
     double? quantity,
+    double? originalQuantity,
     PantryUnit? unit,
     double? price,
+    double? priceAmount,
+    PantryPriceType? priceType,
     DateTime? expiryDate,
     bool clearExpiryDate = false,
     DateTime? createdAt,
@@ -341,8 +438,10 @@ class PantryItem {
       category: category ?? this.category,
       location: location ?? this.location,
       quantity: quantity ?? this.quantity,
+      originalQuantity: originalQuantity ?? this.originalQuantity,
       unit: unit ?? this.unit,
-      price: price ?? unitPrice,
+      priceAmount: priceAmount ?? price ?? this.priceAmount,
+      priceType: priceType ?? this.priceType,
       expiryDate: clearExpiryDate ? null : (expiryDate ?? this.expiryDate),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -365,8 +464,12 @@ class PantryItem {
       'category': category.name,
       'location': location.name,
       'quantity': quantity,
+      'originalQuantity': originalQuantity,
       'unit': unit.name,
-      'price': unitPrice,
+      'priceType': priceType.name,
+      'priceAmount': priceAmount,
+      // Kept equal to priceAmount so older readers still see a number.
+      'price': priceAmount,
       'expiryDate': expiryDate?.toIso8601String(),
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
@@ -390,8 +493,12 @@ class PantryItem {
       'category': category.name,
       'location': location.name,
       'quantity': quantity,
+      'originalQuantity': originalQuantity,
       'unit': unit.name,
-      'price': unitPrice,
+      'priceType': priceType.name,
+      'priceAmount': priceAmount,
+      // Kept equal to priceAmount so older readers still see a number.
+      'price': priceAmount,
       'expiryDate': expiryDate == null ? null : Timestamp.fromDate(expiryDate!),
       'userId': userId,
       'createdAt': preserveCreatedAt && createdAt != null
@@ -421,8 +528,12 @@ class PantryItem {
       category: PantryCategory.fromStorage(_stringField(data['category'])),
       location: PantryLocation.fromStorage(_stringField(data['location'])),
       quantity: _numField(data['quantity']),
+      originalQuantity: data.containsKey('originalQuantity')
+          ? _numField(data['originalQuantity'])
+          : _numField(data['quantity']),
       unit: PantryUnit.fromStorage(_stringField(data['unit'])),
-      price: _numField(data['price']),
+      priceAmount: _readPriceAmount(data),
+      priceType: PantryPriceType.fromStorage(data['priceType']),
       expiryDate: _parseDate(data['expiryDate']),
       createdAt: _parseDate(data['createdAt']),
       updatedAt: _parseDate(data['updatedAt']),
@@ -455,9 +566,33 @@ class PantryItem {
   }
 
   static double _numField(dynamic value) {
+    final parsed = _optionalNum(value);
+    if (parsed == null || !parsed.isFinite || parsed < 0) return 0;
+    return parsed;
+  }
+
+  static double? _optionalNum(dynamic value) {
     if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0;
-    return 0;
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  /// Prefers [priceAmount]. Falls back to the legacy `price` field, which is
+  /// read as a total price by [PantryPriceType.fromStorage].
+  static double? _readPriceAmount(Map<String, dynamic> data) {
+    if (data.containsKey('priceAmount')) {
+      return _finitePrice(data['priceAmount']);
+    }
+    if (data.containsKey('price')) {
+      return _finitePrice(data['price']);
+    }
+    return null;
+  }
+
+  static double? _finitePrice(dynamic value) {
+    final parsed = _optionalNum(value);
+    if (parsed == null || !parsed.isFinite || parsed < 0) return null;
+    return parsed;
   }
 
   static DateTime? _parseDate(dynamic value) {
@@ -469,4 +604,50 @@ class PantryItem {
     }
     return null;
   }
+}
+
+/// Remaining value of [item] from its quantity, unit, and price.
+///
+/// Not written to Firestore. A saved total would become stale as soon as the
+/// remaining quantity changes.
+///
+/// Future Expiry and Waste Tracker flow: when a pantry item expires, read the
+/// remaining quantity, call this function, and store that number as a snapshot
+/// on the waste record.
+double calculateRemainingValue(PantryItem item) {
+  final amount = item.priceAmount;
+  if (amount == null || !amount.isFinite || amount <= 0) return 0;
+
+  final remaining = item.quantity;
+  if (!remaining.isFinite || remaining <= 0) return 0;
+
+  final raw = switch (item.priceType) {
+    PantryPriceType.unitPrice => _valueAtUnitPrice(
+      item.unit,
+      remaining,
+      amount,
+    ),
+    PantryPriceType.totalPrice => _valueAtTotalPrice(
+      remaining,
+      item.originalQuantity,
+      amount,
+    ),
+  };
+  if (!raw.isFinite || raw < 0) return 0;
+  return raw;
+}
+
+double _valueAtUnitPrice(PantryUnit unit, double quantity, double price) {
+  // Grams and millilitres stay in the stored unit. The price the user entered
+  // is per kilogram or per litre, so convert before multiplying.
+  final referenceQuantity = switch (unit) {
+    PantryUnit.g || PantryUnit.ml => quantity / 1000,
+    _ => quantity,
+  };
+  return referenceQuantity * price;
+}
+
+double _valueAtTotalPrice(double remaining, double original, double total) {
+  if (!original.isFinite || original <= 0) return 0;
+  return (remaining / original) * total;
 }

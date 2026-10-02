@@ -27,6 +27,7 @@ String wasteUnitFor(PantryUnit unit) => switch (unit) {
   PantryUnit.ml => 'ml',
   PantryUnit.packs => 'pack',
   PantryUnit.bottles => 'bottle',
+  PantryUnit.boxes => 'box',
 };
 
 class PantryWasteSource {

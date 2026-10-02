@@ -621,6 +621,9 @@ class _QuantityEditSession {
   });
 
   final PantryItem item;
+
+  /// Remaining quantity before this +/- burst. Undo writes this back and does
+  /// not change [PantryItem.originalQuantity], price type, or price amount.
   final double originalQuantity;
   double pendingQuantity;
   Timer? debounceTimer;
@@ -649,8 +652,8 @@ final pantryItemsProvider =
 /// Listening to the user document is important because changing
 /// pantryType/pantryId does not change Firebase Auth state.
 Stream<List<PantryItem>> _watchPantryForSignedInUser(
-    PantryFirestoreService service,
-    ) {
+  PantryFirestoreService service,
+) {
   late final StreamController<List<PantryItem>> controller;
 
   StreamSubscription<User?>? authSub;
@@ -675,22 +678,22 @@ Stream<List<PantryItem>> _watchPantryForSignedInUser(
         .watchPantryItems(userId: user.uid)
         .listen(
           (items) {
-        if (!controller.isClosed) {
-          controller.add(items);
-        }
-      },
-      onError: (Object error, StackTrace stackTrace) {
-        if (!controller.isClosed) {
-          controller.addError(error, stackTrace);
-        }
-      },
-    );
+            if (!controller.isClosed) {
+              controller.add(items);
+            }
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!controller.isClosed) {
+              controller.addError(error, stackTrace);
+            }
+          },
+        );
   }
 
   controller = StreamController<List<PantryItem>>(
     onListen: () {
       authSub = FirebaseAuth.instance.authStateChanges().listen(
-            (user) async {
+        (user) async {
           // Cancel everything belonging to the previous user.
           await profileSub?.cancel();
           await pantrySub?.cancel();
@@ -718,38 +721,34 @@ Stream<List<PantryItem>> _watchPantryForSignedInUser(
               .snapshots()
               .listen(
                 (snapshot) async {
-              if (controller.isClosed) return;
+                  if (controller.isClosed) return;
 
-              final data = snapshot.data();
+                  final data = snapshot.data();
 
-              final pantryType =
-                  (data?['pantryType'] as String?)
-                      ?.trim()
-                      .toLowerCase() ??
+                  final pantryType =
+                      (data?['pantryType'] as String?)?.trim().toLowerCase() ??
                       'personal';
 
-              final pantryId =
-              (data?['pantryId'] as String?)?.trim();
+                  final pantryId = (data?['pantryId'] as String?)?.trim();
 
-              // Only recreate the pantry stream when the active
-              // pantry context actually changes.
-              final contextKey =
-                  '$pantryType|${pantryId ?? ''}';
+                  // Only recreate the pantry stream when the active
+                  // pantry context actually changes.
+                  final contextKey = '$pantryType|${pantryId ?? ''}';
 
-              if (contextKey == lastPantryContextKey) {
-                return;
-              }
+                  if (contextKey == lastPantryContextKey) {
+                    return;
+                  }
 
-              lastPantryContextKey = contextKey;
+                  lastPantryContextKey = contextKey;
 
-              await switchPantryStream(user);
-            },
-            onError: (Object error, StackTrace stackTrace) {
-              if (!controller.isClosed) {
-                controller.addError(error, stackTrace);
-              }
-            },
-          );
+                  await switchPantryStream(user);
+                },
+                onError: (Object error, StackTrace stackTrace) {
+                  if (!controller.isClosed) {
+                    controller.addError(error, stackTrace);
+                  }
+                },
+              );
         },
         onError: (Object error, StackTrace stackTrace) {
           if (!controller.isClosed) {
