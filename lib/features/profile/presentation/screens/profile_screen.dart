@@ -1121,13 +1121,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               onChanged: _isSaving
                   ? null
                   : (newValue) {
-                      if (newValue == null) {
-                        return;
-                      }
-
-                      setState(() {
-  _selectedPantryType = value;
-});
+                if (newValue == null) {
+                  return;
+                }
+                setState(() {
+                  _selectedPantryType = value;
+                });
+              }
             ),
           ],
         ),
