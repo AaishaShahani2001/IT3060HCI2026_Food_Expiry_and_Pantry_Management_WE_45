@@ -40,51 +40,167 @@ class HomeExpirySoonSection extends ConsumerWidget {
     return Column(
       key: const ValueKey('home-expiry-soon-section'),
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _ExpirySoonHeader(),
-        const SizedBox(height: 12),
-        body,
-      ],
+      children: [const _ExpirySoonHeader(), const SizedBox(height: 12), body],
     );
   }
 }
 
-class _ExpirySoonHeader extends StatelessWidget {
+class _ExpirySoonHeader extends StatefulWidget {
   const _ExpirySoonHeader();
 
   @override
+  State<_ExpirySoonHeader> createState() => _ExpirySoonHeaderState();
+}
+
+class _ExpirySoonHeaderState extends State<_ExpirySoonHeader>
+    with SingleTickerProviderStateMixin {
+  static const _assetPath = 'assets/images/expiry_soon.png';
+  static const _titleHeight = 36.0;
+  static const _titleAspectRatio = 1112 / 360;
+
+  late final AnimationController _controller;
+  late final Animation<double> _scaleAnimation;
+  late final Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1,
+      end: 1.03,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _opacityAnimation = Tween<double>(
+      begin: 0.82,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  bool get _animationsAllowed {
+    final inTest = WidgetsBinding.instance.runtimeType.toString().contains(
+      'Test',
+    );
+    final disabled =
+        (MediaQuery.maybeDisableAnimationsOf(context) ?? false) ||
+        !TickerMode.valuesOf(context).enabled;
+    return !inTest && !disabled;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_animationsAllowed) {
+      if (!_controller.isAnimating) {
+        _controller.repeat(reverse: true);
+      }
+    } else if (_controller.isAnimating) {
+      _controller.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final title = Semantics(
+      container: true,
+      header: true,
+      label: 'Expiry Soon',
+      child: ExcludeSemantics(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: _titleVisual(context),
+          ),
+        ),
+      ),
+    );
 
     return Row(
       children: [
-        Expanded(
-          child: Text(
-            'Expiry Soon',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: colorScheme.onSurface,
+        Flexible(child: title),
+        const SizedBox(width: 8),
+        Tooltip(
+          message: 'View all expiring-soon items',
+          child: Semantics(
+            container: true,
+            button: true,
+            label: 'View all expiring-soon items',
+            child: ExcludeSemantics(
+              child: TextButton(
+                onPressed: () => context.go(AppRoutes.expiry),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: theme.colorScheme.primary,
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('See All'),
+                    Icon(Icons.chevron_right_rounded, size: 18),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-        TextButton(
-          onPressed: () => context.go(AppRoutes.expiry),
-          style: TextButton.styleFrom(
-            visualDensity: VisualDensity.compact,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            foregroundColor: colorScheme.primary,
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('See All'),
-              Icon(Icons.chevron_right_rounded, size: 18),
-            ],
-          ),
-        ),
       ],
+    );
+  }
+
+  Widget _titleVisual(BuildContext context) {
+    final titleWidth = _titleHeight * _titleAspectRatio;
+    final image = Image.asset(
+      _assetPath,
+      width: titleWidth,
+      height: _titleHeight,
+      fit: BoxFit.contain,
+      alignment: Alignment.centerLeft,
+      filterQuality: FilterQuality.medium,
+      errorBuilder: (context, error, stackTrace) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return SizedBox(
+          width: titleWidth,
+          height: _titleHeight,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Expiry Soon',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: isDark ? FreshPalette.darkHeading : FreshPalette.heading,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!_animationsAllowed) return image;
+
+    return RepaintBoundary(
+      child: FadeTransition(
+        opacity: _opacityAnimation,
+        child: ScaleTransition(
+          alignment: Alignment.centerLeft,
+          scale: _scaleAnimation,
+          child: image,
+        ),
+      ),
     );
   }
 }
