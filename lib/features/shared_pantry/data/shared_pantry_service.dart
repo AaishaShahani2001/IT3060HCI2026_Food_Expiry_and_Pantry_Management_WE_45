@@ -2,7 +2,15 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+class ActivePantryContext {
+  const ActivePantryContext({
+    required this.pantryType,
+    required this.pantryId,
+  });
 
+  final String pantryType;
+  final String? pantryId;
+}
 class SharedPantryService {
   SharedPantryService._();
 
@@ -46,6 +54,28 @@ class SharedPantryService {
       throw Exception('Please enter a pantry name.');
     }
 
+    // Get the pantry type selected and saved from Profile.
+    final userDoc = await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    final userData = userDoc.data();
+
+    final pantryType =
+        (userData?['pantryType'] as String?)
+            ?.trim()
+            .toLowerCase() ??
+            'personal';
+
+    if (pantryType != 'family' &&
+        pantryType != 'shared') {
+      throw Exception(
+        'Please select Family or Hostel / Shared Pantry '
+            'in your Profile before creating a shared pantry.',
+      );
+    }
+
     // Check whether the user already belongs
     // to a pantry.
     final existingMemberships = await _firestore
@@ -68,13 +98,17 @@ class SharedPantryService {
     final batch = _firestore.batch();
 
     // Create pantry
-    batch.set(pantryRef, {
-      'name': name,
-      'type': 'shared',
-      'inviteCode': inviteCode,
-      'ownerId': user.uid,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    batch.set(
+      pantryRef,
+      {
+        'name': name,
+        'type': pantryType,
+        'inviteCode': inviteCode,
+        'ownerId': user.uid,
+        'createdAt':
+        FieldValue.serverTimestamp(),
+      },
+    );
 
     // Add creator as owner
     batch.set(pantryRef.collection('members').doc(user.uid), {
@@ -86,11 +120,18 @@ class SharedPantryService {
     });
 
     // Link user to pantry
-    batch.set(_firestore.collection('users').doc(user.uid), {
-      'pantryId': pantryRef.id,
-      'pantryType': 'shared',
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    batch.set(
+      _firestore
+          .collection('users')
+          .doc(user.uid),
+      {
+        'pantryId': pantryRef.id,
+        'pantryType': pantryType,
+        'updatedAt':
+        FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
 
     await batch.commit();
 
@@ -128,6 +169,21 @@ class SharedPantryService {
 
     final pantryId = pantryDoc.id;
 
+    final pantryData = pantryDoc.data();
+
+    final pantryType =
+        (pantryData['type'] as String?)
+            ?.trim()
+            .toLowerCase() ??
+            'shared';
+
+    if (pantryType != 'family' &&
+        pantryType != 'shared') {
+      throw Exception(
+        'This pantry has an invalid pantry type.',
+      );
+    }
+
     // Check whether user already belongs
     // to any pantry.
     final existingMemberships = await _firestore
@@ -157,11 +213,18 @@ class SharedPantryService {
     });
 
     // Link user to pantry
-    batch.set(_firestore.collection('users').doc(user.uid), {
-      'pantryId': pantryId,
-      'pantryType': 'shared',
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    batch.set(
+      _firestore
+          .collection('users')
+          .doc(user.uid),
+      {
+        'pantryId': pantryId,
+        'pantryType': pantryType,
+        'updatedAt':
+        FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
 
     await batch.commit();
 
@@ -287,5 +350,177 @@ class SharedPantryService {
     }, SetOptions(merge: true));
 
     await batch.commit();
+  }
+
+  // ------------------------------------------------------------
+  // GET ACTIVE PANTRY TYPE
+  // ------------------------------------------------------------
+
+  Future<String> getCurrentPantryType() async {
+    final user = _auth.currentUser;
+
+    if (user == null) {
+      throw Exception('You must be logged in.');
+    }
+
+    final userDoc = await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    final data = userDoc.data();
+
+    final pantryType = data?['pantryType'];
+
+    if (pantryType is String && pantryType.trim().isNotEmpty) {
+      return pantryType.trim().toLowerCase();
+    }
+
+    return 'personal';
+  }
+
+  // ------------------------------------------------------------
+  // GET ACTIVE PANTRY ID
+  // ------------------------------------------------------------
+
+  Future<String?> getCurrentPantryId() async {
+    final user = _auth.currentUser;
+
+    if (user == null) {
+      throw Exception('You must be logged in.');
+    }
+
+    final userDoc = await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    final data = userDoc.data();
+
+    final pantryId = data?['pantryId'];
+
+    if (pantryId is String && pantryId.trim().isNotEmpty) {
+      return pantryId.trim();
+    }
+
+    return null;
+  }
+
+  // ------------------------------------------------------------
+  // GET ACTIVE PANTRY CONTEXT
+  // ------------------------------------------------------------
+
+  Future<ActivePantryContext> getActivePantryContext() async {
+    final user = _auth.currentUser;
+
+    if (user == null) {
+      throw Exception('You must be logged in.');
+    }
+
+    final userDoc = await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    final data = userDoc.data();
+
+    final pantryType =
+        (data?['pantryType'] as String?)
+            ?.trim()
+            .toLowerCase() ??
+            'personal';
+
+    String? pantryId =
+    (data?['pantryId'] as String?)?.trim();
+
+    // ----------------------------------------------------------
+    // PERSONAL PANTRY
+    // ----------------------------------------------------------
+
+    if (pantryType == 'personal') {
+      return const ActivePantryContext(
+        pantryType: 'personal',
+        pantryId: null,
+      );
+    }
+
+    // ----------------------------------------------------------
+    // FAMILY / SHARED PANTRY
+    // ----------------------------------------------------------
+
+    if (pantryType == 'family' || pantryType == 'shared') {
+      // If pantryId is already saved, use it.
+      if (pantryId != null && pantryId.isNotEmpty) {
+        return ActivePantryContext(
+          pantryType: pantryType,
+          pantryId: pantryId,
+        );
+      }
+
+      // --------------------------------------------------------
+      // FALLBACK:
+      // The user may already be a member of a pantry, but the
+      // pantryId was removed when switching to Personal.
+      // Recover the existing pantry from membership records.
+      // --------------------------------------------------------
+
+      final memberships = await _firestore
+          .collectionGroup('members')
+          .where(
+        'uid',
+        isEqualTo: user.uid,
+      )
+          .limit(1)
+          .get();
+
+      if (memberships.docs.isNotEmpty) {
+        final memberDoc = memberships.docs.first;
+
+        final pantryReference =
+            memberDoc.reference.parent.parent;
+
+        if (pantryReference != null) {
+          final pantryDoc =
+          await pantryReference.get();
+
+          if (pantryDoc.exists) {
+            // Restore the pantryId in the user's profile.
+            pantryId = pantryDoc.id;
+
+            await _firestore
+                .collection('users')
+                .doc(user.uid)
+                .set(
+              {
+                'pantryId': pantryId,
+                'pantryType': pantryType,
+                'updatedAt':
+                FieldValue.serverTimestamp(),
+              },
+              SetOptions(merge: true),
+            );
+
+            return ActivePantryContext(
+              pantryType: pantryType,
+              pantryId: pantryId,
+            );
+          }
+        }
+      }
+
+      // No existing pantry membership was found.
+      throw Exception(
+        'No shared pantry is linked to this account. '
+            'Create or join a shared pantry first.',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // UNKNOWN PANTRY TYPE
+    // ----------------------------------------------------------
+
+    throw Exception(
+      'Invalid pantry type: $pantryType',
+    );
   }
 }
