@@ -212,7 +212,7 @@ const Map<String, List<String>> foodItemSuggestionCategories = {
     'Mustard Seeds',
     'Ketchup',
     'Tomato Sauce',
-    'Chili Sauce',
+    'Chilli Sauce',
     'Soy Sauce',
     'Fish Sauce',
     'Mayonnaise',
@@ -220,6 +220,7 @@ const Map<String, List<String>> foodItemSuggestionCategories = {
     'Pickles',
     'Jam',
     'Honey',
+    'Spices',
   ],
   'Oils': [
     'Coconut Oil',
@@ -229,6 +230,7 @@ const Map<String, List<String>> foodItemSuggestionCategories = {
     'Sesame Oil',
     'Canola Oil',
     'Corn Oil',
+    'Cooking Oil',
   ],
   'Beverages': [
     'Water',
@@ -244,11 +246,11 @@ const Map<String, List<String>> foodItemSuggestionCategories = {
     'Apple Juice',
     'Mango Juice',
     'Soft Drink',
-    'Soda',
     'Energy Drink',
     'Sports Drink',
     'Hot Chocolate',
     'Malt Drink',
+    'Coconut Water',
   ],
   'Snacks': [
     'Chips',
@@ -307,14 +309,79 @@ const Map<String, List<String>> foodItemSuggestionCategories = {
 
 final List<String> foodItemSuggestions = _buildFoodItemSuggestions();
 
+final Map<String, String> _canonicalFoodNameByNormalized = Map.unmodifiable({
+  for (final name in foodItemSuggestions) normalizeFoodItemName(name): name,
+});
+
 // Derived from the autocomplete catalogue, not a second food list.
 final Map<String, String> _categoryByFoodName = Map.unmodifiable({
   for (final category in foodItemSuggestionCategories.entries)
     for (final name in category.value) name.trim().toLowerCase(): category.key,
 });
 
-String foodItemCategoryFor(String name) =>
-    _categoryByFoodName[name.trim().toLowerCase()] ?? 'Other';
+const Map<String, String> _canonicalNameByAlias = {
+  'chili sauce': 'Chilli Sauce',
+  'soda': 'Soft Drink',
+};
+
+String normalizeFoodItemName(String value) => value.trim().toLowerCase();
+
+String? canonicalFoodItemNameFor(String name) {
+  final normalized = normalizeFoodItemName(name);
+  final alias = _canonicalNameByAlias[normalized];
+  return alias ?? _canonicalFoodNameByNormalized[normalized];
+}
+
+String foodItemCategoryFor(String name) {
+  final canonical = canonicalFoodItemNameFor(name);
+  return canonical == null
+      ? 'Other'
+      : _categoryByFoodName[normalizeFoodItemName(canonical)] ?? 'Other';
+}
+
+/// Case-insensitive Shopping autocomplete ordered by exact, full-name prefix,
+/// word prefix, alias prefix, then contains.
+List<String> matchFoodItemSuggestions(String rawQuery, {int? limit}) {
+  final query = normalizeFoodItemName(rawQuery);
+  if (query.isEmpty || (limit != null && limit <= 0)) return const [];
+
+  final aliasesByCanonical = <String, List<String>>{};
+  for (final alias in _canonicalNameByAlias.entries) {
+    aliasesByCanonical
+        .putIfAbsent(normalizeFoodItemName(alias.value), () => [])
+        .add(alias.key);
+  }
+
+  final matches = <({String name, int rank})>[];
+  for (final name in foodItemSuggestions) {
+    final normalizedName = normalizeFoodItemName(name);
+    final aliases = aliasesByCanonical[normalizedName] ?? const <String>[];
+    final rank = _foodMatchRank(normalizedName, aliases, query);
+    if (rank != null) matches.add((name: name, rank: rank));
+  }
+
+  matches.sort((first, second) {
+    final byRank = first.rank.compareTo(second.rank);
+    if (byRank != 0) return byRank;
+    return normalizeFoodItemName(
+      first.name,
+    ).compareTo(normalizeFoodItemName(second.name));
+  });
+
+  final names = matches.map((match) => match.name);
+  return List.unmodifiable(limit == null ? names : names.take(limit));
+}
+
+int? _foodMatchRank(String name, List<String> aliases, String query) {
+  if (name == query) return 0;
+  if (name.startsWith(query)) return 1;
+  if (name.split(' ').skip(1).any((word) => word.startsWith(query))) return 2;
+  if (aliases.any((alias) => alias.startsWith(query))) return 3;
+  if (name.contains(query) || aliases.any((alias) => alias.contains(query))) {
+    return 4;
+  }
+  return null;
+}
 
 List<String> _buildFoodItemSuggestions() {
   final suggestionsByName = <String, String>{};
@@ -327,7 +394,9 @@ List<String> _buildFoodItemSuggestions() {
 
   final suggestions = suggestionsByName.values.toList()
     ..sort((first, second) {
-      return first.toLowerCase().compareTo(second.toLowerCase());
+      return normalizeFoodItemName(
+        first,
+      ).compareTo(normalizeFoodItemName(second));
     });
 
   return List.unmodifiable(suggestions);

@@ -2,7 +2,15 @@ import '../../pantry/domain/models/pantry_item.dart';
 import '../models/shopping_item.dart';
 import 'food_item_suggestions.dart';
 
-const List<String> shoppingUnitLabels = ['pcs', 'kg', 'g', 'L', 'ml'];
+const List<String> shoppingUnitLabels = [
+  'pcs',
+  'kg',
+  'g',
+  'L',
+  'ml',
+  'packs',
+  'bottles',
+];
 
 const List<PantryUnit> shoppingUnits = [
   PantryUnit.items,
@@ -10,7 +18,87 @@ const List<PantryUnit> shoppingUnits = [
   PantryUnit.g,
   PantryUnit.liters,
   PantryUnit.ml,
+  PantryUnit.packs,
+  PantryUnit.bottles,
 ];
+
+const Set<String> _literFoodNames = {
+  'milk',
+  'fresh milk',
+  'full cream milk',
+  'low fat milk',
+  'skim milk',
+  'coconut milk',
+  'soy milk',
+  'almond milk',
+  'oat milk',
+};
+
+const Set<String> _bottledFoodNames = {
+  'water',
+  'bottled water',
+  'sparkling water',
+  'juice',
+  'orange juice',
+  'apple juice',
+  'mango juice',
+  'soft drink',
+  'energy drink',
+  'sports drink',
+  'coconut water',
+  'ketchup',
+  'tomato sauce',
+  'chilli sauce',
+  'soy sauce',
+  'fish sauce',
+  'mayonnaise',
+  'vinegar',
+  'coconut oil',
+  'vegetable oil',
+  'olive oil',
+  'sunflower oil',
+  'sesame oil',
+  'canola oil',
+  'corn oil',
+  'cooking oil',
+};
+
+const Set<String> _packedFoodNames = {
+  'bread',
+  'white bread',
+  'brown bread',
+  'whole wheat bread',
+  'sandwich bread',
+  'garlic bread',
+  'biscuits',
+  'cookies',
+  'crackers',
+  'wafer biscuits',
+};
+
+PantryUnit? shoppingDefaultUnitForFood(String name) {
+  final canonical = canonicalFoodItemNameFor(name);
+  if (canonical == null) return null;
+
+  final normalized = normalizeFoodItemName(canonical);
+  if (_literFoodNames.contains(normalized)) return PantryUnit.liters;
+  if (_bottledFoodNames.contains(normalized)) return PantryUnit.bottles;
+  if (_packedFoodNames.contains(normalized)) return PantryUnit.packs;
+
+  return switch (foodItemCategoryFor(canonical)) {
+    'Rice, Grains and Cereals' ||
+    'Meat' ||
+    'Seafood' ||
+    'Legumes' => PantryUnit.kg,
+    'Pasta and Noodles' ||
+    'Frozen Food' ||
+    'Canned and Packaged Food' ||
+    'Snacks' ||
+    'Breakfast' ||
+    'Baking' => PantryUnit.packs,
+    _ => PantryUnit.items,
+  };
+}
 
 String shoppingUnitLabel(PantryUnit unit) => switch (unit) {
   PantryUnit.items => 'pcs',
