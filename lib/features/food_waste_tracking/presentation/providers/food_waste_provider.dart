@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/food_waste_repository.dart';
+import '../../models/automatic_waste_candidate.dart';
 import '../../models/food_waste_record.dart';
 import '../../models/waste_summary.dart';
 
@@ -168,6 +169,48 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
       await _repository.delete(uid, id);
       if (_isCurrent(uid, generation)) {
         state = AsyncData(state.requireValue.where((r) => r.id != id).toList());
+      }
+    } finally {
+      if (ref.mounted && generation == _generation) _busy = false;
+    }
+  }
+
+  Future<bool> reconcileAutomatic(
+    List<AutomaticWasteCandidate> candidates,
+  ) async {
+    if (candidates.isEmpty) return false;
+    final uid = _requireUser();
+    if (candidates.any((candidate) => candidate.uid != uid)) {
+      throw StateError('Account changed.');
+    }
+    final generation = _generation;
+    _busy = true;
+    try {
+      final changed = await _repository.reconcileAutomatic(uid, candidates);
+      if (changed && _isCurrent(uid, generation)) {
+        state = AsyncData(await _repository.load(uid));
+      }
+      return changed;
+    } finally {
+      if (ref.mounted && generation == _generation) _busy = false;
+    }
+  }
+
+  Future<void> markNotWasted(FoodWasteRecord record) async {
+    final uid = _requireUser();
+    if (record.id == null ||
+        !record.isAutomaticExpiry ||
+        !state.requireValue.any((existing) => identical(existing, record))) {
+      throw StateError('Automatic waste record changed.');
+    }
+    final generation = _generation;
+    _busy = true;
+    try {
+      await _repository.markNotWasted(uid, record);
+      if (_isCurrent(uid, generation)) {
+        state = AsyncData(
+          state.requireValue.where((entry) => entry.id != record.id).toList(),
+        );
       }
     } finally {
       if (ref.mounted && generation == _generation) _busy = false;
