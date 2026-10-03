@@ -9,8 +9,8 @@ import '../../../../core/constants/app_colors.dart';
 abstract final class PantrySnackBar {
   /// Used Up feedback. A SnackBar action defaults to [SnackBar.persist], so
   /// this message puts both actions in the content and sets [SnackBar.persist]
-  /// to false. The framework timer then dismisses it after three seconds.
-  static const Duration usedUpUndo = Duration(seconds: 3);
+  /// to false. The framework timer then dismisses it after six seconds.
+  static const Duration usedUpUndo = Duration(seconds: 6);
   static const Duration quantityUndo = Duration(seconds: 3);
   static const Duration markConsumedUndo = Duration(seconds: 3);
 
