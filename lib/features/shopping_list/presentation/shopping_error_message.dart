@@ -4,6 +4,9 @@ import 'package:food_expiry_and_pantry_management/features/shopping_list/present
 
 // Technical details belong in debug logs, not in end-user messages.
 String shoppingErrorMessage(Object error) {
+  if (error is ExpiredLowStockSuggestionException) {
+    return 'This Pantry item has expired and is no longer a low-stock suggestion.';
+  }
   if (error is ShoppingQuantityLimitException) {
     return 'Maximum quantity is 100.';
   }
