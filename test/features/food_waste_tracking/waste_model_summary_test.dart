@@ -102,7 +102,7 @@ void main() {
     );
     expect(summary.count, 2);
     expect(summary.quantitiesByUnit, {'kg': 0.5, 'pcs': 2});
-    expect(summary.quantityValue, '2 units');
+    expect(summary.quantityValue, '2 unit types');
     expect(summary.mixedUnits, isTrue);
     expect(summary.quantityDetail, '0.5 kg • 2 pcs');
     expect(summary.estimatedValue, 125.5);
@@ -169,7 +169,7 @@ void main() {
         WastePeriod.today,
         wasteTestNow,
       );
-      expect(mixed.quantityValue, '5 units');
+      expect(mixed.quantityValue, '5 unit types');
       expect(mixed.quantityDetail, '2 bottle • 2 g • 1.5 kg • +2 more');
     },
   );

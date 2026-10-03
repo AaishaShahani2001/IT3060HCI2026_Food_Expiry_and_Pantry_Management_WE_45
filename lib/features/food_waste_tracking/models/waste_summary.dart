@@ -101,7 +101,7 @@ class WasteSummary {
 
   bool get mixedUnits => quantitiesByUnit.length > 1;
   String get quantityValue => mixedUnits
-      ? '${quantitiesByUnit.length} units'
+      ? '${quantitiesByUnit.length} unit types'
       : wasteNumber(quantitiesByUnit.values.firstOrNull ?? 0);
   String get quantityDetail {
     final totals = quantitiesByUnit;

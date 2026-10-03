@@ -145,7 +145,7 @@ void main() {
         ).copyWith(reason: 'Spoiled'),
       );
       await open(tester);
-      expect(find.text('2 units'), findsOneWidget);
+      expect(find.text('2 unit types'), findsOneWidget);
       expect(find.text('2 bottle • 1.5 kg'), findsOneWidget);
       expect(find.text('Rs. 1,450.50'), findsOneWidget);
       expect(
@@ -153,7 +153,7 @@ void main() {
         findsOneWidget,
       );
       await tap(tester, find.text('This Month'));
-      expect(find.text('3 units'), findsOneWidget);
+      expect(find.text('3 unit types'), findsOneWidget);
       expect(find.text('Rs. 6,450.50'), findsOneWidget);
       expect(
         find.textContaining('Most common reason: Expired (2/3)'),
