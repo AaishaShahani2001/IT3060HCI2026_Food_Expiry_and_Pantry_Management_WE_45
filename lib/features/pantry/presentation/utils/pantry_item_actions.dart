@@ -1,6 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/router/app_routes.dart';
+import '../../../shopping_list/models/shopping_item.dart';
+import '../../../shopping_list/models/shopping_item_draft.dart';
 import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
 import '../../domain/models/removed_pantry_item.dart';
@@ -9,6 +15,13 @@ import '../screens/pantry_item_form_screen.dart';
 import '../widgets/pantry_item_form.dart';
 import '../widgets/pantry_item_dialogs.dart';
 import 'pantry_snackbar.dart';
+
+/// Document ids whose Used Up undo is currently writing.
+final Set<String> _usedUpRestoresInFlight = <String>{};
+
+/// Snapshots that already restored successfully. A failed restore clears its
+/// claim so Retry can try again. A new Used Up creates a new snapshot.
+final Expando<bool> _usedUpUndoClaimed = Expando<bool>();
 
 Future<void> openPantryAddItem(
   BuildContext context, {
@@ -34,21 +47,32 @@ Future<void> handlePantryUsedUp({
 }) async {
   if (ref.read(pantryBusyItemIdsProvider).contains(item.id)) return;
 
-  try {
-    final removed = await ref
-        .read(pantryItemsProvider.notifier)
-        .markAsUsedUp(item, originalIndex: originalIndex);
-    if (removed == null || !context.mounted) return;
+  // Capture these before the item card leaves the tree. The screen messenger
+  // and router stay valid after that card is removed.
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  final router = GoRouter.maybeOf(context);
+  final notifier = ref.read(pantryItemsProvider.notifier);
+  if (messenger == null) return;
 
-    final messenger = ScaffoldMessenger.of(context);
-    final notifier = ref.read(pantryItemsProvider.notifier);
-    _showUsedUpSnackBar(messenger, notifier, removed);
+  try {
+    final removed = await notifier.markAsUsedUp(
+      item,
+      originalIndex: originalIndex,
+    );
+    if (removed == null || !messenger.mounted) return;
+
+    _showUsedUpSnackBar(
+      messenger: messenger,
+      notifier: notifier,
+      removed: removed,
+      router: router,
+    );
     onRemoved?.call();
   } catch (error) {
     debugPrint('Pantry Used Up UI failed: $error');
-    if (!context.mounted) return;
-    PantrySnackBar.error(
-      context,
+    if (!messenger.mounted) return;
+    PantrySnackBar.errorOn(
+      messenger,
       error is PantryFirestoreException
           ? error.message
           : 'Unable to mark ${item.name} as used up. Please try again.',
@@ -56,21 +80,54 @@ Future<void> handlePantryUsedUp({
   }
 }
 
-void _showUsedUpSnackBar(
+void _showUsedUpSnackBar({
+  required ScaffoldMessengerState messenger,
+  required PantryItemsNotifier notifier,
+  required RemovedPantryItem removed,
+  required GoRouter? router,
+}) {
+  PantrySnackBar.showUsedUp(
+    messenger,
+    itemName: removed.name,
+    onUndo: () {
+      unawaited(_restoreUsedUp(messenger, notifier, removed));
+    },
+    onAddToList: () {
+      unawaited(_openShoppingListForUsedUp(router, messenger, removed));
+    },
+  );
+}
+
+Future<void> _openShoppingListForUsedUp(
+  GoRouter? router,
   ScaffoldMessengerState messenger,
-  PantryItemsNotifier notifier,
   RemovedPantryItem removed,
-) {
+) async {
+  final navigation = router;
+  if (navigation == null) {
+    debugPrint('Shopping List route is unavailable.');
+    return;
+  }
+
+  final draft = ShoppingItemDraft.fromPantryItem(removed.item);
+  // Query values avoid casting route extra as ShoppingItem. The add route
+  // turns these parameters back into a ShoppingItemDraft.
+  final saved = await navigation.push<ShoppingItem>(
+    Uri(
+      path: AppRoutes.addShoppingItem,
+      queryParameters: {
+        if (draft.name != null && draft.name!.isNotEmpty) 'name': draft.name!,
+        if (draft.category != null && draft.category!.isNotEmpty)
+          'category': draft.category!,
+        if (draft.unit != null) 'unit': draft.unit!.name,
+      },
+    ).toString(),
+  );
+  if (saved == null || !messenger.mounted) return;
   PantrySnackBar.showOn(
     messenger,
-    message: '${removed.name} marked as used up.',
-    duration: PantrySnackBar.usedUpUndo,
-    action: SnackBarAction(
-      label: 'UNDO',
-      onPressed: () {
-        _restoreUsedUp(messenger, notifier, removed);
-      },
-    ),
+    message: '${saved.name} added to your Shopping List.',
+    duration: PantrySnackBar.standard,
   );
 }
 
@@ -79,15 +136,23 @@ Future<void> _restoreUsedUp(
   PantryItemsNotifier notifier,
   RemovedPantryItem removed,
 ) async {
+  final restoreKey = removed.documentId;
+  if (_usedUpUndoClaimed[removed] == true) return;
+  if (!_usedUpRestoresInFlight.add(restoreKey)) return;
+  _usedUpUndoClaimed[removed] = true;
+
   try {
     await notifier.restoreUsedUpItem(removed);
+    if (!messenger.mounted) return;
     PantrySnackBar.showOn(
       messenger,
       message: '${removed.name} restored.',
       duration: PantrySnackBar.confirmation,
     );
   } catch (error) {
+    _usedUpUndoClaimed[removed] = false;
     debugPrint('Pantry Used Up undo UI failed: $error');
+    if (!messenger.mounted) return;
     PantrySnackBar.showOn(
       messenger,
       isError: true,
@@ -95,10 +160,12 @@ Future<void> _restoreUsedUp(
       action: SnackBarAction(
         label: 'Retry',
         onPressed: () {
-          _restoreUsedUp(messenger, notifier, removed);
+          unawaited(_restoreUsedUp(messenger, notifier, removed));
         },
       ),
     );
+  } finally {
+    _usedUpRestoresInFlight.remove(restoreKey);
   }
 }
 
