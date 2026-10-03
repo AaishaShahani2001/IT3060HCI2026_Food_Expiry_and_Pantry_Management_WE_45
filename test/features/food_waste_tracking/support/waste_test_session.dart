@@ -3,6 +3,7 @@ import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/d
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/food_waste_record.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/data/services/pantry_firestore_service.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/removed_pantry_item.dart';
 import 'fake_waste_firestore.dart';
 
 final wasteTestNow = DateTime(2026, 9, 16, 12);
@@ -48,14 +49,34 @@ class WasteTestSession {
 class FakeWastePantryService implements PantryFirestoreService {
   final items = <String, List<PantryItem>>{};
   final _listeners = <String, Set<MultiStreamController<List<PantryItem>>>>{};
-  final reductions = <(String, String, double)>[];
-  Object? failure;
-  Future<void>? gate;
+  final decrements = <(String, String, double)>[];
+  Object? decrementError;
+  Future<void>? decrementGate;
+  void Function()? beforeDecrement;
+  int markItemConsumedCalls = 0;
+  int markAsUsedUpCalls = 0;
+  int deletePantryItemCalls = 0;
+
   void seed(String uid, PantryItem item) {
     items[uid] = [...?items[uid]?.where((r) => r.id != item.id), item];
     for (final listener
         in _listeners[uid] ?? <MultiStreamController<List<PantryItem>>>{}) {
       listener.add(List.of(items[uid]!));
+    }
+  }
+
+  void remove(String uid, String firestoreId) {
+    items[uid] = [
+      for (final item in items[uid] ?? const <PantryItem>[])
+        if (item.firestoreId != firestoreId) item,
+    ];
+    _publish(uid);
+  }
+
+  void _publish(String uid) {
+    for (final listener
+        in _listeners[uid] ?? <MultiStreamController<List<PantryItem>>>{}) {
+      listener.add(List.of(items[uid] ?? const <PantryItem>[]));
     }
   }
 
@@ -66,22 +87,60 @@ class FakeWastePantryService implements PantryFirestoreService {
         controller.add(List.of(items[userId] ?? []));
         controller.onCancel = () => _listeners[userId]?.remove(controller);
       });
+
+  @override
+  Future<double> decrementItemQuantity({
+    required String userId,
+    required String itemId,
+    required double amount,
+  }) async {
+    decrements.add((userId, itemId, amount));
+    await decrementGate;
+    beforeDecrement?.call();
+    if (decrementError case final error?) throw error;
+    final matches = (items[userId] ?? const <PantryItem>[])
+        .where((item) => item.firestoreId == itemId)
+        .toList();
+    if (matches.isEmpty) throw PantryItemNotFoundException(itemId);
+    final item = matches.single;
+    if (amount > item.quantity) {
+      throw InsufficientPantryQuantityException(
+        requested: amount,
+        available: item.quantity,
+      );
+    }
+    final remaining = double.parse((item.quantity - amount).toStringAsFixed(2));
+    seed(userId, item.copyWith(quantity: remaining));
+    return remaining;
+  }
+
   @override
   Future<double> markItemConsumed({
     required String userId,
     required String itemId,
     required double consumedQuantity,
-  }) async {
-    reductions.add((userId, itemId, consumedQuantity));
-    if (gate != null) await gate;
-    if (failure != null) throw failure!;
-    final item = items[userId]!.singleWhere((r) => r.firestoreId == itemId);
-    if (consumedQuantity > item.quantity || consumedQuantity <= 0) {
-      throw StateError('Invalid quantity');
-    }
-    final remaining = item.quantity - consumedQuantity;
-    seed(userId, item.copyWith(quantity: remaining));
-    return remaining;
+  }) {
+    markItemConsumedCalls++;
+    throw UnsupportedError('Waste Tracker must use decrementItemQuantity.');
+  }
+
+  @override
+  Future<RemovedPantryItem> markAsUsedUp({
+    required String userId,
+    required PantryItem item,
+    required int originalIndex,
+  }) {
+    markAsUsedUpCalls++;
+    throw UnsupportedError('Waste Tracker must not invoke Used Up.');
+  }
+
+  @override
+  Future<void> deletePantryItem({
+    required String userId,
+    required String itemId,
+  }) {
+    deletePantryItemCalls++;
+    throw UnsupportedError('Waste Tracker must not delete Pantry items.');
   }
 
   @override

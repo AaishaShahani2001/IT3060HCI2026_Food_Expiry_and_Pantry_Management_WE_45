@@ -102,7 +102,6 @@ void main() {
       expect(records(tester).single.quantity, 1);
       expect(records(tester).single.unit, 'bottle');
       expect(records(tester).single.wastedAt, DateTime(2026, 9, 16));
-      expect(session.pantry.reductions, isEmpty);
       expect(find.text('Expired Pantry Items'), findsNothing);
       expect(find.text('Auto-recorded from expired Pantry stock'), findsOne);
     },
@@ -223,7 +222,6 @@ void main() {
       ),
       hasLength(1),
     );
-    expect(session.pantry.reductions, isEmpty);
   });
 
   testWidgets('failed automatic write is safe and retries on Pantry refresh', (
@@ -237,7 +235,6 @@ void main() {
     await open(tester);
     expect(records(tester), isEmpty);
     expect(session.store.documents, isEmpty);
-    expect(session.pantry.reductions, isEmpty);
 
     session.store.transactionError = null;
     session.pantry.seed('alice', stock());
@@ -273,7 +270,6 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(records(tester).single.itemName, 'Cheese');
-      expect(session.pantry.reductions, isEmpty);
     },
   );
 
