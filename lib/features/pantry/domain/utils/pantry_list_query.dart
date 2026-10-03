@@ -1,7 +1,7 @@
 import '../models/pantry_item.dart';
 
 /// Maximum cards shown on the Pantry dashboard preview.
-const int kPantryDashboardPreviewLimit = 5;
+const int kPantryDashboardPreviewLimit = 6;
 
 /// How filtered pantry items are ordered for the dashboard and View All.
 enum PantrySortOption {
@@ -72,7 +72,7 @@ abstract final class PantryListQuery {
     return sorted;
   }
 
-  /// Derive a five-item dashboard preview without modifying the
+  /// Derive a six-item dashboard preview without modifying the
   /// complete Firestore-backed list used by View All and summary counts.
   static List<PantryItem> preview(
     List<PantryItem> filteredAndSortedItems, {

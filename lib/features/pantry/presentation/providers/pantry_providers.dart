@@ -634,9 +634,9 @@ class _QuantityEditSession {
 
 /// Live pantry collection at `users/{uid}/pantryItems`.
 ///
-/// One stream is shared by the dashboard and All Pantry Items. The five-item
+/// One stream is shared by the dashboard and All Pantry Items. The six-item
 /// preview is derived in memory from [filteredPantryItemsProvider]; this
-/// notifier is not limited to five documents.
+/// notifier is not limited to six documents.
 final pantryItemsProvider =
     StreamNotifierProvider<PantryItemsNotifier, List<PantryItem>>(
       PantryItemsNotifier.new,
@@ -797,7 +797,7 @@ final filteredPantryItemsProvider = Provider<List<PantryItem>>((ref) {
   );
 });
 
-/// At most five matching items for the dashboard. The source list is unchanged.
+/// At most six matching items for the dashboard. The source list is unchanged.
 final pantryPreviewItemsProvider = Provider<List<PantryItem>>((ref) {
   final filteredAndSortedItems = ref.watch(filteredPantryItemsProvider);
   return PantryListQuery.preview(filteredAndSortedItems);

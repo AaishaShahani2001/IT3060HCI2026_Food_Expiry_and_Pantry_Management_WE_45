@@ -9,6 +9,7 @@ import 'package:food_expiry_and_pantry_management/features/shopping_list/data/fo
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/quantity_presets.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_item_metadata.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item_draft.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_pantry_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/shopping_error_message.dart';
@@ -18,7 +19,10 @@ import 'package:go_router/go_router.dart';
 class AddShoppingItemScreen extends ConsumerStatefulWidget {
   final ShoppingItem? initialItem;
 
-  const AddShoppingItemScreen({super.key, this.initialItem});
+  /// Optional values for a new item. Does not switch the form into edit mode.
+  final ShoppingItemDraft? initialDraft;
+
+  const AddShoppingItemScreen({super.key, this.initialItem, this.initialDraft});
 
   @override
   ConsumerState<AddShoppingItemScreen> createState() =>
@@ -57,18 +61,32 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
   void initState() {
     super.initState();
     _formUid = ref.read(shoppingAuthUidProvider).asData?.value;
+    final draft = _isEditing ? null : widget.initialDraft;
+    final draftCategory = draft?.category?.trim();
+    final hasDraftCategory = draftCategory != null && draftCategory.isNotEmpty;
     _itemNameController = TextEditingController(
-      text: widget.initialItem?.name ?? '',
+      text: widget.initialItem?.name ?? draft?.name ?? '',
     );
     _quantityController = TextEditingController(
-      text: widget.initialItem?.quantity.toString() ?? '',
+      text: _initialQuantityText(draft),
     );
-    _selectedUnit = widget.initialItem?.unit ?? PantryUnit.items;
-    _selectedCategory = widget.initialItem?.category ?? 'Other';
-    _unitManuallySelected = _isEditing;
-    _categoryManuallySelected = _isEditing;
+    _selectedUnit = widget.initialItem?.unit ?? draft?.unit ?? PantryUnit.items;
+    _selectedCategory =
+        widget.initialItem?.category ??
+        (hasDraftCategory ? draftCategory : 'Other');
+    _unitManuallySelected = _isEditing || draft?.unit != null;
+    _categoryManuallySelected = _isEditing || hasDraftCategory;
     _itemNameController.addListener(_onNameChanged);
     _quantityController.addListener(_refreshFormOptions);
+  }
+
+  String _initialQuantityText(ShoppingItemDraft? draft) {
+    if (widget.initialItem != null) {
+      return widget.initialItem!.quantity.toString();
+    }
+    final quantity = draft?.quantity;
+    if (quantity == null) return '';
+    return quantity.toString();
   }
 
   @override
@@ -76,9 +94,21 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
     super.didChangeDependencies();
     if (!_readPrefill) {
       _readPrefill = true;
-      if (!_isEditing) {
-        _itemNameController.text =
-            GoRouterState.of(context).uri.queryParameters['name'] ?? '';
+      // A Used Up draft already supplied the name. The search query param is
+      // only for the normal add flow and must not wipe that draft.
+      if (!_isEditing && widget.initialDraft == null) {
+        final params = GoRouterState.of(context).uri.queryParameters;
+        _itemNameController.text = params['name'] ?? '';
+        final category = params['category']?.trim();
+        if (category != null && category.isNotEmpty) {
+          _selectedCategory = category;
+          _categoryManuallySelected = true;
+        }
+        final unitName = params['unit']?.trim();
+        if (unitName != null && unitName.isNotEmpty) {
+          _selectedUnit = PantryUnit.fromStorage(unitName);
+          _unitManuallySelected = true;
+        }
       }
     }
   }

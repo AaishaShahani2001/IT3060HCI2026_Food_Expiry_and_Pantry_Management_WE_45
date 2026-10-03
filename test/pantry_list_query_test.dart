@@ -48,19 +48,19 @@ void main() {
     final original = List<PantryItem>.from(items);
     final preview = PantryListQuery.preview(items);
 
-    expect(preview, hasLength(5));
+    expect(preview, hasLength(6));
     expect(items, hasLength(original.length));
     expect(identical(preview, items), isFalse);
   });
 
-  test('preview returns all items when there are fewer than five', () {
+  test('preview returns all items when there are fewer than six', () {
     final few = items.take(3).toList();
     expect(PantryListQuery.preview(few), hasLength(3));
   });
 
-  test('preview returns five items when there are exactly five', () {
-    final five = items.take(5).toList();
-    expect(PantryListQuery.preview(five), hasLength(5));
+  test('preview returns six items when there are exactly six', () {
+    final six = items.take(6).toList();
+    expect(PantryListQuery.preview(six), hasLength(6));
   });
 
   test('recently added sort puts newest createdAt first and nulls last', () {

@@ -13,6 +13,7 @@ import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/
 import 'package:food_expiry_and_pantry_management/features/pantry/presentation/screens/pantry_item_form_screen.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/domain/models/shopping_reminder.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item_draft.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/domain/services/shopping_reminder_notification_service.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/low_stock_suggestion_settings_provider.dart';
@@ -164,8 +165,15 @@ void main() {
         ),
         GoRoute(
           path: '/shopping/add',
-          builder: (context, state) =>
-              AddShoppingItemScreen(initialItem: state.extra as ShoppingItem?),
+          builder: (context, state) {
+            final extra = state.extra;
+            return AddShoppingItemScreen(
+              initialItem: extra is ShoppingItem ? extra : null,
+              initialDraft: extra is ShoppingItemDraft
+                  ? extra
+                  : ShoppingItemDraft.fromQuery(state.uri.queryParameters),
+            );
+          },
         ),
       ],
     );

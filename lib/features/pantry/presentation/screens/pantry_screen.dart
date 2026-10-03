@@ -186,7 +186,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
             child: PantryRecentItemsHeader(matchingCount: filteredItems.length),
           ),
           PantryItemsSliver(
-            // Derive a five-item dashboard preview without modifying the
+            // Derive a six-item dashboard preview without modifying the
             // complete Firestore-backed list used by View All.
             items: previewItems,
             viewMode: PantryViewMode.cards,

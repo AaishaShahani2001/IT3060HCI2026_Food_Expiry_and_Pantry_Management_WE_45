@@ -69,7 +69,7 @@ class PantryItemsSliver extends ConsumerWidget {
           crossAxisCount: crossAxisCount,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
-          mainAxisExtent: 224,
+          mainAxisExtent: kPantryCardExtent,
         ),
         delegate: SliverChildBuilderDelegate((context, index) {
           final item = items[index];
