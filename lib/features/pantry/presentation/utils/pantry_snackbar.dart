@@ -25,6 +25,7 @@ abstract final class PantrySnackBar {
     required String message,
     Duration duration = standard,
     SnackBarAction? action,
+    bool? persist,
     bool isError = false,
   }) {
     if (!context.mounted) return;
@@ -33,6 +34,7 @@ abstract final class PantrySnackBar {
       message: message,
       duration: duration,
       action: action,
+      persist: persist,
       isError: isError,
     );
   }
@@ -42,6 +44,7 @@ abstract final class PantrySnackBar {
     required String message,
     Duration duration = standard,
     SnackBarAction? action,
+    bool? persist,
     bool isError = false,
   }) {
     if (!messenger.mounted) return;
@@ -51,6 +54,8 @@ abstract final class PantrySnackBar {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           duration: duration,
+          // An action otherwise keeps the bar up until it is pressed.
+          persist: persist,
           backgroundColor: isError
               ? Theme.of(messenger.context).colorScheme.error
               : null,

@@ -702,13 +702,9 @@ void main() {
       expect(find.byType(SnackBar), findsOneWidget);
       final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
       expect(snackBar.duration, PantrySnackBar.quantityUndo);
-      expect(snackBar.persist, isTrue);
+      expect(snackBar.persist, isFalse);
       expect(snackBar.action?.label, 'UNDO');
       expect(pantry.items.single.quantity, 4);
-
-      await tester.pump(const Duration(seconds: 3));
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(find.textContaining('quantity updated'), findsOneWidget);
 
       await tester.tap(find.text('UNDO'));
       await tester.pump();
@@ -718,6 +714,20 @@ void main() {
       expect(pantry.items.single.originalQuantity, 5);
       expect(find.text('Basmati Rice quantity restored.'), findsOneWidget);
       expect(find.text('UNDO'), findsNothing);
+
+      await tester.tap(find.text('Increase quantity'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 550));
+
+      expect(find.textContaining('quantity updated'), findsOneWidget);
+      expect(pantry.items.single.quantity, 3);
+
+      await tester.pump(PantrySnackBar.quantityUndo);
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.textContaining('quantity updated'), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(pantry.items.single.quantity, 3);
     });
 
     testWidgets('a normal shopping form stays empty without a draft', (
