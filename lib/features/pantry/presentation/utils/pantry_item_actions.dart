@@ -219,6 +219,7 @@ Future<void> handlePantryQuantityDelta({
           message:
               '${writeResult.itemName} quantity updated to ${writeResult.quantityLabel}.',
           duration: PantrySnackBar.quantityUndo,
+          persist: false,
           action: SnackBarAction(
             label: 'UNDO',
             onPressed: () {
