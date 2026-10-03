@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/presentation/providers/pantry_providers.dart';
 
+import '../../data/low_stock_eligibility.dart';
 import 'shopping_list_provider.dart';
 
 class LowStockSyncFeedback {
@@ -66,7 +67,9 @@ class _LowStockSync {
       ref.read(shoppingAuthUidProvider).asData?.value == uid &&
       ref.read(shoppingListRepositoryProvider).isCurrentUser(uid);
 
-  bool _low(PantryItem item) => item.isLowStock || item.isOutOfStock;
+  bool _low(PantryItem item) =>
+      hasEligibleShoppingLowStockExpiry(item) &&
+      (item.isLowStock || item.isOutOfStock);
 
   void accept(List<PantryItem> items) {
     if (!_active) return;

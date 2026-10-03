@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../pantry/domain/models/pantry_item.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
+import '../../data/low_stock_eligibility.dart';
 import '../../models/shopping_item.dart';
 import 'low_stock_suggestion_settings_provider.dart';
 import 'shopping_list_provider.dart';
@@ -178,6 +179,7 @@ List<PantryItem> lowStockShoppingSuggestions({
     return item.isConnectedToFirestore &&
         item.name.trim().isNotEmpty &&
         item.quantity.isFinite &&
+        hasEligibleShoppingLowStockExpiry(item) &&
         isLowStock &&
         !dismissedPantryItemIds.contains(item.firestoreId) &&
         !shoppingNames.contains(normalized(item.name)) &&

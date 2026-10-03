@@ -356,18 +356,21 @@ void main() {
       });
     }
 
-    testWidgets('Used Up SnackBar dismisses after three seconds', (
+    testWidgets('Used Up SnackBar dismisses after six seconds', (
       tester,
     ) async {
       await pumpPantry(tester);
       await markUsedUp(tester);
 
       final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
-      expect(snackBar.duration, const Duration(seconds: 3));
+      expect(snackBar.duration, const Duration(seconds: 6));
       expect(snackBar.persist, isFalse);
       expect(snackBar.action, isNull);
       expect(find.text('Basmati Rice marked as used up.'), findsOneWidget);
       expect(pantry.items, isEmpty);
+
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.text('Basmati Rice marked as used up.'), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 3));
       await tester.pump(const Duration(milliseconds: 400));
@@ -382,7 +385,7 @@ void main() {
     testWidgets('doing nothing keeps the item used up', (tester) async {
       await pumpPantry(tester);
       await markUsedUp(tester);
-      await tester.pump(const Duration(seconds: 3));
+      await tester.pump(const Duration(seconds: 6));
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.byType(SnackBar), findsNothing);

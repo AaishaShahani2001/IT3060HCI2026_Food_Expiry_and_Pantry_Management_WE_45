@@ -169,6 +169,28 @@ void main() {
     expect(items().length, 1);
     expect(items().single.quantity, 1);
   });
+  test(
+    'expired low stock is excluded while expiring soon stays eligible',
+    () async {
+      final now = DateTime.now();
+      await start([
+        stock(
+          1,
+          id: 'expired',
+          name: 'Expired Milk',
+          expiry: DateTime(now.year, now.month, now.day - 1),
+        ),
+        stock(
+          1,
+          id: 'soon',
+          name: 'Soon Milk',
+          expiry: DateTime(now.year, now.month, now.day + 1),
+        ),
+      ]);
+      expect(items().map((item) => item.name), ['Soon Milk']);
+      expect(session.store.addCalls, 1);
+    },
+  );
   for (final name in ['Milk', 'milk', ' MILK ', '  Fresh\t  Milk ']) {
     test(
       'manual To Buy preserved verbatim for normalized name $name',

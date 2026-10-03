@@ -11,6 +11,7 @@ PantryItem pantryItem({
   required double quantity,
   PantryUnit unit = PantryUnit.items,
   PantryCategory category = PantryCategory.other,
+  DateTime? expiryDate,
 }) {
   return PantryItem(
     id: id,
@@ -20,6 +21,7 @@ PantryItem pantryItem({
     location: PantryLocation.pantry,
     quantity: quantity,
     unit: unit,
+    expiryDate: expiryDate,
   );
 }
 
@@ -127,6 +129,97 @@ void main() {
       categoryThresholds: defaultLowStockThresholds,
     );
     expect(suggestions.map((item) => item.name), ['Flour']);
+  });
+
+  test('expired low-stock item is not suggested', () {
+    final now = DateTime.now();
+    final suggestions = lowStockShoppingSuggestions(
+      pantryItems: [
+        pantryItem(
+          id: 'rice',
+          name: 'Rice',
+          quantity: 0.5,
+          unit: PantryUnit.kg,
+          category: PantryCategory.grains,
+          expiryDate: DateTime(now.year, now.month, now.day - 1),
+        ),
+      ],
+      shoppingItems: const [],
+      categoryThresholds: defaultLowStockThresholds,
+    );
+    expect(suggestions, isEmpty);
+  });
+
+  test('expired out-of-stock item is not suggested', () {
+    final now = DateTime.now();
+    final suggestions = lowStockShoppingSuggestions(
+      pantryItems: [
+        pantryItem(
+          id: 'milk',
+          name: 'Milk',
+          quantity: 0,
+          expiryDate: DateTime(now.year, now.month, now.day - 1),
+        ),
+      ],
+      shoppingItems: const [],
+    );
+    expect(suggestions, isEmpty);
+  });
+
+  test('expiring-soon low-stock item remains suggested', () {
+    final now = DateTime.now();
+    final suggestions = lowStockShoppingSuggestions(
+      pantryItems: [
+        pantryItem(
+          id: 'milk',
+          name: 'Milk',
+          quantity: 1,
+          expiryDate: DateTime(now.year, now.month, now.day + 1),
+        ),
+      ],
+      shoppingItems: const [],
+    );
+    expect(suggestions.map((item) => item.name), ['Milk']);
+  });
+
+  test('item expiring today remains suggested', () {
+    final now = DateTime.now();
+    final suggestions = lowStockShoppingSuggestions(
+      pantryItems: [
+        pantryItem(
+          id: 'milk',
+          name: 'Milk',
+          quantity: 1,
+          expiryDate: DateTime(now.year, now.month, now.day),
+        ),
+      ],
+      shoppingItems: const [],
+    );
+    expect(suggestions.map((item) => item.name), ['Milk']);
+  });
+
+  test('fresh low-stock item remains suggested', () {
+    final now = DateTime.now();
+    final suggestions = lowStockShoppingSuggestions(
+      pantryItems: [
+        pantryItem(
+          id: 'milk',
+          name: 'Milk',
+          quantity: 1,
+          expiryDate: DateTime(now.year, now.month, now.day + 10),
+        ),
+      ],
+      shoppingItems: const [],
+    );
+    expect(suggestions.map((item) => item.name), ['Milk']);
+  });
+
+  test('no-expiry low-stock item remains suggested', () {
+    final suggestions = lowStockShoppingSuggestions(
+      pantryItems: [pantryItem(id: 'milk', name: 'Milk', quantity: 1)],
+      shoppingItems: const [],
+    );
+    expect(suggestions.map((item) => item.name), ['Milk']);
   });
 
   test('quick picks prefer frequent/current names and keep safe fallbacks', () {
