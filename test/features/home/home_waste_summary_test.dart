@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/pantry_waste_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/food_waste_record.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/pantry_waste_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:food_expiry_and_pantry_management/core/providers/current_user_provider.dart';
@@ -120,6 +121,76 @@ void main() {
 
     expect(find.text('2 items'), findsOneWidget);
     expect(find.text('Rs. 4,000'), findsOneWidget);
+  });
+
+  testWidgets('no waste records show zero items and Rs. 0', (tester) async {
+    await open(tester);
+
+    expect(find.text('0 items'), findsOneWidget);
+    expect(find.text('Rs. 0'), findsOneWidget);
+  });
+
+  testWidgets('one waste record shows its estimated value', (tester) async {
+    session.seed('alice', 'milk', draft(name: 'Milk', value: 500));
+    await open(tester);
+
+    expect(find.text('1 item'), findsOneWidget);
+    expect(find.text('Rs. 500'), findsOneWidget);
+  });
+
+  testWidgets('adding and deleting a record updates the home summary', (
+    tester,
+  ) async {
+    session.seed('alice', 'milk', draft(name: 'Milk', value: 500));
+    await open(tester);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HomeWasteSummaryCard)),
+    );
+    await container
+        .read(foodWasteProvider.notifier)
+        .save(draft(name: 'Bread', value: 250));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 items'), findsOneWidget);
+    expect(find.text('Rs. 750'), findsOneWidget);
+
+    final bread = container
+        .read(foodWasteProvider)
+        .requireValue
+        .singleWhere((record) => record.itemName == 'Bread');
+    await container.read(foodWasteProvider.notifier).delete(bread.id!);
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 item'), findsOneWidget);
+    expect(find.text('Rs. 500'), findsOneWidget);
+  });
+
+  testWidgets('a pantry waste record is included in the home summary', (
+    tester,
+  ) async {
+    await open(tester);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HomeWasteSummaryCard)),
+    );
+    await container
+        .read(foodWasteProvider.notifier)
+        .save(
+          FoodWasteRecord(
+            itemName: 'Milk',
+            quantity: 1,
+            unit: 'pcs',
+            reason: 'Expired',
+            estimatedValue: 500,
+            wastedAt: wasteTestNow,
+            source: manualPantryWasteSource,
+            sourcePantryItemId: 'milk-1',
+          ),
+        );
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 item'), findsOneWidget);
+    expect(find.text('Rs. 500'), findsOneWidget);
   });
 
   testWidgets('Tapping View All or Card navigates to waste tracker screen', (

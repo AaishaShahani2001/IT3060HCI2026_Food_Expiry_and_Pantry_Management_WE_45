@@ -8,7 +8,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../expiry/presentation/providers/expiry_provider.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
-import 'home_section_header.dart';
 
 /// Home dashboard overview card for the user's pantry.
 ///
@@ -33,7 +32,7 @@ class _PantrySummaryView extends ConsumerStatefulWidget {
 }
 
 class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
-  static const _radius = BorderRadius.all(Radius.circular(20));
+  static const _radius = BorderRadius.all(Radius.circular(22));
   bool _imageFailed = false;
 
   @override
@@ -41,12 +40,10 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Watch raw pantry items stream state to handle loading and error states gracefully
     final pantryAsync = ref.watch(pantryItemsProvider);
     final isLoading = pantryAsync.isLoading && !pantryAsync.hasValue;
     final hasError = pantryAsync.hasError && !pantryAsync.hasValue;
 
-    // Reuse existing pantry and expiry providers to keep counts synchronized
     final pantrySummary = ref.watch(pantrySummaryProvider);
     final expirySummary = ref.watch(expirySummaryProvider);
 
@@ -54,65 +51,49 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
     final expiringCount = hasError ? 0 : expirySummary.expiringSoon;
     final usePhoto = !_imageFailed;
     final fallbackColor = isDark ? FreshPalette.darkCard : FreshPalette.card;
-    final onPhoto = FreshPalette.darkOnPrimary;
-    final titleColor = usePhoto
-        ? onPhoto
-        : (isDark ? FreshPalette.darkHeading : FreshPalette.heading);
-    final subtitleColor = usePhoto
-        ? onPhoto.withValues(alpha: 0.9)
-        : (isDark
-              ? FreshPalette.darkSecondaryText
-              : FreshPalette.secondaryText);
-    final pantryIconBackground = isDark
-        ? FreshPalette.selected
-        : FreshPalette.primaryButton;
-    final pantryIconBorder = isDark
-        ? FreshPalette.highlight.withValues(alpha: 0.75)
-        : Colors.white.withValues(alpha: 0.62);
-    final overlay = const Color(
-      0xFF0E2F25,
-    ).withValues(alpha: isDark ? 0.62 : 0.55);
 
     final textScale = MediaQuery.textScalerOf(context).scale(1);
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final shouldStack = textScale > 1.4 || screenWidth < 300;
+    final shouldStack = textScale > 1.35 || screenWidth < 340;
 
-    final totalBox = _PantryStatBox(
+    final tileColor = isDark ? const Color(0xFF1A2822) : Colors.white;
+    final countColor = isDark ? FreshPalette.darkHeading : FreshPalette.heading;
+    final labelColor = isDark
+        ? FreshPalette.darkSecondaryText
+        : FreshPalette.secondaryText;
+    final onPhoto = FreshPalette.darkOnPrimary;
+
+    final totalBox = _PantryStatTile(
       icon: Icons.inventory_2_outlined,
       iconColor: isDark ? FreshPalette.highlight : FreshPalette.primaryButton,
-      iconBgColor:
-          (isDark ? FreshPalette.highlight : FreshPalette.primaryButton)
-              .withValues(alpha: 0.14),
-      bgColor: isDark
-          ? FreshPalette.darkAccentSurface
+      iconBgColor: isDark
+          ? FreshPalette.highlight.withValues(alpha: 0.16)
           : FreshPalette.accentSurface,
-      borderColor:
-          (isDark ? FreshPalette.highlight : FreshPalette.primaryButton)
-              .withValues(alpha: 0.2),
+      tileColor: tileColor,
+      countColor: countColor,
+      labelColor: labelColor,
       count: totalCount,
       label: 'Total Items',
       isLoading: isLoading,
-      isDark: isDark,
-      imageAssetPath: 'assets/images/vector-pantry.avif',
-      fallbackIcon: Icons.inventory_2_outlined,
     );
 
-    final expiringBox = _PantryStatBox(
+    final expiringBox = _PantryStatTile(
       icon: Icons.schedule_outlined,
       iconColor: AppColors.statusAmber,
-      iconBgColor: AppColors.statusAmber.withValues(alpha: 0.15),
-      bgColor: isDark ? const Color(0xFF2C2216) : AppColors.statusAmberBg,
-      borderColor: AppColors.statusAmber.withValues(alpha: 0.25),
+      iconBgColor: isDark
+          ? AppColors.statusAmber.withValues(alpha: 0.18)
+          : AppColors.statusAmberBg,
+      tileColor: tileColor,
+      countColor: countColor,
+      labelColor: labelColor,
       count: expiringCount,
       label: 'Expiring Soon',
       isLoading: isLoading,
-      isDark: isDark,
-      imageAssetPath: 'assets/images/expiry-icon.jpg',
-      fallbackIcon: Icons.schedule_outlined,
     );
 
     return Material(
       color: fallbackColor,
+      elevation: 0,
       borderRadius: _radius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -121,18 +102,11 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
         child: Ink(
           decoration: BoxDecoration(
             borderRadius: _radius,
-            border: Border.all(
-              color: usePhoto
-                  ? onPhoto.withValues(alpha: 0.28)
-                  : (isDark
-                        ? FreshPalette.darkOutline.withValues(alpha: 0.6)
-                        : FreshPalette.outline.withValues(alpha: 0.6)),
-            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
+                color: const Color(0xFF0E2F25).withValues(alpha: 0.16),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -143,7 +117,7 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
                   child: Image(
                     image: HomePantrySummaryCard.backgroundImage,
                     fit: BoxFit.cover,
-                    alignment: Alignment.center,
+                    alignment: const Alignment(0, -0.15),
                     gaplessPlayback: true,
                     frameBuilder:
                         (context, child, frame, wasSynchronouslyLoaded) {
@@ -155,12 +129,25 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
                             children: [
                               ImageFiltered(
                                 imageFilter: ImageFilter.blur(
-                                  sigmaX: 3,
-                                  sigmaY: 3,
+                                  sigmaX: 1.6,
+                                  sigmaY: 1.6,
                                 ),
                                 child: child,
                               ),
-                              ColoredBox(color: overlay),
+                              const DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Color(0x8A12352A),
+                                      Color(0xC012352A),
+                                      Color(0xE60E2F25),
+                                    ],
+                                    stops: [0, 0.46, 1],
+                                  ),
+                                ),
+                              ),
                             ],
                           );
                         },
@@ -175,35 +162,63 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
                   ),
                 ),
               Padding(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // PANTRY HEADER — Reusable HomeSectionHeader
-                    HomeSectionHeader(
-                      title: 'Your Pantry',
-                      subtitle: 'Keep track of your food items',
-                      assetPath: 'assets/images/food-pantry.png',
-                      fallbackIcon: Icons.kitchen_outlined,
-                      titleColor: titleColor,
-                      subtitleColor: subtitleColor,
-                      iconBgColor: pantryIconBackground,
-                      iconBorderColor: pantryIconBorder,
-                      iconSize: 36,
-                      iconPadding: const EdgeInsets.all(6),
-                      iconFit: BoxFit.contain,
-                      semanticLabel: 'Your Pantry, view pantry items',
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        size: 22,
-                        color: subtitleColor,
+                    Semantics(
+                      header: true,
+                      label: 'Your Pantry, view pantry items',
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Your Pantry',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.15,
+                                    letterSpacing: -0.2,
+                                    color: usePhoto ? onPhoto : countColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Keep track of your food items',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontSize: 13,
+                                    height: 1.2,
+                                    color: usePhoto
+                                        ? onPhoto.withValues(alpha: 0.84)
+                                        : labelColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          _OpenMark(
+                            color: usePhoto
+                                ? onPhoto
+                                : (isDark
+                                      ? FreshPalette.highlight
+                                      : FreshPalette.primaryButton),
+                            filled: usePhoto,
+                          ),
+                        ],
                       ),
                     ),
-
-                    const SizedBox(height: 16),
-
-                    // STATISTIC CARDS ROW OR COLUMN
+                    const SizedBox(height: 14),
                     if (shouldStack)
                       Column(
                         children: [
@@ -234,189 +249,144 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
   }
 }
 
-/// Compact stat box used for Total Items and Expiring Soon metrics.
-class _PantryStatBox extends StatelessWidget {
-  const _PantryStatBox({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBgColor,
-    required this.bgColor,
-    required this.borderColor,
-    required this.count,
-    required this.label,
-    required this.isLoading,
-    required this.isDark,
-    required this.imageAssetPath,
-    required this.fallbackIcon,
-  });
+class _OpenMark extends StatelessWidget {
+  const _OpenMark({required this.color, required this.filled});
 
-  static const _radius = 14.0;
-
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBgColor;
-  final Color bgColor;
-  final Color borderColor;
-  final int count;
-  final String label;
-  final bool isLoading;
-  final bool isDark;
-  final String imageAssetPath;
-  final IconData fallbackIcon;
+  final Color color;
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final countColor = isDark ? FreshPalette.darkHeading : FreshPalette.heading;
-    final labelColor = isDark
-        ? FreshPalette.darkSecondaryText
-        : FreshPalette.secondaryText;
-
     return Container(
-      clipBehavior: Clip.antiAlias,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(_radius),
-        border: Border.all(color: borderColor),
+        color: filled
+            ? Colors.white.withValues(alpha: 0.16)
+            : color.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: filled
+              ? Colors.white.withValues(alpha: 0.38)
+              : color.withValues(alpha: 0.28),
+        ),
       ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: _BlurredCardImage(
-              assetPath: imageAssetPath,
-              fallbackIcon: fallbackIcon,
-              iconColor: iconColor,
-              overlayColor: bgColor,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Stat Icon Well
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: iconBgColor,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, size: 16, color: iconColor),
-                ),
-                const SizedBox(height: 10),
-
-                // Count or Loading Indicator
-                if (isLoading)
-                  SizedBox(
-                    height: 26,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(iconColor),
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Text(
-                    '$count',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      height: 1.1,
-                      color: countColor,
-                    ),
-                  ),
-
-                const SizedBox(height: 4),
-
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: labelColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      child: Icon(Icons.arrow_forward_rounded, size: 18, color: color),
     );
   }
 }
 
-class _BlurredCardImage extends StatelessWidget {
-  const _BlurredCardImage({
-    required this.assetPath,
-    required this.fallbackIcon,
+/// Solid metric tile so the count stays readable over the pantry photo.
+class _PantryStatTile extends StatelessWidget {
+  const _PantryStatTile({
+    required this.icon,
     required this.iconColor,
-    required this.overlayColor,
+    required this.iconBgColor,
+    required this.tileColor,
+    required this.countColor,
+    required this.labelColor,
+    required this.count,
+    required this.label,
+    required this.isLoading,
   });
 
-  final String assetPath;
-  final IconData fallbackIcon;
+  final IconData icon;
   final Color iconColor;
-  final Color overlayColor;
+  final Color iconBgColor;
+  final Color tileColor;
+  final Color countColor;
+  final Color labelColor;
+  final int count;
+  final String label;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: ExcludeSemantics(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final widthCap = constraints.maxWidth * 0.42;
-            final heightCap = constraints.maxHeight * 0.72;
-            var side = widthCap < heightCap ? widthCap : heightCap;
-            if (side > 62) side = 62;
-            if (side < 40) side = 40;
+    final theme = Theme.of(context);
 
-            final tint = overlayColor.computeLuminance() < 0.45
-                ? Color.lerp(overlayColor, Colors.white, 0.58)!
-                : overlayColor;
-
-            return Align(
-              alignment: const Alignment(0.92, -0.05),
-              child: ImageFiltered(
-                imageFilter: ImageFilter.blur(sigmaX: 1.4, sigmaY: 1.4),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: ColorFiltered(
-                    colorFilter: ColorFilter.mode(tint, BlendMode.darken),
-                    child: Image.asset(
-                      assetPath,
-                      width: side,
-                      height: side,
-                      fit: BoxFit.contain,
-                      excludeFromSemantics: true,
-                      filterQuality: FilterQuality.medium,
-                      cacheWidth: (side * 3).round(),
-                      errorBuilder: (context, error, stackTrace) {
-                        return SizedBox.square(
-                          dimension: side,
-                          child: Icon(
-                            fallbackIcon,
-                            size: side * 0.46,
-                            color: iconColor.withValues(alpha: 0.45),
+    return Semantics(
+      label: isLoading ? label : '$label, $count',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: tileColor,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: iconBgColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 15, color: iconColor),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isLoading)
+                      SizedBox(
+                        height: 18,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                iconColor,
+                              ),
+                            ),
                           ),
-                        );
-                      },
+                        ),
+                      )
+                    else
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '$count',
+                          maxLines: 1,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            height: 1.05,
+                            color: countColor,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 1),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        height: 1.15,
+                        color: labelColor,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
-            );
-          },
+            ],
+          ),
         ),
       ),
     );
