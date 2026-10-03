@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shopping_list/data/food_item_suggestions.dart';
+import '../../../pantry/data/services/pantry_firestore_service.dart';
+import '../../models/automatic_waste_candidate.dart';
 import '../../models/food_waste_record.dart';
 import '../../models/waste_summary.dart';
 import '../providers/food_waste_provider.dart';
 import '../providers/pantry_waste_provider.dart';
 import '../widgets/waste_motion.dart';
 import '../waste_feedback.dart';
+
+enum WasteEntrySource { storage, external }
 
 class RecordWasteScreen extends ConsumerStatefulWidget {
   const RecordWasteScreen({super.key, this.initialRecord, this.pantrySource})
@@ -23,9 +27,13 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
   final _quantity = TextEditingController();
   final _value = TextEditingController();
   final _nameFocus = FocusNode();
+  final _storageSearch = TextEditingController();
+  final _storageFocus = FocusNode();
   late DateTime _date;
   String _unit = wasteUnits.first;
   String _reason = wasteReasons.first;
+  late WasteEntrySource _entrySource;
+  PantryWasteSource? _selectedStorage;
   String? _openedUid;
   bool _expired = false;
   bool _saving = false;
@@ -46,12 +54,20 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
     _openedUid =
         widget.pantrySource?.uid ??
         ref.read(wasteAuthUidProvider).asData?.value;
+    _entrySource = widget.pantrySource == null
+        ? WasteEntrySource.external
+        : WasteEntrySource.storage;
+    _selectedStorage = widget.pantrySource;
     _name.text = initial?.itemName ?? '';
-    _quantity.text = initial == null ? '' : wasteNumber(initial.quantity);
+    _storageSearch.text = widget.pantrySource?.item.name ?? '';
+    _quantity.text = widget.pantrySource == null
+        ? (initial == null ? '' : wasteNumber(initial.quantity))
+        : '';
     _value.text = initial == null ? '0' : wasteNumber(initial.estimatedValue);
     _date = initial?.wastedAt.toLocal() ?? ref.read(wasteClockProvider)();
     _unit = initial?.unit ?? wasteUnits.first;
     _reason = initial?.reason ?? wasteReasons.first;
+    _quantity.addListener(_refreshStorageValue);
   }
 
   @override
@@ -60,7 +76,57 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
     _quantity.dispose();
     _value.dispose();
     _nameFocus.dispose();
+    _storageSearch.dispose();
+    _storageFocus.dispose();
     super.dispose();
+  }
+
+  bool get _newRecord => widget.initialRecord == null;
+  bool get _storageMode =>
+      _newRecord && _entrySource == WasteEntrySource.storage;
+
+  void _refreshStorageValue() {
+    if (!_storageMode || _selectedStorage == null) return;
+    final quantity = double.tryParse(_quantity.text.trim());
+    final value = quantity == null
+        ? 0.0
+        : _selectedStorage!.estimatedValueFor(quantity);
+    final text = wasteNumber(value);
+    if (_value.text != text) _value.text = text;
+  }
+
+  void _setEntrySource(WasteEntrySource source) {
+    if (_entrySource == source) return;
+    setState(() {
+      _entrySource = source;
+      _selectedStorage = null;
+      _storageSearch.clear();
+      _name.clear();
+      _quantity.clear();
+      _value.text = '0';
+      _unit = wasteUnits.first;
+      _reason = source == WasteEntrySource.storage
+          ? 'Spoiled'
+          : wasteReasons.first;
+    });
+    _form.currentState?.reset();
+  }
+
+  void _selectStorage(PantryWasteSource source) {
+    setState(() {
+      _selectedStorage = source;
+      _storageSearch.text = source.item.name;
+      _name.text = source.item.name;
+      _unit = wasteUnitFor(source.item.unit);
+      _quantity.clear();
+      _value.text = '0';
+      if (source.isExpiredAt(ref.read(wasteClockProvider)())) {
+        _reason = 'Expired';
+      } else if (_reason == 'Expired') {
+        _reason = 'Spoiled';
+      }
+    });
+    _form.currentState?.validate();
   }
 
   String? _numberError(String? input, {bool positive = false}) {
@@ -100,6 +166,231 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
     );
   }
 
+  Widget _sourceSelector() {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Where is this item from?',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ChoiceChip(
+              key: const ValueKey('waste-source-storage'),
+              selected: _entrySource == WasteEntrySource.storage,
+              onSelected: (_) => _setEntrySource(WasteEntrySource.storage),
+              avatar: const Icon(Icons.inventory_2_outlined, size: 18),
+              label: const Text('My Storage'),
+            ),
+            ChoiceChip(
+              key: const ValueKey('waste-source-external'),
+              selected: _entrySource == WasteEntrySource.external,
+              onSelected: (_) => _setEntrySource(WasteEntrySource.external),
+              avatar: const Icon(Icons.edit_outlined, size: 18),
+              label: const Text('Other / External'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: colors.secondaryContainer.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 19,
+                color: colors.onSecondaryContainer,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Expired items with saved expiry dates are tracked automatically.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.onSecondaryContainer,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _externalNameField() => RawAutocomplete<String>(
+    textEditingController: _name,
+    focusNode: _nameFocus,
+    optionsBuilder: (value) {
+      final query = value.text.trim().toLowerCase();
+      return query.isEmpty
+          ? const Iterable<String>.empty()
+          : foodItemSuggestions
+                .where((name) => name.toLowerCase().startsWith(query))
+                .take(8);
+    },
+    fieldViewBuilder: (context, controller, focus, submit) => TextFormField(
+      key: const ValueKey('waste-name'),
+      controller: controller,
+      focusNode: focus,
+      decoration: _fieldDecoration('Item Name', icon: const Icon(Icons.search)),
+      validator: (value) =>
+          value == null || value.trim().isEmpty ? 'Enter an item name.' : null,
+    ),
+    optionsViewBuilder: (context, select, options) => Align(
+      alignment: Alignment.topLeft,
+      child: Material(
+        elevation: 3,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: (MediaQuery.sizeOf(context).width - 72)
+              .clamp(0, 528)
+              .toDouble(),
+          height: 220,
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              for (final option in options)
+                ListTile(title: Text(option), onTap: () => select(option)),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _storageItemField(AsyncValue<List<PantryWasteSource>> storage) {
+    if (storage.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (storage.hasError) {
+      return const Text(
+        'Stored items are unavailable. Try again or use Other / External.',
+      );
+    }
+    final sources = storage.asData?.value ?? const <PantryWasteSource>[];
+    if (sources.isEmpty) {
+      return const Text(
+        'No stored items with remaining quantity are available.',
+      );
+    }
+    return RawAutocomplete<PantryWasteSource>(
+      textEditingController: _storageSearch,
+      focusNode: _storageFocus,
+      displayStringForOption: (source) => source.item.name,
+      optionsBuilder: (value) {
+        final query = value.text.trim().toLowerCase();
+        return sources
+            .where((source) {
+              if (query.isEmpty) return true;
+              final item = source.item;
+              return item.name.toLowerCase().contains(query) ||
+                  item.category.label.toLowerCase().contains(query) ||
+                  item.location.label.toLowerCase().contains(query);
+            })
+            .take(8);
+      },
+      onSelected: _selectStorage,
+      fieldViewBuilder: (context, controller, focus, submit) => TextFormField(
+        key: const ValueKey('waste-storage-item'),
+        controller: controller,
+        focusNode: focus,
+        onChanged: (value) {
+          final selected = _selectedStorage;
+          if (selected != null && value.trim() != selected.item.name) {
+            setState(() {
+              _selectedStorage = null;
+              _name.clear();
+              _quantity.clear();
+              _value.text = '0';
+            });
+          }
+        },
+        decoration: _fieldDecoration(
+          'Search stored item',
+          icon: const Icon(Icons.search),
+        ),
+        validator: (_) =>
+            _selectedStorage == null ? 'Select an item from My Storage.' : null,
+      ),
+      optionsViewBuilder: (context, select, options) => Align(
+        alignment: Alignment.topLeft,
+        child: Material(
+          elevation: 3,
+          borderRadius: BorderRadius.circular(12),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: (MediaQuery.sizeOf(context).width - 72)
+                  .clamp(0, 528)
+                  .toDouble(),
+              maxHeight: 280,
+            ),
+            child: ListView(
+              padding: EdgeInsets.zero,
+              shrinkWrap: true,
+              children: [
+                for (final source in options)
+                  ListTile(
+                    title: Text(source.item.name),
+                    subtitle: Text(
+                      '${source.item.category.label} • ${source.item.location.label}\n${source.item.quantityLabel} remaining',
+                    ),
+                    isThreeLine: true,
+                    onTap: () => select(source),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _selectedStorageDetails(PantryWasteSource source) {
+    final colors = Theme.of(context).colorScheme;
+    final expired = source.isExpiredAt(ref.read(wasteClockProvider)());
+    return Container(
+      key: const ValueKey('waste-storage-details'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            source.item.name,
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text('${source.item.category.label} • ${source.item.location.label}'),
+          Text('Available: ${source.item.quantityLabel}'),
+          if (expired) ...[
+            const SizedBox(height: 8),
+            Text(
+              'This expired item is tracked automatically in Waste Tracker.',
+              key: const ValueKey('waste-storage-expired'),
+              style: TextStyle(color: colors.error),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Future<void> _save() async {
     if (_saving ||
         _saved ||
@@ -110,20 +401,74 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
     FocusScope.of(context).unfocus();
     setState(() => _saving = true);
     try {
+      PantryWasteSource? storageSource;
+      if (_storageMode) {
+        storageSource = _currentStorageSource();
+        if (storageSource == null) {
+          showWasteMessage(
+            context,
+            'This stored item is no longer available. Select it again.',
+          );
+          return;
+        }
+        final quantity = double.parse(_quantity.text.trim());
+        if (quantity > storageSource.item.quantity) {
+          showWasteMessage(
+            context,
+            'Only ${storageSource.item.quantityLabel} is currently available.',
+          );
+          return;
+        }
+        if (_isAutomaticExpiry(storageSource)) {
+          showWasteMessage(
+            context,
+            'This expired item is tracked automatically in Waste Tracker.',
+          );
+          return;
+        }
+        final confirmed = await _confirmStorageSave(storageSource, quantity);
+        if (!mounted || !_sameUser || confirmed != true) return;
+        storageSource = _currentStorageSource();
+        if (storageSource == null) {
+          showWasteMessage(
+            context,
+            'This stored item is no longer available. Select it again.',
+          );
+          return;
+        }
+        if (quantity > storageSource.item.quantity) {
+          showWasteMessage(
+            context,
+            'The available quantity changed. Review the item and try again.',
+          );
+          return;
+        }
+        if (_isAutomaticExpiry(storageSource)) {
+          showWasteMessage(
+            context,
+            'This expired item is tracked automatically in Waste Tracker.',
+          );
+          return;
+        }
+      }
       final record = FoodWasteRecord(
         id: widget.initialRecord?.id,
         itemName: _name.text.trim(),
         quantity: double.parse(_quantity.text.trim()),
         unit: _unit,
         reason: _reason,
-        estimatedValue: double.parse(_value.text.trim()),
+        estimatedValue: storageSource == null
+            ? double.parse(_value.text.trim())
+            : storageSource.estimatedValueFor(
+                double.parse(_quantity.text.trim()),
+              ),
         wastedAt: _date,
         source:
             widget.initialRecord?.source ??
-            (widget.pantrySource == null ? null : 'pantry'),
+            (storageSource == null ? null : manualPantryWasteSource),
         sourcePantryItemId:
             widget.initialRecord?.sourcePantryItemId ??
-            widget.pantrySource?.item.firestoreId,
+            storageSource?.item.firestoreId,
       );
       WasteDuplicateWarning? confirmation;
       FoodWasteRecord? saved;
@@ -153,9 +498,9 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
                 icon: const Icon(Icons.info_outline),
                 title: const Text('Similar waste record'),
                 content: Text(
-                  widget.pantrySource == null
+                  storageSource == null
                       ? 'This waste record looks similar to one already saved.'
-                      : 'This expired item may already have been recorded as waste.',
+                      : 'This stored item may already have been recorded as waste.',
                 ),
                 actions: [
                   TextButton(
@@ -176,8 +521,37 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
         }
       }
       if (mounted && _sameUser && saved != null) {
+        if (storageSource != null) {
+          Object? decrementError;
+          try {
+            await ref
+                .read(pantryWasteActionsProvider)
+                .decrementSavedQuantity(storageSource, saved);
+          } catch (error) {
+            decrementError = error;
+            debugPrint('Waste Pantry decrement failed: $error');
+          }
+
+          if (decrementError != null) {
+            var rollbackSucceeded = false;
+            try {
+              await ref.read(foodWasteProvider.notifier).delete(saved.id!);
+              rollbackSucceeded = true;
+            } catch (rollbackError) {
+              debugPrint('Waste compensation rollback failed: $rollbackError');
+            }
+            _refreshStorageAfterFailure(storageSource.uid);
+            if (!mounted || !_sameUser) return;
+            showWasteMessage(
+              context,
+              rollbackSucceeded
+                  ? _storageFailureMessage(decrementError)
+                  : "We couldn't fully complete this update. Please refresh and check your Waste records and stored quantity.",
+            );
+            return;
+          }
+        }
         _saved = true;
-        if (widget.pantrySource != null) await _offerPantryUpdate(saved);
         if (!mounted || !_sameUser) return;
         Navigator.of(context).pop(true);
       }
@@ -193,64 +567,84 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
     }
   }
 
-  Future<void> _offerPantryUpdate(FoodWasteRecord saved) async {
-    final source = widget.pantrySource!;
-    setState(() => _choosingDuplicate = true);
-    final compatible =
-        saved.unit == wasteUnitFor(source.item.unit) &&
-        saved.quantity <= source.item.quantity;
-    bool answered = false;
-    final remove = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        void answer(bool value) {
-          if (answered) return;
-          answered = true;
-          Navigator.of(dialogContext).pop(value);
-        }
-
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
-          ),
-          icon: const Icon(Icons.inventory_2_outlined),
-          title: const Text('Update Pantry?'),
-          content: Text(
-            'Waste was saved. You recorded ${wasteNumber(saved.quantity)} ${saved.unit} of ${saved.itemName} as waste.\n\n${compatible ? 'Remove this quantity from Pantry?' : 'Quantity or unit differs from available Pantry stock. Pantry will stay unchanged.'}\n\nKeeping or cancelling here does not undo the saved Waste record.',
-          ),
-          scrollable: true,
-          actions: [
-            TextButton(
-              onPressed: () => answer(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => answer(false),
-              child: const Text('Keep Pantry Unchanged'),
-            ),
-            FilledButton(
-              onPressed: compatible ? () => answer(true) : null,
-              child: const Text('Remove from Pantry'),
-            ),
-          ],
-        );
-      },
-    );
-    if (!mounted || !_sameUser || remove != true) return;
-    setState(() => _choosingDuplicate = false);
-    try {
-      await ref
-          .read(pantryWasteActionsProvider)
-          .removeSavedQuantity(source, saved);
-    } catch (error) {
-      debugPrint('Waste Pantry update failed: $error');
-      if (mounted && _sameUser) {
-        showWasteMessage(
-          context,
-          'Waste was recorded, but Pantry could not be updated.',
-        );
+  PantryWasteSource? _currentStorageSource() {
+    final selected = _selectedStorage;
+    if (selected == null || selected.uid != _openedUid) return null;
+    final sources = ref.read(activeWastePantryProvider).asData?.value;
+    if (sources == null) return null;
+    for (final source in sources) {
+      if (source.item.firestoreId == selected.item.firestoreId) {
+        return source;
       }
     }
+    return null;
+  }
+
+  bool _isAutomaticExpiry(PantryWasteSource source) {
+    if (source.isExpiredAt(ref.read(wasteClockProvider)())) return true;
+    final expiry = source.item.expiryDate;
+    if (expiry == null) return false;
+    return ref
+            .read(foodWasteProvider)
+            .asData
+            ?.value
+            .any(
+              (record) =>
+                  record.isAutomaticExpiry &&
+                  record.sourcePantryItemId == source.item.firestoreId &&
+                  record.sourceExpiryDate != null &&
+                  wasteExpiryDate(record.sourceExpiryDate!) ==
+                      wasteExpiryDate(expiry),
+            ) ??
+        false;
+  }
+
+  void _refreshStorageAfterFailure(String uid) {
+    ref.invalidate(wastePantryItemsProvider(uid));
+    if (!mounted) return;
+    setState(() {
+      _selectedStorage = null;
+      _storageSearch.clear();
+      _name.clear();
+      _quantity.clear();
+      _value.text = '0';
+    });
+  }
+
+  String _storageFailureMessage(Object error) {
+    if (error is PantryItemNotFoundException) {
+      return 'This stored item is no longer available. Waste was not recorded.';
+    }
+    if (error is InsufficientPantryQuantityException) {
+      return 'The available quantity changed. Waste was not recorded. Select the item again.';
+    }
+    return 'The stored quantity could not be updated. Waste was not recorded. Please try again.';
+  }
+
+  Future<bool?> _confirmStorageSave(PantryWasteSource source, double quantity) {
+    final remaining = source.item.quantity - quantity;
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        icon: const Icon(Icons.inventory_2_outlined),
+        title: const Text('Record stored food as waste?'),
+        content: Text(
+          'This will record ${wasteNumber(quantity)} ${source.item.unit.displayLabel(quantity)} as waste and reduce the stored quantity from ${wasteNumber(source.item.quantity)} to ${wasteNumber(remaining)}.',
+        ),
+        scrollable: true,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Record Waste'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _pickDate() async {
@@ -276,9 +670,13 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
     final auth = ref.watch(wasteAuthUidProvider);
     final records = ref.watch(foodWasteProvider);
     _openedUid ??= auth.asData?.value;
-    // Keep the source account's stock live while the dashboard route is paused.
-    if (widget.pantrySource != null && _sameUser) {
-      ref.watch(wastePantryItemsProvider(widget.pantrySource!.uid));
+    final storage = _newRecord
+        ? ref.watch(activeWastePantryProvider)
+        : const AsyncData<List<PantryWasteSource>>([]);
+    PantryWasteSource? liveSelection;
+    final selectedId = _selectedStorage?.item.firestoreId;
+    for (final source in storage.asData?.value ?? const <PantryWasteSource>[]) {
+      if (source.item.firestoreId == selectedId) liveSelection = source;
     }
     final editing = widget.initialRecord != null;
     return PopScope(
@@ -318,82 +716,52 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
                                   'Every record is a step toward less waste.',
                                   style: Theme.of(context).textTheme.bodyLarge,
                                 ),
+                                if (_newRecord) ...[
+                                  const SizedBox(height: 20),
+                                  _sourceSelector(),
+                                ],
                                 const SizedBox(height: 24),
-                                RawAutocomplete<String>(
-                                  textEditingController: _name,
-                                  focusNode: _nameFocus,
-                                  optionsBuilder: (value) {
-                                    final query = value.text
-                                        .trim()
-                                        .toLowerCase();
-                                    return query.isEmpty
-                                        ? const Iterable<String>.empty()
-                                        : foodItemSuggestions
-                                              .where(
-                                                (name) => name
-                                                    .toLowerCase()
-                                                    .startsWith(query),
-                                              )
-                                              .take(8);
-                                  },
-                                  fieldViewBuilder:
-                                      (context, controller, focus, submit) =>
-                                          TextFormField(
-                                            key: const ValueKey('waste-name'),
-                                            controller: controller,
-                                            focusNode: focus,
-                                            decoration: _fieldDecoration(
-                                              'Item Name',
-                                              icon: const Icon(Icons.search),
-                                            ),
-                                            validator: (value) =>
-                                                value == null ||
-                                                    value.trim().isEmpty
-                                                ? 'Enter an item name.'
-                                                : null,
-                                          ),
-                                  optionsViewBuilder:
-                                      (context, select, options) => Align(
-                                        alignment: Alignment.topLeft,
-                                        child: Material(
-                                          elevation: 3,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          child: SizedBox(
-                                            width:
-                                                (MediaQuery.sizeOf(
-                                                          context,
-                                                        ).width -
-                                                        72)
-                                                    .clamp(0, 528)
-                                                    .toDouble(),
-                                            height: 220,
-                                            child: ListView(
-                                              padding: EdgeInsets.zero,
-                                              children: [
-                                                for (final option in options)
-                                                  ListTile(
-                                                    title: Text(option),
-                                                    onTap: () => select(option),
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                ),
+                                if (_storageMode) ...[
+                                  _storageItemField(storage),
+                                  if (liveSelection != null) ...[
+                                    const SizedBox(height: 12),
+                                    _selectedStorageDetails(liveSelection),
+                                  ],
+                                ] else
+                                  _externalNameField(),
                                 const SizedBox(height: 20),
                                 TextFormField(
                                   key: const ValueKey('waste-quantity'),
                                   controller: _quantity,
+                                  autovalidateMode:
+                                      AutovalidateMode.onUserInteraction,
                                   keyboardType:
                                       const TextInputType.numberWithOptions(
                                         decimal: true,
                                       ),
-                                  decoration: _fieldDecoration('Quantity'),
-                                  validator: (value) =>
-                                      _numberError(value, positive: true),
+                                  decoration: _fieldDecoration(
+                                    _storageMode
+                                        ? 'Waste Quantity'
+                                        : 'Quantity',
+                                    prefix: _storageMode ? '$_unit ' : null,
+                                  ),
+                                  validator: (value) {
+                                    final error = _numberError(
+                                      value,
+                                      positive: true,
+                                    );
+                                    if (error != null) return error;
+                                    final quantity = double.parse(
+                                      value!.trim(),
+                                    );
+                                    if (_storageMode &&
+                                        liveSelection != null &&
+                                        quantity >
+                                            liveSelection.item.quantity) {
+                                      return 'Waste quantity cannot exceed ${liveSelection.item.quantityLabel}.';
+                                    }
+                                    return null;
+                                  },
                                 ),
                                 const SizedBox(height: 20),
                                 DropdownButtonFormField<String>(
@@ -407,8 +775,10 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
                                         child: Text(unit),
                                       ),
                                   ],
-                                  onChanged: (value) =>
-                                      setState(() => _unit = value!),
+                                  onChanged: _storageMode
+                                      ? null
+                                      : (value) =>
+                                            setState(() => _unit = value!),
                                 ),
                                 const SizedBox(height: 20),
                                 Text(
@@ -441,9 +811,17 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
                                         child: Semantics(
                                           selected: _reason == reason,
                                           child: TextButton(
-                                            onPressed: () => setState(
-                                              () => _reason = reason,
-                                            ),
+                                            onPressed:
+                                                _storageMode &&
+                                                    liveSelection
+                                                            ?.item
+                                                            .expiryDate !=
+                                                        null &&
+                                                    reason == 'Expired'
+                                                ? null
+                                                : () => setState(
+                                                    () => _reason = reason,
+                                                  ),
                                             child: AnimatedDefaultTextStyle(
                                               duration: wasteMotionDuration(
                                                 context,
@@ -480,6 +858,7 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
                                     'Estimated Value',
                                     prefix: 'Rs. ',
                                   ),
+                                  readOnly: _storageMode,
                                   validator: _numberError,
                                 ),
                                 const SizedBox(height: 20),
