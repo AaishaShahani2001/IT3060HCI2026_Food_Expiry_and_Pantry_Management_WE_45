@@ -18,6 +18,80 @@ class PantryFirestoreException implements Exception {
   String toString() => message;
 }
 
+/// The pantry document for [itemId] was not found in the active pantry.
+class PantryItemNotFoundException extends PantryFirestoreException {
+  const PantryItemNotFoundException(this.itemId)
+    : super('This item no longer exists.');
+
+  final String itemId;
+}
+
+/// [amount] or the stored quantity cannot be used for a decrement.
+class InvalidPantryQuantityException extends PantryFirestoreException {
+  const InvalidPantryQuantityException(super.message);
+}
+
+/// [requested] is greater than the quantity stored for the item.
+class InsufficientPantryQuantityException extends PantryFirestoreException {
+  const InsufficientPantryQuantityException({
+    required this.requested,
+    required this.available,
+  }) : super('The requested amount is greater than the available quantity.');
+
+  final double requested;
+  final double available;
+}
+
+/// The signed-in user cannot change the selected Personal or Shared Pantry.
+class PantryAccessDeniedException extends PantryFirestoreException {
+  const PantryAccessDeniedException([
+    super.message = 'You do not have permission to update this item.',
+  ]);
+}
+
+/// Pantry quantities are stored to two decimal places, matching
+/// [PantryFirestoreService.updateQuantity]. Values that round to 0.00 become
+/// 0 so an exact depletion is not left as a floating-point residue.
+double _normalizePantryQuantity(double value) {
+  final normalized = double.parse(value.toStringAsFixed(2));
+  return normalized == 0 ? 0.0 : normalized;
+}
+
+double _readStoredQuantity(Map<String, dynamic>? data) {
+  final raw = data == null ? null : data['quantity'];
+  if (raw is! num) {
+    throw const InvalidPantryQuantityException(
+      'The stored quantity is missing or invalid.',
+    );
+  }
+
+  final value = raw.toDouble();
+  if (!value.isFinite || value < 0) {
+    throw const InvalidPantryQuantityException(
+      'The stored quantity is missing or invalid.',
+    );
+  }
+
+  return _normalizePantryQuantity(value);
+}
+
+double _validatedDecrement(double amount) {
+  if (!amount.isFinite) {
+    throw const InvalidPantryQuantityException(
+      'The decrement amount must be a finite number greater than zero.',
+    );
+  }
+
+  final normalized = _normalizePantryQuantity(amount);
+  if (normalized <= 0) {
+    throw const InvalidPantryQuantityException(
+      'The decrement amount must be greater than zero.',
+    );
+  }
+
+  return normalized;
+}
+
 /// Maps technical Firebase/unknown errors to the messages shown in the UI.
 String mapPantryFirestoreError(Object error) {
   if (error is PantryFirestoreException) {
@@ -125,12 +199,33 @@ PantryFirestoreException _quantityFailure(Object error) {
 /// Family / Hostel / Shared:
 /// pantries/{pantryId}/items/{itemId}
 class PantryFirestoreService {
-  PantryFirestoreService({FirebaseFirestore? firestore, FirebaseAuth? auth})
-    : _firestore = firestore ?? FirebaseFirestore.instance,
-      _auth = auth ?? FirebaseAuth.instance;
+  PantryFirestoreService({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+    String? Function()? currentUserId,
+    Future<ActivePantryContext> Function()? activePantryContext,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _auth = auth ?? (currentUserId == null ? FirebaseAuth.instance : null),
+       _currentUserId = currentUserId,
+       _activePantryContext =
+           activePantryContext ??
+           SharedPantryService.instance.getActivePantryContext;
 
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final FirebaseAuth? _auth;
+
+  /// When set, used instead of [FirebaseAuth.currentUser]. Tests pass this so
+  /// they do not initialize Firebase Auth.
+  final String? Function()? _currentUserId;
+
+  /// Defaults to [SharedPantryService.instance.getActivePantryContext].
+  final Future<ActivePantryContext> Function() _activePantryContext;
+
+  String? _signedInUserId() {
+    final currentUserId = _currentUserId;
+    if (currentUserId != null) return currentUserId();
+    return _auth?.currentUser?.uid;
+  }
 
   /// Returns the correct pantry item collection.
   ///
@@ -140,19 +235,22 @@ class PantryFirestoreService {
   /// Family / Shared:
   /// pantries/{pantryId}/items
   Future<CollectionReference<Map<String, dynamic>>> _itemsCollection() async {
-    final user = _auth.currentUser;
+    final uid = _signedInUserId();
 
-    if (user == null) {
+    if (uid == null || uid.isEmpty) {
       throw const PantryFirestoreException(kPantrySignInRequiredMessage);
     }
 
-    final context = await SharedPantryService.instance.getActivePantryContext();
+    final context = await _activePantryContext();
+    return _collectionFor(uid, context);
+  }
 
+  CollectionReference<Map<String, dynamic>> _collectionFor(
+    String uid,
+    ActivePantryContext context,
+  ) {
     if (context.pantryType == 'personal') {
-      return _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('pantryItems');
+      return _firestore.collection('users').doc(uid).collection('pantryItems');
     }
 
     if ((context.pantryType == 'family' || context.pantryType == 'shared') &&
@@ -167,6 +265,37 @@ class PantryFirestoreService {
     throw const PantryFirestoreException(
       'No active pantry is available. Please create or join a shared pantry.',
     );
+  }
+
+  /// Shared and family pantries keep membership at
+  /// pantries/{pantryId}/members/{uid}, written by [SharedPantryService].
+  Future<void> _requireSharedMember(
+    String uid,
+    ActivePantryContext context,
+  ) async {
+    final isShared =
+        context.pantryType == 'family' || context.pantryType == 'shared';
+    if (!isShared) return;
+
+    final pantryId = context.pantryId;
+    if (pantryId == null || pantryId.isEmpty) {
+      throw const PantryFirestoreException(
+        'No active pantry is available. Please create or join a shared pantry.',
+      );
+    }
+
+    final memberSnapshot = await _firestore
+        .collection('pantries')
+        .doc(pantryId)
+        .collection('members')
+        .doc(uid)
+        .get();
+    final memberUid = memberSnapshot.data()?['uid'];
+    if (!memberSnapshot.exists || memberUid != uid) {
+      throw const PantryAccessDeniedException(
+        'You do not have permission to update this shared pantry.',
+      );
+    }
   }
 
   /// Returns a specific pantry item document.
@@ -257,20 +386,18 @@ class PantryFirestoreService {
   /// Uses a pre-assigned ID when [item] already has one so the photo upload
   /// and this Firestore document share the same item ID.
   Future<PantryItem> addItem(PantryItem item) async {
-    final user = _auth.currentUser;
+    final uid = _signedInUserId();
 
-    if (user == null) {
+    if (uid == null || uid.isEmpty) {
       throw const PantryFirestoreException(kPantrySignInRequiredMessage);
     }
 
     final now = DateTime.now();
-    final itemData = item.toFirestore(userId: user.uid);
+    final itemData = item.toFirestore(userId: uid);
 
     final providedId = (item.firestoreId ?? item.id).trim();
 
-    final itemId = providedId.isNotEmpty
-        ? providedId
-        : newItemDocumentId(user.uid);
+    final itemId = providedId.isNotEmpty ? providedId : newItemDocumentId(uid);
 
     try {
       final itemReference = await _itemDoc(itemId: itemId);
@@ -560,6 +687,72 @@ class PantryFirestoreService {
       debugPrint('Pantry mark consumed failed: $error');
 
       throw _quantityFailure(error);
+    }
+  }
+
+  /// Decreases the active pantry item's quantity by [amount] inside a
+  /// Firestore transaction.
+  ///
+  /// The transaction reads the latest stored quantity, so a concurrent edit is
+  /// retried instead of overwritten. Zero is written on the same document.
+  /// This does not delete the item, mark it used up, or create a waste record.
+  /// A waste record written separately is not atomic with this update.
+  Future<double> decrementItemQuantity({
+    required String userId,
+    required String itemId,
+    required double amount,
+  }) async {
+    try {
+      final uid = _signedInUserId();
+      if (uid == null || uid.isEmpty) {
+        throw const PantryFirestoreException(kPantrySignInRequiredMessage);
+      }
+      if (userId != uid) {
+        throw const PantryAccessDeniedException();
+      }
+      if (itemId.trim().isEmpty) {
+        throw PantryItemNotFoundException(itemId);
+      }
+
+      final context = await _activePantryContext();
+      final itemRef = _collectionFor(uid, context).doc(itemId);
+      await _requireSharedMember(uid, context);
+
+      return await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(itemRef);
+        if (!snapshot.exists) {
+          throw PantryItemNotFoundException(itemId);
+        }
+
+        final currentQuantity = _readStoredQuantity(snapshot.data());
+        final decrement = _validatedDecrement(amount);
+        if (decrement > currentQuantity) {
+          throw InsufficientPantryQuantityException(
+            requested: decrement,
+            available: currentQuantity,
+          );
+        }
+
+        final newQuantity = _normalizePantryQuantity(
+          currentQuantity - decrement,
+        );
+        transaction.update(itemRef, {
+          'quantity': newQuantity,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        return newQuantity;
+      });
+    } on PantryFirestoreException {
+      rethrow;
+    } on FirebaseException catch (error) {
+      debugPrint(
+        'Pantry quantity decrement failed: '
+        '${error.code} ${error.message}',
+      );
+
+      throw PantryFirestoreException(
+        _friendlyQuantityFirebaseMessage(error.code),
+      );
     }
   }
 }
