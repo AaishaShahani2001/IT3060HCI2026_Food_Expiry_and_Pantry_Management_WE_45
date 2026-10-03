@@ -23,28 +23,22 @@ class HomeWasteSummaryCard extends ConsumerWidget {
     final auth = ref.watch(wasteAuthUidProvider);
     final records = ref.watch(foodWasteProvider);
     final uid = auth.asData?.value;
-
-    String itemCountText = '5 items';
-    String estimatedLossText = 'Rs. 4,000';
-
-    if (!auth.isLoading &&
-        !auth.hasError &&
+    final signedIn =
         uid != null &&
-        ref.read(foodWasteRepositoryProvider).isCurrentUser(uid) &&
-        !records.hasError) {
-      records.whenData((items) {
-        final summary = WasteSummary(
-          items,
-          WastePeriod.month,
-          ref.read(wasteClockProvider)(),
-        );
-        if (items.isNotEmpty) {
-          itemCountText =
-              '${summary.count} ${summary.count == 1 ? 'item' : 'items'}';
-          estimatedLossText = wasteMoney(summary.estimatedValue);
-        }
-      });
-    }
+        ref.watch(foodWasteRepositoryProvider).isCurrentUser(uid);
+
+    // Same records and monthly total the Waste Tracker uses. Placeholders are
+    // not shown while the account or Firestore read is still settling.
+    final summary = signedIn && records.hasValue
+        ? WasteSummary(
+            records.requireValue,
+            WastePeriod.month,
+            ref.read(wasteClockProvider)(),
+          )
+        : null;
+    final count = summary?.count ?? 0;
+    final itemCountText = '$count ${count == 1 ? 'item' : 'items'}';
+    final estimatedLossText = wasteMoney(summary?.estimatedValue ?? 0);
 
     // Helper to open the full Food Waste Tracking screen
     void openWasteTracker() {

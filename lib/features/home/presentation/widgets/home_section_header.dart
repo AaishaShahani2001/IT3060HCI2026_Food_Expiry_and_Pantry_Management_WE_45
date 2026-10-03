@@ -11,7 +11,7 @@ class HomeSectionHeader extends StatelessWidget {
   const HomeSectionHeader({
     super.key,
     required this.title,
-    required this.assetPath,
+    this.assetPath,
     this.subtitle,
     this.onSeeAll,
     this.seeAllLabel = 'See All',
@@ -30,7 +30,7 @@ class HomeSectionHeader extends StatelessWidget {
   });
 
   final String title;
-  final String assetPath;
+  final String? assetPath;
   final String? subtitle;
   final VoidCallback? onSeeAll;
   final String seeAllLabel;
@@ -61,20 +61,23 @@ class HomeSectionHeader extends StatelessWidget {
         subtitleColor ??
         (isDark ? FreshPalette.darkSecondaryText : FreshPalette.secondaryText);
 
+    final iconPath = assetPath;
     final content = Row(
       children: [
-        _HeaderIcon(
-          assetPath: assetPath,
-          size: containerSize,
-          animateIcon: animateIcon,
-          fallbackIcon: fallbackIcon,
-          isDark: isDark,
-          customBgColor: iconBgColor,
-          iconPadding: iconPadding,
-          iconFit: iconFit,
-          iconBorderColor: iconBorderColor,
-        ),
-        const SizedBox(width: 12),
+        if (iconPath != null) ...[
+          _HeaderIcon(
+            assetPath: iconPath,
+            size: containerSize,
+            animateIcon: animateIcon,
+            fallbackIcon: fallbackIcon,
+            isDark: isDark,
+            customBgColor: iconBgColor,
+            iconPadding: iconPadding,
+            iconFit: iconFit,
+            iconBorderColor: iconBorderColor,
+          ),
+          const SizedBox(width: 12),
+        ],
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

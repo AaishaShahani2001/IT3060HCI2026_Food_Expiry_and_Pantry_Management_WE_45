@@ -57,9 +57,6 @@ class _RecentRecipesHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return HomeSectionHeader(
       title: 'Recent Recipes',
-      assetPath: 'assets/images/recipe-icon.jpg',
-      fallbackIcon: Icons.restaurant_menu_outlined,
-      animateIcon: false,
       onSeeAll: () => context.go(AppRoutes.recipes),
       semanticLabel: 'Recent Recipes',
     );
