@@ -3,6 +3,7 @@ import '../../../pantry/data/services/pantry_firestore_service.dart';
 import '../../../pantry/domain/models/pantry_item.dart';
 import '../../../pantry/domain/utils/expiry_status.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
+import '../../models/automatic_waste_candidate.dart';
 import '../../models/food_waste_record.dart';
 import 'food_waste_provider.dart';
 
@@ -27,6 +28,7 @@ String wasteUnitFor(PantryUnit unit) => switch (unit) {
   PantryUnit.ml => 'ml',
   PantryUnit.packs => 'pack',
   PantryUnit.bottles => 'bottle',
+  PantryUnit.boxes => 'box',
 };
 
 class PantryWasteSource {
@@ -34,7 +36,7 @@ class PantryWasteSource {
   final String uid;
   final PantryItem item;
   FoodWasteRecord draft(DateTime now) {
-    final value = item.unitPrice * item.quantity;
+    final value = calculateRemainingValue(item);
     return FoodWasteRecord(
       itemName: item.name,
       quantity: item.quantity,
@@ -42,8 +44,30 @@ class PantryWasteSource {
       reason: 'Expired',
       estimatedValue: value.isFinite && value >= 0 ? value : 0,
       wastedAt: now,
-      source: 'pantry',
+      source: manualPantryWasteSource,
       sourcePantryItemId: item.firestoreId,
+    );
+  }
+
+  AutomaticWasteCandidate automaticCandidate() {
+    final pantryItemId = item.firestoreId!;
+    final expiryDate = item.expiryDate!;
+    final value = calculateRemainingValue(item);
+    final normalizedExpiry = wasteExpiryDate(expiryDate);
+    return AutomaticWasteCandidate(
+      uid: uid,
+      record: FoodWasteRecord(
+        id: automaticWasteEventId(pantryItemId, normalizedExpiry),
+        itemName: item.name,
+        quantity: item.quantity,
+        unit: wasteUnitFor(item.unit),
+        reason: 'Expired',
+        estimatedValue: value.isFinite && value >= 0 ? value : 0,
+        wastedAt: wasteExpiryEventTime(normalizedExpiry),
+        source: automaticExpiryWasteSource,
+        sourcePantryItemId: pantryItemId,
+        sourceExpiryDate: normalizedExpiry,
+      ),
     );
   }
 }
@@ -64,6 +88,7 @@ final expiredWastePantryProvider =
             (items) => [
               for (final item in items)
                 if (item.isConnectedToFirestore &&
+                    item.expiryDate != null &&
                     item.quantity.isFinite &&
                     item.quantity > 0 &&
                     ExpiryStatusHelper.fromDate(

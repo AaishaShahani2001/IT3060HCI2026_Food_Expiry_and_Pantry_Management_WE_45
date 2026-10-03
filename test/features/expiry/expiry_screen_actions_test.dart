@@ -91,12 +91,16 @@ void main() {
     expect(wasteButton, findsOneWidget);
     expect(expiryButton, findsOneWidget);
     expect(
-      tester.getCenter(expiryButton).dx,
-      lessThan(tester.getCenter(wasteButton).dx),
+      tester.getCenter(wasteButton).dx,
+      lessThan(tester.getCenter(expiryButton).dx),
     );
     expect(
-      tester.getTopLeft(find.text('Fresh 0')).dy,
+      tester.getTopLeft(find.text('ALERT')).dy,
       lessThan(tester.getTopLeft(expiryButton).dy),
+    );
+    expect(
+      tester.getTopLeft(expiryButton).dy,
+      lessThan(tester.getTopLeft(find.text('Fresh 0')).dy),
     );
     expect(tester.takeException(), isNull);
 
@@ -185,26 +189,28 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('All 3'), findsNothing);
+    expect(find.text('All 3'), findsOneWidget);
     expect(find.text('Fresh 1'), findsOneWidget);
     expect(find.text('Expiring Soon 1'), findsOneWidget);
     expect(find.text('Expired 1'), findsOneWidget);
+    final allLabel = tester.getTopLeft(find.text('All 3'));
     final freshLabel = tester.getTopLeft(find.text('Fresh 1'));
     final soonLabel = tester.getTopLeft(find.text('Expiring Soon 1'));
     final expiredLabel = tester.getTopLeft(find.text('Expired 1'));
+    expect((allLabel.dy - freshLabel.dy).abs(), lessThan(2));
     expect((freshLabel.dy - soonLabel.dy).abs(), lessThan(2));
     expect((freshLabel.dy - expiredLabel.dy).abs(), lessThan(2));
+    expect(allLabel.dx, lessThan(freshLabel.dx));
     expect(freshLabel.dx, lessThan(soonLabel.dx));
     expect(soonLabel.dx, lessThan(expiredLabel.dx));
     expect(find.text('Yogurt'), findsOneWidget);
     expect(find.text('Milk'), findsOneWidget);
     expect(find.text('Bread'), findsOneWidget);
     expect(find.text('Rice'), findsNothing);
-    expect(find.text('USE FIRST'), findsWidgets);
-    expect(find.text('HIGH PRIORITY'), findsOneWidget);
+    expect(find.text('FRESH'), findsOneWidget);
+    expect(find.text('EXPIRING SOON'), findsOneWidget);
     expect(find.text('EXPIRED ITEMS'), findsOneWidget);
     expect(find.text('Action Needed'), findsOneWidget);
-    expect(find.text('EXPIRING SOON'), findsNothing);
     expect(
       tester.getTopLeft(find.text('Milk')).dy,
       lessThan(tester.getTopLeft(find.text('Bread')).dy),
@@ -235,6 +241,24 @@ void main() {
     expect(find.text('Yogurt'), findsOneWidget);
     expect(find.text('Milk'), findsOneWidget);
     expect(find.text('Bread'), findsOneWidget);
+    expect(find.text('FRESH'), findsOneWidget);
+    expect(find.text('EXPIRING SOON'), findsOneWidget);
+    expect(find.text('EXPIRED ITEMS'), findsOneWidget);
+
+    await tester.tap(find.text('Fresh 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('FRESH'), findsOneWidget);
+    expect(find.text('EXPIRING SOON'), findsNothing);
+    expect(find.text('EXPIRED ITEMS'), findsNothing);
+
+    await tester.tap(find.text('All 3'));
+    await tester.pumpAndSettle();
+    expect(find.text('Yogurt'), findsOneWidget);
+    expect(find.text('Milk'), findsOneWidget);
+    expect(find.text('Bread'), findsOneWidget);
+    expect(find.text('FRESH'), findsOneWidget);
+    expect(find.text('EXPIRING SOON'), findsOneWidget);
+    expect(find.text('EXPIRED ITEMS'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -302,11 +326,20 @@ void main() {
       tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
       AppColors.cream,
     );
+    expect(_expiryButtonColor(tester), FreshPalette.primaryButton);
 
     await pumpTheme(AppTheme.dark);
     final darkScaffold = tester.widget<Scaffold>(find.byType(Scaffold));
     expect(darkScaffold.backgroundColor, AppTheme.dark.colorScheme.surface);
     expect(darkScaffold.backgroundColor, isNot(AppColors.cream));
+    expect(_expiryButtonColor(tester), FreshPalette.selected);
     expect(tester.takeException(), isNull);
   });
+}
+
+Color? _expiryButtonColor(WidgetTester tester) {
+  final button = tester.widget<FilledButton>(
+    find.byKey(const ValueKey('track-item-expiry-button')),
+  );
+  return button.style?.backgroundColor?.resolve(const <WidgetState>{});
 }

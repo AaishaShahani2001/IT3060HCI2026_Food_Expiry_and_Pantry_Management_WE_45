@@ -367,7 +367,7 @@ void main() {
       'https://res.cloudinary.com/test-cloud/image/upload/v1/freshtrack/pantry/user-1/milk.jpg',
       delivery: PantryImageDelivery.card,
     );
-    expect(cloudinary, contains('/upload/f_auto,q_auto,w_300,h_300,c_fill/'));
+    expect(cloudinary, contains('/upload/f_auto,q_auto,w_640,c_limit/'));
 
     final details = pantryDisplayImageUrl(
       'https://res.cloudinary.com/test-cloud/image/upload/v1/freshtrack/pantry/user-1/milk.jpg',

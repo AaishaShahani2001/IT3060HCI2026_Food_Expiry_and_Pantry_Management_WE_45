@@ -48,6 +48,8 @@ class PantryItemImage extends StatelessWidget {
         width: width,
         height: height,
         fit: BoxFit.cover,
+        alignment: Alignment.center,
+        filterQuality: FilterQuality.medium,
         semanticLabel: '${item.name} photo',
         loadingBuilder: (context, image, progress) {
           if (progress == null) return image;

@@ -7,6 +7,7 @@ import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_list_repository.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/shopping_error_message.dart';
 
 import 'support/fake_firestore.dart';
 
@@ -74,6 +75,35 @@ void main() {
       expect(items().first.category, 'Dairy');
     },
   );
+
+  test('low-stock add refuses an item that became expired', () async {
+    await load();
+    final now = DateTime.now();
+    final renderedSuggestion = PantryItem(
+      id: 'rice',
+      firestoreId: 'rice',
+      name: 'Rice',
+      category: PantryCategory.grains,
+      location: PantryLocation.pantry,
+      quantity: 0.5,
+      unit: PantryUnit.kg,
+      expiryDate: DateTime(now.year, now.month, now.day + 1),
+    );
+    final becameExpired = renderedSuggestion.copyWith(
+      expiryDate: DateTime(now.year, now.month, now.day - 1),
+    );
+
+    await expectLater(
+      notifier().addLowStockSuggestion(becameExpired),
+      throwsA(isA<ExpiredLowStockSuggestionException>()),
+    );
+    expect(session.store.addCalls, 0);
+    expect(items(), isEmpty);
+    expect(
+      shoppingErrorMessage(const ExpiredLowStockSuggestionException()),
+      'This Pantry item has expired and is no longer a low-stock suggestion.',
+    );
+  });
 
   test('failed add retains existing items', () async {
     session.store.seed('alice', 'milk', 'Milk');

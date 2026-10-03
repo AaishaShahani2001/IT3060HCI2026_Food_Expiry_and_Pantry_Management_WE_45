@@ -11,7 +11,6 @@ import '../../domain/services/expiry_alert_service.dart';
 import '../../domain/services/expiry_notification_provider.dart';
 import '../../domain/services/expiry_service.dart';
 
-
 // ============================================================
 // EXPIRY SERVICE
 // ============================================================
@@ -20,23 +19,19 @@ final expiryServiceProvider = Provider<ExpiryService>((ref) {
   return const ExpiryService();
 });
 
-
 // ============================================================
 // FIRESTORE REPOSITORY
 // ============================================================
 
-final expiryRepositoryProvider =
-    Provider<ExpiryRepository>((ref) {
+final expiryRepositoryProvider = Provider<ExpiryRepository>((ref) {
   return FirestoreExpiryRepository();
 });
-
 
 // ============================================================
 // SMART ALERT SERVICE
 // ============================================================
 
-final expiryAlertServiceProvider =
-    Provider<ExpiryAlertService>((ref) {
+final expiryAlertServiceProvider = Provider<ExpiryAlertService>((ref) {
   return ExpiryAlertService(
     expiryService: ref.read(expiryServiceProvider),
     repository: ref.read(expiryRepositoryProvider),
@@ -44,101 +39,68 @@ final expiryAlertServiceProvider =
   );
 });
 
-
 // ============================================================
 // ALL PANTRY ITEMS SORTED BY EXPIRY
 // ============================================================
 
-final expiryItemsProvider =
-    Provider<List<PantryItem>>((ref) {
+final expiryItemsProvider = Provider<List<PantryItem>>((ref) {
   final itemsAsync = ref.watch(pantryItemsProvider);
 
   return itemsAsync.maybeWhen(
     data: (items) {
-      return ref
-          .read(expiryServiceProvider)
-          .sortByExpiryUrgency(items);
+      return ref.read(expiryServiceProvider).sortByExpiryUrgency(items);
     },
     orElse: () => const [],
   );
 });
 
-
 // ============================================================
 // EXPIRED ITEMS
 // ============================================================
 
-final expiredItemsProvider =
-    Provider<List<PantryItem>>((ref) {
+final expiredItemsProvider = Provider<List<PantryItem>>((ref) {
   final items = ref
       .watch(pantryItemsProvider)
-      .maybeWhen(
-        data: (items) => items,
-        orElse: () => const <PantryItem>[],
-      );
+      .maybeWhen(data: (items) => items, orElse: () => const <PantryItem>[]);
 
-  return ref
-      .read(expiryServiceProvider)
-      .expiredItems(items);
+  return ref.read(expiryServiceProvider).expiredItems(items);
 });
-
 
 // ============================================================
 // EXPIRING SOON
 // ============================================================
 
-final expiringSoonItemsProvider =
-    Provider<List<PantryItem>>((ref) {
+final expiringSoonItemsProvider = Provider<List<PantryItem>>((ref) {
   final items = ref
       .watch(pantryItemsProvider)
-      .maybeWhen(
-        data: (items) => items,
-        orElse: () => const <PantryItem>[],
-      );
+      .maybeWhen(data: (items) => items, orElse: () => const <PantryItem>[]);
 
-  return ref
-      .read(expiryServiceProvider)
-      .expiringSoonItems(items);
+  return ref.read(expiryServiceProvider).expiringSoonItems(items);
 });
-
 
 // ============================================================
 // FRESH ITEMS
 // ============================================================
 
-final freshItemsProvider =
-    Provider<List<PantryItem>>((ref) {
+final freshItemsProvider = Provider<List<PantryItem>>((ref) {
   final items = ref
       .watch(pantryItemsProvider)
-      .maybeWhen(
-        data: (items) => items,
-        orElse: () => const <PantryItem>[],
-      );
+      .maybeWhen(data: (items) => items, orElse: () => const <PantryItem>[]);
 
-  return ref
-      .read(expiryServiceProvider)
-      .freshItems(items);
+  return ref.read(expiryServiceProvider).freshItems(items);
 });
-
 
 // ============================================================
 // ITEMS WITHOUT EXPIRY
 // ============================================================
 
-final unknownExpiryItemsProvider =
-    Provider<List<PantryItem>>((ref) {
+final unknownExpiryItemsProvider = Provider<List<PantryItem>>((ref) {
   final items = ref
       .watch(pantryItemsProvider)
-      .maybeWhen(
-        data: (items) => items,
-        orElse: () => const <PantryItem>[],
-      );
+      .maybeWhen(data: (items) => items, orElse: () => const <PantryItem>[]);
 
-  return ref
-      .read(expiryServiceProvider)
-      .itemsWithoutExpiry(items);
+  return ref.read(expiryServiceProvider).itemsWithoutExpiry(items);
 });
-
 
 // ============================================================
 // SUMMARY
@@ -159,7 +121,10 @@ final expirySummaryProvider =
     });
 
 /// Status filter for the expiry list. This is separate from urgency sorting.
-enum ExpiryStatusFilter { all, fresh, expiringSoon, expired }
+///
+/// [unknown] is selected from the No Expiry summary card. The status chip
+/// bar continues to offer only fresh, expiring soon, and expired.
+enum ExpiryStatusFilter { all, fresh, expiringSoon, expired, unknown }
 
 class ExpiryStatusFilterNotifier extends Notifier<ExpiryStatusFilter> {
   @override
@@ -206,6 +171,7 @@ int expiryStatusFilterCount(
     ExpiryStatusFilter.fresh => summary.fresh,
     ExpiryStatusFilter.expiringSoon => summary.expiringSoon,
     ExpiryStatusFilter.expired => summary.expired,
+    ExpiryStatusFilter.unknown => summary.unknown,
   };
 }
 
@@ -217,6 +183,7 @@ extension on PantryItem {
       ExpiryStatusFilter.expiringSoon =>
         expiryStatus == ExpiryStatus.expiringSoon,
       ExpiryStatusFilter.expired => expiryStatus == ExpiryStatus.expired,
+      ExpiryStatusFilter.unknown => expiryStatus == ExpiryStatus.unknown,
     };
   }
 }
@@ -232,33 +199,22 @@ extension on PantryItem {
 final smartAlertItemsProvider = Provider<List<PantryItem>>((ref) {
   final items = ref
       .watch(pantryItemsProvider)
-      .maybeWhen(
-        data: (items) => items,
-        orElse: () => const <PantryItem>[],
-      );
+      .maybeWhen(data: (items) => items, orElse: () => const <PantryItem>[]);
 
   final service = ref.read(expiryServiceProvider);
 
-  final attentionItems =
-      service.attentionItems(items);
+  final attentionItems = service.attentionItems(items);
 
-  return service.sortByExpiryUrgency(
-    attentionItems,
-  );
+  return service.sortByExpiryUrgency(attentionItems);
 });
-
 
 // ============================================================
 // FIRESTORE EXPIRY ALERTS
 // ============================================================
 
-final expiryAlertsProvider =
-    FutureProvider<List<ExpiryAlert>>((ref) {
-  return ref
-      .read(expiryRepositoryProvider)
-      .fetchAlerts();
+final expiryAlertsProvider = FutureProvider<List<ExpiryAlert>>((ref) {
+  return ref.read(expiryRepositoryProvider).fetchAlerts();
 });
-
 
 // ============================================================
 // MAP PANTRY ITEM ID → EXPIRY ALERT
@@ -279,90 +235,65 @@ final expiryAlertsProvider =
 // for Update and Stop Tracking.
 // ============================================================
 
-final expiryAlertByItemIdProvider =
-    Provider<Map<String, ExpiryAlert>>((ref) {
-  final alertsAsync =
-      ref.watch(expiryAlertsProvider);
+final expiryAlertByItemIdProvider = Provider<Map<String, ExpiryAlert>>((ref) {
+  final alertsAsync = ref.watch(expiryAlertsProvider);
 
   return alertsAsync.maybeWhen(
     data: (alerts) {
-      return {
-        for (final alert in alerts)
-          alert.itemId: alert,
-      };
+      return {for (final alert in alerts) alert.itemId: alert};
     },
     orElse: () => const <String, ExpiryAlert>{},
   );
 });
-
 
 // ============================================================
 // CREATE / UPDATE EXPIRY ALERT
 // ============================================================
 
 final saveExpiryAlertProvider =
-    Provider<Future<void> Function(ExpiryAlert alert)>(
-  (ref) {
-    return (ExpiryAlert alert) async {
-      await ref
-          .read(expiryRepositoryProvider)
-          .saveAlert(alert);
+    Provider<Future<void> Function(ExpiryAlert alert)>((ref) {
+      return (ExpiryAlert alert) async {
+        await ref.read(expiryRepositoryProvider).saveAlert(alert);
 
-      ref.invalidate(expiryAlertsProvider);
-    };
-  },
-);
-
+        ref.invalidate(expiryAlertsProvider);
+      };
+    });
 
 // ============================================================
 // SYNCHRONIZE EXPIRY ALERTS
 // ============================================================
 
 final synchronizeExpiryAlertsProvider =
-    Provider<Future<void> Function(List<PantryItem>)>(
-  (ref) {
-    return (List<PantryItem> items) async {
-      await ref
-          .read(expiryAlertServiceProvider)
-          .synchronizeAlerts(items);
+    Provider<Future<void> Function(List<PantryItem>)>((ref) {
+      return (List<PantryItem> items) async {
+        await ref.read(expiryAlertServiceProvider).synchronizeAlerts(items);
 
-      ref.invalidate(expiryAlertsProvider);
-    };
-  },
-);
-
+        ref.invalidate(expiryAlertsProvider);
+      };
+    });
 
 // ============================================================
 // MARK ALERT AS READ
 // ============================================================
 
 final markExpiryAlertAsReadProvider =
-    Provider<Future<void> Function(String alertId)>(
-  (ref) {
-    return (String alertId) async {
-      await ref
-          .read(expiryRepositoryProvider)
-          .markAlertAsRead(alertId);
+    Provider<Future<void> Function(String alertId)>((ref) {
+      return (String alertId) async {
+        await ref.read(expiryRepositoryProvider).markAlertAsRead(alertId);
 
-      ref.invalidate(expiryAlertsProvider);
-    };
-  },
-);
-
+        ref.invalidate(expiryAlertsProvider);
+      };
+    });
 
 // ============================================================
 // STOP TRACKING / DELETE EXPIRY ALERT
 // ============================================================
 
 final deleteExpiryAlertProvider =
-    Provider<Future<void> Function(String alertId)>(
-  (ref) {
-    return (String alertId) async {
-      await ref
-          .read(expiryRepositoryProvider)
-          .deleteAlert(alertId);
+    Provider<Future<void> Function(String alertId)>((ref) {
+      return (String alertId) async {
+        await ref.read(expiryRepositoryProvider).deleteAlert(alertId);
 
-      ref.invalidate(expiryAlertsProvider);
-    };
-  },
-);
+        ref.invalidate(expiryAlertsProvider);
+      };
+    });

@@ -10,6 +10,7 @@ class WasteRecordTile extends StatelessWidget {
     required this.now,
     this.onEdit,
     this.onDelete,
+    this.onNotWasted,
   });
   final FoodWasteRecord record;
   final DateTime now;
@@ -21,6 +22,7 @@ class WasteRecordTile extends StatelessWidget {
   };
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onNotWasted;
   @override
   Widget build(BuildContext context) => Card(
     elevation: 1,
@@ -49,6 +51,15 @@ class WasteRecordTile extends StatelessWidget {
                   '${wasteNumber(record.quantity)} ${record.unit} • ${record.reason}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
+                if (record.isAutomaticExpiry) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Auto-recorded from expired Pantry stock',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   '${wasteMoney(record.estimatedValue)} • ${wasteRelativeDate(record.wastedAt, now)}',
@@ -57,17 +68,30 @@ class WasteRecordTile extends StatelessWidget {
               ],
             ),
           ),
-          if (onEdit != null || onDelete != null)
+          if (onEdit != null || onDelete != null || onNotWasted != null)
             WastePress(
               child: PopupMenuButton<String>(
                 tooltip: 'Actions for ${record.itemName}',
-                onSelected: (value) =>
-                    value == 'edit' ? onEdit?.call() : onDelete?.call(),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'edit':
+                      onEdit?.call();
+                    case 'delete':
+                      onDelete?.call();
+                    case 'not-wasted':
+                      onNotWasted?.call();
+                  }
+                },
                 itemBuilder: (_) => [
                   if (onEdit != null)
                     const PopupMenuItem(value: 'edit', child: Text('Edit')),
                   if (onDelete != null)
                     const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                  if (onNotWasted != null)
+                    const PopupMenuItem(
+                      value: 'not-wasted',
+                      child: Text('Not Wasted'),
+                    ),
                 ],
               ),
             ),

@@ -3,7 +3,8 @@ enum PantryImageDelivery { card, details }
 
 /// Returns [url] unchanged unless it is a Cloudinary delivery URL.
 ///
-/// Card images use `f_auto,q_auto,w_300,h_300,c_fill`.
+/// Card images use `f_auto,q_auto,w_640,c_limit` so the full photo is
+/// available and the card can show it without a prior square crop.
 /// Detail images use `f_auto,q_auto,w_900,c_limit`.
 /// Firebase Storage and other hosts are never rewritten.
 String pantryDisplayImageUrl(
@@ -24,7 +25,7 @@ String pantryDisplayImageUrl(
   if (_looksLikeTransform(segments[uploadIndex + 1])) return trimmed;
 
   final transform = delivery == PantryImageDelivery.card
-      ? 'f_auto,q_auto,w_300,h_300,c_fill'
+      ? 'f_auto,q_auto,w_640,c_limit'
       : 'f_auto,q_auto,w_900,c_limit';
   return uri
       .replace(

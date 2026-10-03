@@ -110,7 +110,12 @@ void main() {
 
     await pumpSection(tester, notifier: _ScriptedPantryItemsNotifier.new);
 
-    expect(find.text('Expiry Soon'), findsOneWidget);
+    expect(find.text('Expiry Soon'), findsNothing);
+    expect(find.bySemanticsLabel('Expiry Soon'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('View all expiring-soon items'),
+      findsOneWidget,
+    );
     expect(find.text('Yogurt'), findsOneWidget);
     expect(find.text('Milk'), findsOneWidget);
     expect(find.text('Cheese'), findsOneWidget);

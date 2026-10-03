@@ -21,6 +21,7 @@ import '../../features/settings/presentation/screens/low_stock_suggestion_settin
 import '../../features/shared_pantry/presentation/screens/shared_pantry_members_screen.dart';
 import '../../features/shared_pantry/presentation/screens/shared_pantry_screen.dart';
 import '../../features/shopping_list/models/shopping_item.dart';
+import '../../features/shopping_list/models/shopping_item_draft.dart';
 import '../../features/shopping_list/presentation/screens/add_shopping_item_screen.dart';
 import '../../features/shopping_list/presentation/screens/shopping_list_screen.dart';
 import '../../features/food_waste_tracking/presentation/screens/waste_tracker_screen.dart';
@@ -96,8 +97,15 @@ final GoRouter appRouter = GoRouter(
 
     GoRoute(
       path: AppRoutes.addShoppingItem,
-      builder: (context, state) =>
-          AddShoppingItemScreen(initialItem: state.extra as ShoppingItem?),
+      builder: (context, state) {
+        final extra = state.extra;
+        return AddShoppingItemScreen(
+          initialItem: extra is ShoppingItem ? extra : null,
+          initialDraft: extra is ShoppingItemDraft
+              ? extra
+              : ShoppingItemDraft.fromQuery(state.uri.queryParameters),
+        );
+      },
     ),
 
     GoRoute(

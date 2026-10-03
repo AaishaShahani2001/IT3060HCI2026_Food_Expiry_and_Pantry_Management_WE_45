@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/data/low_stock_eligibility.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_item_metadata.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_list_repository.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
@@ -22,6 +23,10 @@ final shoppingAuthUidProvider = StreamProvider<String?>((ref) {
 enum ShoppingDuplicateAction { increaseQuantity, moveToBuy, addAnyway }
 
 enum LowStockShoppingResult { unchanged, added, reactivated }
+
+class ExpiredLowStockSuggestionException implements Exception {
+  const ExpiredLowStockSuggestionException();
+}
 
 class ShoppingDuplicateException implements Exception {
   const ShoppingDuplicateException(this.existing);
@@ -284,6 +289,9 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
   }) async {
     _requireUser();
     final effectiveThreshold = threshold ?? pantryItem.minQuantity;
+    if (!hasEligibleShoppingLowStockExpiry(pantryItem)) {
+      throw const ExpiredLowStockSuggestionException();
+    }
     if (!pantryItem.isConnectedToFirestore ||
         pantryItem.name.trim().isEmpty ||
         !pantryItem.quantity.isFinite ||

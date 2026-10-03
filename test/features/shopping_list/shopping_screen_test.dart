@@ -13,6 +13,7 @@ import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/
 import 'package:food_expiry_and_pantry_management/features/pantry/presentation/screens/pantry_item_form_screen.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/domain/models/shopping_reminder.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item_draft.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/domain/services/shopping_reminder_notification_service.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/low_stock_suggestion_settings_provider.dart';
@@ -164,8 +165,15 @@ void main() {
         ),
         GoRoute(
           path: '/shopping/add',
-          builder: (context, state) =>
-              AddShoppingItemScreen(initialItem: state.extra as ShoppingItem?),
+          builder: (context, state) {
+            final extra = state.extra;
+            return AddShoppingItemScreen(
+              initialItem: extra is ShoppingItem ? extra : null,
+              initialDraft: extra is ShoppingItemDraft
+                  ? extra
+                  : ShoppingItemDraft.fromQuery(state.uri.queryParameters),
+            );
+          },
         ),
       ],
     );
@@ -492,6 +500,26 @@ void main() {
         of: find.byType(ListView),
         matching: find.text('Milk'),
       );
+      await tester.enterText(name, 'ri');
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: find.byType(ListView), matching: find.text('Rice')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(ListView),
+          matching: find.text('Rice Flour'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(ListView),
+          matching: find.text('Basmati Rice'),
+        ),
+        findsOneWidget,
+      );
       await tester.enterText(name, 'm');
       await tester.pumpAndSettle();
       expect(
@@ -508,6 +536,14 @@ void main() {
       await tester.tap(milkSuggestion);
       await tester.pumpAndSettle();
       expect(tester.widget<TextFormField>(name).controller!.text, 'Milk');
+      expect(
+        tester
+            .widget<DropdownButtonFormField<String>>(
+              find.byType(DropdownButtonFormField<String>),
+            )
+            .initialValue,
+        'Dairy',
+      );
       await tester.tap(find.widgetWithText(ChoiceChip, '4'));
       await tester.pumpAndSettle();
       expect(tester.widget<TextFormField>(quantity).controller!.text, '4');
@@ -530,6 +566,243 @@ void main() {
       expect(find.text('Sri Lankan Red Rice'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'catalogue and recent picks apply metadata while quantities preserve units',
+    (tester) async {
+      await openScreen(tester, seed: false);
+      await tester.tap(find.byTooltip('Add shopping item'));
+      await tester.pumpAndSettle();
+
+      final name = find.byType(TextFormField).at(0);
+      final quantity = find.byType(TextFormField).at(1);
+      PantryUnit selectedUnit() => tester
+          .widget<DropdownButtonFormField<PantryUnit>>(
+            find.byType(DropdownButtonFormField<PantryUnit>),
+          )
+          .initialValue!;
+      String selectedCategory() => tester
+          .widget<DropdownButtonFormField<String>>(
+            find.byType(DropdownButtonFormField<String>),
+          )
+          .initialValue!;
+
+      await tester.enterText(name, 'ri');
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(of: find.byType(ListView), matching: find.text('Rice')),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextFormField>(name).controller!.text, 'Rice');
+      expect(selectedCategory(), 'Rice, Grains and Cereals');
+      expect(selectedUnit(), PantryUnit.kg);
+
+      for (final value in [1, 2, 5, 10]) {
+        await tester.tap(find.widgetWithText(ChoiceChip, '$value'));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TextFormField>(quantity).controller!.text,
+          '$value',
+        );
+        expect(selectedUnit(), PantryUnit.kg);
+      }
+      expect(tester.state<FormState>(find.byType(Form)).validate(), isTrue);
+
+      final unitField = find.byType(DropdownButtonFormField<PantryUnit>);
+      await tester.ensureVisible(unitField);
+      await tester.tap(unitField);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('g').last);
+      await tester.pumpAndSettle();
+      expect(selectedUnit(), PantryUnit.g);
+      await tester.tap(find.widgetWithText(ChoiceChip, '5'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextFormField>(quantity).controller!.text, '5');
+      expect(selectedUnit(), PantryUnit.g);
+
+      await tester.ensureVisible(name);
+      await tester.enterText(name, 'mi');
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(of: find.byType(ListView), matching: find.text('Milk')),
+      );
+      await tester.pumpAndSettle();
+      expect(selectedCategory(), 'Dairy');
+      expect(selectedUnit(), PantryUnit.liters);
+      expect(tester.state<FormState>(find.byType(Form)).validate(), isTrue);
+
+      await tester.enterText(name, 'bis');
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(ListView),
+          matching: find.text('Biscuits'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(selectedCategory(), 'Bakery');
+      expect(selectedUnit(), PantryUnit.packs);
+      expect(tester.state<FormState>(find.byType(Form)).validate(), isTrue);
+
+      await tester.enterText(name, 'A custom market item');
+      await tester.pumpAndSettle();
+      expect(selectedCategory(), 'Other');
+      expect(selectedUnit(), PantryUnit.items);
+      expect(tester.state<FormState>(find.byType(Form)).validate(), isTrue);
+    },
+  );
+
+  testWidgets('recent pick uses the same Shopping metadata as autocomplete', (
+    tester,
+  ) async {
+    await openScreen(tester, seed: false);
+    await tester.tap(find.byTooltip('Add shopping item'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(ActionChip, 'Rice'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TextFormField>(find.byType(TextFormField).at(0))
+          .controller!
+          .text,
+      'Rice',
+    );
+    expect(
+      tester
+          .widget<DropdownButtonFormField<PantryUnit>>(
+            find.byType(DropdownButtonFormField<PantryUnit>),
+          )
+          .initialValue,
+      PantryUnit.kg,
+    );
+    expect(
+      tester
+          .widget<DropdownButtonFormField<String>>(
+            find.byType(DropdownButtonFormField<String>),
+          )
+          .initialValue,
+      'Rice, Grains and Cereals',
+    );
+
+    await tester.tap(find.widgetWithText(ChoiceChip, '2'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add Item'));
+    await tester.pumpAndSettle();
+    expect(session.store.documents.values.single['unit'], 'kg');
+    expect(
+      session.store.documents.values.single['category'],
+      'Rice, Grains and Cereals',
+    );
+  });
+
+  testWidgets(
+    'autocomplete selection synchronizes validation and Shopping metadata',
+    (tester) async {
+      await openScreen(tester, seed: false);
+      await tester.tap(find.byTooltip('Add shopping item'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Add Item'));
+      await tester.pumpAndSettle();
+      expect(find.text('Please enter an item name.'), findsOneWidget);
+
+      final name = find.byType(TextFormField).at(0);
+      await tester.enterText(name, 'mango j');
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(ListView),
+          matching: find.text('Mango Juice'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<TextFormField>(name).controller!.text,
+        'Mango Juice',
+      );
+      expect(find.text('Please enter an item name.'), findsNothing);
+      expect(
+        tester
+            .widget<DropdownButtonFormField<String>>(
+              find.byType(DropdownButtonFormField<String>),
+            )
+            .initialValue,
+        'Beverages',
+      );
+      expect(
+        tester
+            .widget<DropdownButtonFormField<PantryUnit>>(
+              find.byType(DropdownButtonFormField<PantryUnit>),
+            )
+            .initialValue,
+        PantryUnit.bottles,
+      );
+
+      await tester.tap(find.widgetWithText(ChoiceChip, '1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add Item'));
+      await tester.pumpAndSettle();
+      expect(session.store.documents.values.single['name'], 'Mango Juice');
+      expect(session.store.documents.values.single['category'], 'Beverages');
+      expect(session.store.documents.values.single['unit'], 'bottles');
+    },
+  );
+
+  testWidgets('recent pick clears stale name validation and submits', (
+    tester,
+  ) async {
+    await openScreen(tester, seed: false);
+    await tester.tap(find.byTooltip('Add shopping item'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add Item'));
+    await tester.pumpAndSettle();
+    expect(find.text('Please enter an item name.'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ActionChip, 'Rice'));
+    await tester.pumpAndSettle();
+    expect(find.text('Please enter an item name.'), findsNothing);
+    await tester.tap(find.widgetWithText(ChoiceChip, '2'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add Item'));
+    await tester.pumpAndSettle();
+
+    expect(session.store.documents.values.single['name'], 'Rice');
+    expect(session.store.documents.values.single['unit'], 'kg');
+  });
+
+  testWidgets('manual custom name synchronizes validation while empty fails', (
+    tester,
+  ) async {
+    await openScreen(tester, seed: false);
+    await tester.tap(find.byTooltip('Add shopping item'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add Item'));
+    await tester.pumpAndSettle();
+    expect(find.text('Please enter an item name.'), findsOneWidget);
+
+    final name = find.byType(TextFormField).at(0);
+    await tester.enterText(name, '   ');
+    await tester.enterText(find.byType(TextFormField).at(1), '1');
+    await tester.tap(find.text('Add Item'));
+    await tester.pumpAndSettle();
+    expect(find.text('Please enter an item name.'), findsOneWidget);
+    expect(session.store.addCalls, 0);
+
+    await tester.enterText(name, 'Farmers market special');
+    await tester.tap(find.text('Add Item'));
+    await tester.pumpAndSettle();
+    expect(
+      session.store.documents.values.single['name'],
+      'Farmers market special',
+    );
+    expect(session.store.documents.values.single['unit'], 'items');
+    expect(session.store.documents.values.single['category'], 'Other');
+  });
 
   testWidgets('edit prefill and purchased checkbox persist after refresh', (
     tester,

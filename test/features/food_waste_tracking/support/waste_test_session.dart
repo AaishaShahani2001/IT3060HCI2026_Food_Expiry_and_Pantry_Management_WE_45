@@ -3,8 +3,7 @@ import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/d
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/food_waste_record.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/data/services/pantry_firestore_service.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
-// Reuse the existing SDK-boundary fake without changing Shopping List tests.
-import '../../shopping_list/support/fake_firestore.dart';
+import 'fake_waste_firestore.dart';
 
 final wasteTestNow = DateTime(2026, 9, 16, 12);
 FoodWasteRecord draft({
@@ -24,7 +23,7 @@ FoodWasteRecord draft({
 
 class WasteTestSession {
   final pantry = FakeWastePantryService();
-  final store = FakeShoppingFirestore();
+  final store = FakeWasteFirestore();
   final changes = StreamController<String?>.broadcast();
   String? uid = 'alice';
   late final repository = FoodWasteRepository(

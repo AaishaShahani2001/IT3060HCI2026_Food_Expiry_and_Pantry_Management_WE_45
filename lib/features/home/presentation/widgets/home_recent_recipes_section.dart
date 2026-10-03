@@ -7,6 +7,7 @@ import '../../../../core/router/app_routes.dart';
 import '../../../recipes/domain/models/recipe.dart';
 import '../../../recipes/presentation/providers/recipe_providers.dart';
 import '../../../recipes/presentation/utils/recipe_image.dart';
+import 'home_section_header.dart';
 
 /// Home preview of the recipes already returned by [recipesProvider].
 ///
@@ -54,37 +55,10 @@ class _RecentRecipesHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            'Recent Recipes',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: colorScheme.onSurface,
-            ),
-          ),
-        ),
-        TextButton(
-          onPressed: () => context.go(AppRoutes.recipes),
-          style: TextButton.styleFrom(
-            visualDensity: VisualDensity.compact,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            foregroundColor: colorScheme.primary,
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('See All'),
-              Icon(Icons.chevron_right_rounded, size: 18),
-            ],
-          ),
-        ),
-      ],
+    return HomeSectionHeader(
+      title: 'Recent Recipes',
+      onSeeAll: () => context.go(AppRoutes.recipes),
+      semanticLabel: 'Recent Recipes',
     );
   }
 }

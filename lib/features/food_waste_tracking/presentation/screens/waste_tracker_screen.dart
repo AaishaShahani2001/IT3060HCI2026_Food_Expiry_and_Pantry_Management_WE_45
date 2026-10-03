@@ -4,7 +4,6 @@ import '../../models/food_waste_record.dart';
 import '../../models/waste_summary.dart';
 import '../providers/food_waste_provider.dart';
 import '../providers/pantry_waste_provider.dart';
-import '../widgets/expired_pantry_section.dart';
 import '../widgets/waste_motion.dart';
 import '../waste_feedback.dart';
 import '../widgets/waste_period_selector.dart';
@@ -23,6 +22,9 @@ class WasteTrackerScreen extends ConsumerStatefulWidget {
 class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
   WastePeriod _period = WastePeriod.today;
   bool _busy = false;
+  bool _reconciling = false;
+  bool _reconcileScheduled = false;
+  bool _reconcileAgain = false;
   int _session = 0;
   String? get _uid => ref.read(wasteAuthUidProvider).asData?.value;
   bool _current(String? uid, int session) =>
@@ -31,6 +33,61 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
       _uid == uid &&
       _session == session &&
       ref.read(foodWasteRepositoryProvider).isCurrentUser(uid);
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual(
+      foodWasteProvider,
+      (_, _) => _scheduleAutomaticReconciliation(),
+      fireImmediately: true,
+    );
+    ref.listenManual(
+      expiredWastePantryProvider,
+      (_, _) => _scheduleAutomaticReconciliation(),
+      fireImmediately: true,
+    );
+  }
+
+  void _scheduleAutomaticReconciliation() {
+    if (_reconciling) {
+      _reconcileAgain = true;
+      return;
+    }
+    if (_reconcileScheduled) return;
+    _reconcileScheduled = true;
+    Future<void>.microtask(() async {
+      _reconcileScheduled = false;
+      if (!mounted || _reconciling) return;
+      final records = ref.read(foodWasteProvider).asData?.value;
+      final sources = ref.read(expiredWastePantryProvider).asData?.value;
+      final uid = _uid;
+      if (records == null || sources == null || uid == null) return;
+      final existingIds = {for (final record in records) record.id};
+      final candidates = sources
+          .where((source) => source.uid == uid)
+          .map((source) => source.automaticCandidate())
+          .where((candidate) => !existingIds.contains(candidate.eventId))
+          .toList();
+      if (candidates.isEmpty) return;
+      _reconciling = true;
+      try {
+        await ref
+            .read(foodWasteProvider.notifier)
+            .reconcileAutomatic(candidates);
+      } catch (error) {
+        // The Pantry stream or a later refresh will retry. Existing Waste data
+        // remains usable while the transient reconciliation failure is logged.
+        debugPrint('Automatic waste reconciliation error: $error');
+      } finally {
+        _reconciling = false;
+        if (_reconcileAgain) {
+          _reconcileAgain = false;
+          _scheduleAutomaticReconciliation();
+        }
+      }
+    });
+  }
 
   Future<void> _record([
     FoodWasteRecord? record,
@@ -110,6 +167,51 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
     }
   }
 
+  Future<void> _markNotWasted(FoodWasteRecord record) async {
+    if (_busy || _uid == null || record.id == null) return;
+    final uid = _uid;
+    final session = _session;
+    setState(() => _busy = true);
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          icon: const Icon(Icons.undo_outlined),
+          title: const Text('Mark as not wasted?'),
+          content: Text(
+            '${record.itemName} will be removed from Waste totals. '
+            'Its Pantry item will not be changed.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Not Wasted'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true && _current(uid, session)) {
+        await ref.read(foodWasteProvider.notifier).markNotWasted(record);
+        if (mounted && _current(uid, session)) {
+          showWasteMessage(context, '${record.itemName} marked as not wasted.');
+        }
+      }
+    } catch (error) {
+      if (mounted && _current(uid, session)) {
+        showWasteError(context, error, action: 'update');
+      }
+    } finally {
+      if (mounted && session == _session) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _refresh() async {
     if (_busy || _uid == null) return;
     final uid = _uid;
@@ -118,7 +220,7 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
     setState(() => _busy = true);
     try {
       await ref.read(foodWasteProvider.notifier).reload();
-      if (_current(uid, session) && !widget.history) {
+      if (_current(uid, session)) {
         ref.invalidate(wastePantryItemsProvider(uid!));
       }
     } catch (error) {
@@ -283,14 +385,6 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
               ),
             ),
           ),
-          if (!widget.history)
-            ExpiredPantrySection(
-              onRecord: _busy
-                  ? null
-                  : (source) {
-                      if (_current(source.uid, session)) _record(null, source);
-                    },
-            ),
           const SizedBox(height: 12),
           Wrap(
             alignment: WrapAlignment.spaceBetween,
@@ -355,15 +449,20 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
                 key: ValueKey(record.id),
                 record: record,
                 now: ref.read(wasteClockProvider)(),
-                onEdit: _busy
+                onEdit: _busy || record.isAutomaticExpiry
                     ? null
                     : () {
                         if (_current(uid, session)) _record(record);
                       },
-                onDelete: _busy
+                onDelete: _busy || record.isAutomaticExpiry
                     ? null
                     : () {
                         if (_current(uid, session)) _delete(record);
+                      },
+                onNotWasted: _busy || !record.isAutomaticExpiry
+                    ? null
+                    : () {
+                        if (_current(uid, session)) _markNotWasted(record);
                       },
               ),
             ),

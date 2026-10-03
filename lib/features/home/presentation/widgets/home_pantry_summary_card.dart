@@ -10,7 +10,7 @@ import '../../../expiry/presentation/providers/expiry_provider.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
 
 /// Home dashboard overview card for the user's pantry.
-
+///
 /// Displays real-time counts for Total Items and Expiring Soon items by
 /// consuming the existing [pantrySummaryProvider] and [expirySummaryProvider].
 class HomePantrySummaryCard extends ConsumerWidget {
@@ -32,22 +32,18 @@ class _PantrySummaryView extends ConsumerStatefulWidget {
 }
 
 class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
-  static const _radius = BorderRadius.all(Radius.circular(20));
+  static const _radius = BorderRadius.all(Radius.circular(22));
   bool _imageFailed = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    //final colorScheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
 
-    // Watch raw pantry items stream state to handle loading and error states gracefully
     final pantryAsync = ref.watch(pantryItemsProvider);
     final isLoading = pantryAsync.isLoading && !pantryAsync.hasValue;
     final hasError = pantryAsync.hasError && !pantryAsync.hasValue;
 
-    // Reuse existing pantry and expiry providers to keep counts synchronized
     final pantrySummary = ref.watch(pantrySummaryProvider);
     final expirySummary = ref.watch(expirySummaryProvider);
 
@@ -55,29 +51,49 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
     final expiringCount = hasError ? 0 : expirySummary.expiringSoon;
     final usePhoto = !_imageFailed;
     final fallbackColor = isDark ? FreshPalette.darkCard : FreshPalette.card;
+
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final shouldStack = textScale > 1.35 || screenWidth < 340;
+
+    final tileColor = isDark ? const Color(0xFF1A2822) : Colors.white;
+    final countColor = isDark ? FreshPalette.darkHeading : FreshPalette.heading;
+    final labelColor = isDark
+        ? FreshPalette.darkSecondaryText
+        : FreshPalette.secondaryText;
     final onPhoto = FreshPalette.darkOnPrimary;
-    final titleColor = usePhoto
-        ? onPhoto
-        : (isDark ? FreshPalette.darkHeading : FreshPalette.heading);
-    final subtitleColor = usePhoto
-        ? onPhoto.withValues(alpha: 0.9)
-        : (isDark
-              ? FreshPalette.darkSecondaryText
-              : FreshPalette.secondaryText);
-    final iconWell = usePhoto
-        ? onPhoto.withValues(alpha: 0.18)
-        : (isDark
-              ? FreshPalette.darkAccentSurface
-              : FreshPalette.accentSurface);
-    final iconColor = usePhoto
-        ? onPhoto
-        : (isDark ? FreshPalette.highlight : FreshPalette.primaryButton);
-    final overlay = const Color(
-      0xFF0E2F25,
-    ).withValues(alpha: isDark ? 0.62 : 0.55);
+
+    final totalBox = _PantryStatTile(
+      icon: Icons.inventory_2_outlined,
+      iconColor: isDark ? FreshPalette.highlight : FreshPalette.primaryButton,
+      iconBgColor: isDark
+          ? FreshPalette.highlight.withValues(alpha: 0.16)
+          : FreshPalette.accentSurface,
+      tileColor: tileColor,
+      countColor: countColor,
+      labelColor: labelColor,
+      count: totalCount,
+      label: 'Total Items',
+      isLoading: isLoading,
+    );
+
+    final expiringBox = _PantryStatTile(
+      icon: Icons.schedule_outlined,
+      iconColor: AppColors.statusAmber,
+      iconBgColor: isDark
+          ? AppColors.statusAmber.withValues(alpha: 0.18)
+          : AppColors.statusAmberBg,
+      tileColor: tileColor,
+      countColor: countColor,
+      labelColor: labelColor,
+      count: expiringCount,
+      label: 'Expiring Soon',
+      isLoading: isLoading,
+    );
 
     return Material(
       color: fallbackColor,
+      elevation: 0,
       borderRadius: _radius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -86,18 +102,11 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
         child: Ink(
           decoration: BoxDecoration(
             borderRadius: _radius,
-            border: Border.all(
-              color: usePhoto
-                  ? onPhoto.withValues(alpha: 0.28)
-                  : (isDark
-                        ? FreshPalette.darkOutline.withValues(alpha: 0.6)
-                        : FreshPalette.outline.withValues(alpha: 0.6)),
-            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
+                color: const Color(0xFF0E2F25).withValues(alpha: 0.16),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -108,7 +117,7 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
                   child: Image(
                     image: HomePantrySummaryCard.backgroundImage,
                     fit: BoxFit.cover,
-                    alignment: Alignment.center,
+                    alignment: const Alignment(0, -0.15),
                     gaplessPlayback: true,
                     frameBuilder:
                         (context, child, frame, wasSynchronouslyLoaded) {
@@ -120,12 +129,25 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
                             children: [
                               ImageFiltered(
                                 imageFilter: ImageFilter.blur(
-                                  sigmaX: 3,
-                                  sigmaY: 3,
+                                  sigmaX: 1.6,
+                                  sigmaY: 1.6,
                                 ),
                                 child: child,
                               ),
-                              ColoredBox(color: overlay),
+                              const DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Color(0x8A12352A),
+                                      Color(0xC012352A),
+                                      Color(0xE60E2F25),
+                                    ],
+                                    stops: [0, 0.46, 1],
+                                  ),
+                                ),
+                              ),
                             ],
                           );
                         },
@@ -140,114 +162,82 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
                   ),
                 ),
               Padding(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // PANTRY HEADER — Open full pantry screen on tap
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: iconWell,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.kitchen_rounded,
-                            size: 22,
-                            color: iconColor,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Your Pantry',
-                                style: textTheme.titleMedium?.copyWith(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: titleColor,
+                    Semantics(
+                      header: true,
+                      label: 'Your Pantry, view pantry items',
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Your Pantry',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.15,
+                                    letterSpacing: -0.2,
+                                    color: usePhoto ? onPhoto : countColor,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Keep track of your food items',
-                                style: textTheme.bodySmall?.copyWith(
-                                  fontSize: 12,
-                                  color: subtitleColor,
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Keep track of your food items',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontSize: 13,
+                                    height: 1.2,
+                                    color: usePhoto
+                                        ? onPhoto.withValues(alpha: 0.84)
+                                        : labelColor,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 22,
-                          color: subtitleColor,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // STATISTIC CARDS ROW — Total Items & Expiring Soon side by side
-                    Row(
-                      children: [
-                        // STAT CARD 1: Total Items (Subtle green tint)
-                        Expanded(
-                          child: _PantryStatBox(
-                            icon: Icons.inventory_2_outlined,
-                            iconColor: isDark
-                                ? FreshPalette.highlight
-                                : FreshPalette.primaryButton,
-                            iconBgColor:
-                                (isDark
-                                        ? FreshPalette.highlight
-                                        : FreshPalette.primaryButton)
-                                    .withValues(alpha: 0.14),
-                            bgColor: isDark
-                                ? FreshPalette.darkAccentSurface
-                                : FreshPalette.accentSurface,
-                            borderColor:
-                                (isDark
-                                        ? FreshPalette.highlight
-                                        : FreshPalette.primaryButton)
-                                    .withValues(alpha: 0.2),
-                            count: totalCount,
-                            label: 'Total Items',
-                            isLoading: isLoading,
-                            isDark: isDark,
-                          ),
-                        ),
-
-                        const SizedBox(width: 12),
-
-                        // STAT CARD 2: Expiring Soon (Subtle warm/orange tint)
-                        Expanded(
-                          child: _PantryStatBox(
-                            icon: Icons.access_time_rounded,
-                            iconColor: AppColors.statusAmber,
-                            iconBgColor: AppColors.statusAmber.withValues(
-                              alpha: 0.15,
+                              ],
                             ),
-                            bgColor: isDark
-                                ? const Color(0xFF2C2216)
-                                : AppColors.statusAmberBg,
-                            borderColor: AppColors.statusAmber.withValues(
-                              alpha: 0.25,
-                            ),
-                            count: expiringCount,
-                            label: 'Expiring Soon',
-                            isLoading: isLoading,
-                            isDark: isDark,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 12),
+                          _OpenMark(
+                            color: usePhoto
+                                ? onPhoto
+                                : (isDark
+                                      ? FreshPalette.highlight
+                                      : FreshPalette.primaryButton),
+                            filled: usePhoto,
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 14),
+                    if (shouldStack)
+                      Column(
+                        children: [
+                          totalBox,
+                          const SizedBox(height: 10),
+                          expiringBox,
+                        ],
+                      )
+                    else
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: totalBox),
+                            const SizedBox(width: 12),
+                            Expanded(child: expiringBox),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -259,97 +249,145 @@ class _PantrySummaryViewState extends ConsumerState<_PantrySummaryView> {
   }
 }
 
-/// Compact stat box used for Total Items and Expiring Soon metrics.
-class _PantryStatBox extends StatelessWidget {
-  const _PantryStatBox({
+class _OpenMark extends StatelessWidget {
+  const _OpenMark({required this.color, required this.filled});
+
+  final Color color;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: filled
+            ? Colors.white.withValues(alpha: 0.16)
+            : color.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: filled
+              ? Colors.white.withValues(alpha: 0.38)
+              : color.withValues(alpha: 0.28),
+        ),
+      ),
+      child: Icon(Icons.arrow_forward_rounded, size: 18, color: color),
+    );
+  }
+}
+
+/// Solid metric tile so the count stays readable over the pantry photo.
+class _PantryStatTile extends StatelessWidget {
+  const _PantryStatTile({
     required this.icon,
     required this.iconColor,
     required this.iconBgColor,
-    required this.bgColor,
-    required this.borderColor,
+    required this.tileColor,
+    required this.countColor,
+    required this.labelColor,
     required this.count,
     required this.label,
     required this.isLoading,
-    required this.isDark,
   });
 
   final IconData icon;
   final Color iconColor;
   final Color iconBgColor;
-  final Color bgColor;
-  final Color borderColor;
+  final Color tileColor;
+  final Color countColor;
+  final Color labelColor;
   final int count;
   final String label;
   final bool isLoading;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Stat Icon Well
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: iconBgColor,
-              shape: BoxShape.circle,
+    return Semantics(
+      label: isLoading ? label : '$label, $count',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: tileColor,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
-            child: Icon(icon, size: 16, color: iconColor),
-          ),
-          const SizedBox(height: 10),
-
-          // Count or Loading Shimmer
-          if (isLoading)
-            SizedBox(
-              height: 26,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(iconColor),
-                  ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: iconBgColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 15, color: iconColor),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isLoading)
+                      SizedBox(
+                        height: 18,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                iconColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '$count',
+                          maxLines: 1,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            height: 1.05,
+                            color: countColor,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 1),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        height: 1.15,
+                        color: labelColor,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            )
-          else
-            Text(
-              '$count',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                height: 1.1,
-                color: isDark ? FreshPalette.darkHeading : FreshPalette.heading,
-              ),
-            ),
-
-          const SizedBox(height: 4),
-
-          // Metric Label
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: isDark
-                  ? FreshPalette.darkSecondaryText
-                  : FreshPalette.secondaryText,
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
