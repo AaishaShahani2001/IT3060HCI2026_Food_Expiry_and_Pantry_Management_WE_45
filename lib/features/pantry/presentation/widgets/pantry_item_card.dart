@@ -7,6 +7,13 @@ import 'pantry_item_actions_sheet.dart';
 import 'pantry_item_image.dart';
 import 'pantry_quantity_stepper.dart';
 
+/// Photo band on the grid card. Tall enough that the food stays recognizable
+/// instead of a thin center crop.
+const double kPantryCardImageHeight = 156;
+
+/// Fixed grid row height: photo band plus name, status, and quantity stepper.
+const double kPantryCardExtent = 284;
+
 /// Image-focused 2-column grid card for All Pantry Items card view.
 class PantryItemCard extends StatelessWidget {
   const PantryItemCard({
@@ -77,13 +84,13 @@ class PantryItemCard extends StatelessWidget {
             Stack(
               children: [
                 Container(
-                  height: 92,
+                  height: kPantryCardImageHeight,
                   width: double.infinity,
                   color: imageBg,
                   child: PantryItemImage(
                     item: item,
                     width: double.infinity,
-                    height: 92,
+                    height: kPantryCardImageHeight,
                     iconSize: 42,
                     backgroundColor: imageBg,
                     iconColor: isDark

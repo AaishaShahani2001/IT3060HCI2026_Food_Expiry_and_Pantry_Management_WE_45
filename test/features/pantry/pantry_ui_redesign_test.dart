@@ -37,7 +37,7 @@ void main() {
         home: Scaffold(
           body: SizedBox(
             width: 180,
-            height: 224,
+            height: kPantryCardExtent,
             child: PantryItemCard(
               item: item,
               onEdit: () {},
