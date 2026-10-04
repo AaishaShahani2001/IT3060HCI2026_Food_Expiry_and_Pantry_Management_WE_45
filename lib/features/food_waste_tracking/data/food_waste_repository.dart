@@ -294,6 +294,20 @@ class FoodWasteRepository {
     _checkScope(scope);
   }
 
+  Future<void> deleteMany(WasteScope scope, Set<String> ids) async {
+    if (ids.isEmpty) throw ArgumentError('Expected Waste record IDs.');
+    for (final id in ids) {
+      _checkId(id);
+    }
+    final records = _records(scope);
+    final batch = _firestore.batch();
+    for (final id in ids) {
+      batch.delete(records.doc(id));
+    }
+    await batch.commit();
+    _checkScope(scope);
+  }
+
   Future<void> rollbackCreated(
     WasteScope capturedScope,
     FoodWasteRecord record,

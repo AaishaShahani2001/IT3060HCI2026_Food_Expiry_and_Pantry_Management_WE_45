@@ -235,6 +235,35 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
     }
   }
 
+  Future<void> deleteMany(
+    Set<String> ids, {
+    required WasteScope expectedScope,
+  }) async {
+    final scope = _requireScope(expectedScope);
+    if (ids.isEmpty) throw ArgumentError('Expected Waste record IDs.');
+    final selected = state.requireValue
+        .where((record) => record.id != null && ids.contains(record.id))
+        .toList();
+    if (selected.length != ids.length ||
+        selected.any((record) => record.isAutomaticExpiry)) {
+      throw StateError('Selected Waste records changed.');
+    }
+    final generation = _generation;
+    _busy = true;
+    try {
+      await _repository.deleteMany(scope, ids);
+      if (_isCurrent(scope, generation)) {
+        state = AsyncData(
+          state.requireValue
+              .where((record) => !ids.contains(record.id))
+              .toList(),
+        );
+      }
+    } finally {
+      if (ref.mounted && generation == _generation) _busy = false;
+    }
+  }
+
   Future<void> rollbackCreated(
     WasteScope capturedScope,
     FoodWasteRecord record,

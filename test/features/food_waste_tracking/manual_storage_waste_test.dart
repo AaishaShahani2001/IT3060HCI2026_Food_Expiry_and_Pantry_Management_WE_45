@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -210,6 +212,85 @@ void main() {
         find.byType(DropdownButtonFormField<String>),
       );
       expect(unit.onChanged, isNull);
+    },
+  );
+
+  testWidgets(
+    'My Storage shows loading without an empty state then selects on first tap',
+    (tester) async {
+      final gate = Completer<void>();
+      session.pantry.watchGate = gate.future;
+      session.pantry.seed(
+        'alice',
+        stock(
+          id: 'test-apple',
+          name: 'Test Apple',
+          quantity: 2,
+          unit: PantryUnit.items,
+          noExpiry: true,
+        ),
+      );
+
+      await open(tester);
+      await openForm(tester);
+      await tester.tap(find.byKey(const ValueKey('waste-source-storage')));
+      await tester.pump();
+
+      expect(find.text('Loading stored items...'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(
+        find.text('No stored items with remaining quantity are available.'),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('waste-storage-item')), findsNothing);
+
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Loading stored items...'), findsNothing);
+      expect(find.byKey(const ValueKey('waste-storage-item')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('waste-storage-item')),
+        'Test Apple',
+      );
+      await tester.pumpAndSettle();
+      final search = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byKey(const ValueKey('waste-storage-item')),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(search.focusNode.hasFocus, isTrue);
+
+      await tester.tap(find.text('Test Apple').last);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('waste-storage-details')),
+        findsOneWidget,
+      );
+      expect(find.text('Available: 2 items'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('waste-quantity')))
+            .enabled,
+        isNot(false),
+      );
+      expect(
+        tester
+            .widget<DropdownButtonFormField<String>>(
+              find.byType(DropdownButtonFormField<String>),
+            )
+            .initialValue,
+        'pcs',
+      );
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('waste-value')))
+            .controller!
+            .text,
+        '0',
+      );
     },
   );
 

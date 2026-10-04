@@ -138,6 +138,7 @@ class FakeWastePantryService implements PantryFirestoreService {
   final decrements = <(String, String, double)>[];
   Object? decrementError;
   Future<void>? decrementGate;
+  Future<void>? watchGate;
   void Function()? beforeDecrement;
   int markItemConsumedCalls = 0;
   int markAsUsedUpCalls = 0;
@@ -189,9 +190,30 @@ class FakeWastePantryService implements PantryFirestoreService {
   @override
   Stream<List<PantryItem>> watchPantryItems({required String userId}) =>
       Stream.multi((controller) {
-        (_listeners[userId] ??= {}).add(controller);
-        controller.add(List.of(items[_key(userId)] ?? []));
-        controller.onCancel = () => _listeners[userId]?.remove(controller);
+        var canceled = false;
+        void attach() {
+          if (canceled) return;
+          (_listeners[userId] ??= {}).add(controller);
+          controller.add(List.of(items[_key(userId)] ?? []));
+        }
+
+        final gate = watchGate;
+        if (gate == null) {
+          attach();
+        } else {
+          unawaited(() async {
+            try {
+              await gate;
+              attach();
+            } catch (error, stackTrace) {
+              if (!canceled) controller.addError(error, stackTrace);
+            }
+          }());
+        }
+        controller.onCancel = () {
+          canceled = true;
+          _listeners[userId]?.remove(controller);
+        };
       });
 
   @override
