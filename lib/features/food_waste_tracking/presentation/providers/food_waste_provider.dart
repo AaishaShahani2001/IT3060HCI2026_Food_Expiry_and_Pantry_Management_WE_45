@@ -1,42 +1,69 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../data/food_waste_repository.dart';
 import '../../models/automatic_waste_candidate.dart';
 import '../../models/food_waste_record.dart';
+import '../../models/waste_scope.dart';
 import '../../models/waste_summary.dart';
 
 final foodWasteRepositoryProvider = Provider<FoodWasteRepository>(
   (ref) => FoodWasteRepository(),
 );
+
 final wasteAuthUidProvider = StreamProvider<String?>(
   (ref) => FirebaseAuth.instance
       .authStateChanges()
       .map((user) => user?.uid)
       .distinct(),
 );
+
+final wasteScopeProvider = StreamProvider<WasteScope?>((ref) {
+  final repository = ref.watch(foodWasteRepositoryProvider);
+  return ref
+      .watch(wasteAuthUidProvider)
+      .when(
+        skipLoadingOnReload: false,
+        skipLoadingOnRefresh: false,
+        data: (uid) {
+          if (uid == null) {
+            repository.clearCurrentScope();
+            return Stream<WasteScope?>.value(null);
+          }
+          return repository.watchScope(uid);
+        },
+        error: (error, stackTrace) =>
+            Stream<WasteScope?>.error(error, stackTrace),
+        loading: () => const Stream<WasteScope?>.empty(),
+      );
+});
+
 final wasteClockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
 final foodWasteProvider =
     AsyncNotifierProvider<FoodWasteNotifier, List<FoodWasteRecord>>(
       FoodWasteNotifier.new,
     );
 
 /// A local warning, not a database uniqueness constraint. Confirmation belongs
-/// to this draft/account/load; refreshed or changed matches require review again.
+/// to this draft/scope/load; refreshed or changed matches require review again.
 class WasteDuplicateWarning implements Exception {
   WasteDuplicateWarning._(
-    this._uid,
+    this._scope,
     this._generation,
     this._draft,
     this._matches,
   );
-  final String _uid;
+
+  final WasteScope _scope;
   final int _generation;
   final FoodWasteRecord _draft;
   final List<FoodWasteRecord> _matches;
 }
 
 bool _similarWaste(FoodWasteRecord a, FoodWasteRecord b) {
-  // A linked item may have been logged on an earlier day or at another amount.
   if (a.sourcePantryItemId != null &&
       a.sourcePantryItemId == b.sourcePantryItemId) {
     return true;
@@ -51,46 +78,81 @@ bool _similarWaste(FoodWasteRecord a, FoodWasteRecord b) {
       first.day == second.day &&
       a.reason == b.reason &&
       a.quantity == b.quantity &&
-      // Two kg and two pcs are different quantities, not an accidental duplicate.
       a.unit == b.unit;
 }
 
 class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
-  String? _uid;
+  WasteScope? _scope;
   int _generation = 0;
   bool _busy = false;
+
   FoodWasteRepository get _repository => ref.read(foodWasteRepositoryProvider);
+
+  WasteScope? get currentScope => _scope;
 
   @override
   Future<List<FoodWasteRecord>> build() async {
     final generation = ++_generation;
-    _uid = null;
+    _scope = null;
     _busy = false;
     final repository = ref.watch(foodWasteRepositoryProvider);
-    final uid = await ref.watch(wasteAuthUidProvider.future);
+    final scope = await ref.watch(wasteScopeProvider.future);
     if (!ref.mounted || generation != _generation) return [];
-    _uid = uid;
-    if (uid == null) return [];
-    final records = await repository.load(uid);
-    return _isCurrent(uid, generation) ? records : [];
+    _scope = scope;
+    if (scope == null) return [];
+
+    final initial = Completer<List<FoodWasteRecord>>();
+    late final StreamSubscription<List<FoodWasteRecord>> subscription;
+    subscription = repository
+        .watch(scope)
+        .listen(
+          (records) {
+            if (!_isCurrent(scope, generation)) return;
+            if (!initial.isCompleted) {
+              initial.complete(records);
+            } else {
+              state = AsyncData(records);
+            }
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!_isCurrent(scope, generation)) return;
+            if (!initial.isCompleted) {
+              initial.completeError(error, stackTrace);
+            } else {
+              state = AsyncError(error, stackTrace);
+            }
+          },
+        );
+    ref.onDispose(() => unawaited(subscription.cancel()));
+    return initial.future;
   }
 
-  bool _isCurrent(String uid, int generation) =>
+  bool _isCurrent(WasteScope scope, int generation) =>
       ref.mounted &&
       generation == _generation &&
-      _uid == uid &&
-      _repository.isCurrentUser(uid);
-  String _requireUser() {
-    final uid = _uid;
-    if (uid == null ||
-        !_repository.isCurrentUser(uid) ||
-        state.isLoading ||
-        state.asData == null ||
-        _busy) {
-      throw StateError('Account changed or operation pending.');
+      _scope == scope &&
+      _repository.isCurrentScope(scope);
+
+  WasteScope _requireScope([WasteScope? expectedScope]) {
+    final scope = _scope;
+    if (scope == null ||
+        !_repository.isCurrentScope(scope) ||
+        (expectedScope != null && expectedScope != scope)) {
+      throw const WasteScopeChangedException();
     }
-    return uid;
+    if (state.isLoading || state.asData == null || _busy) {
+      throw StateError('Waste Tracker operation pending.');
+    }
+    return scope;
   }
+
+  List<FoodWasteRecord> _upsert(
+    Iterable<FoodWasteRecord> records,
+    FoodWasteRecord replacement,
+  ) => newestWasteFirst([
+    ...records.where((record) => record.id != replacement.id),
+    replacement,
+  ]);
 
   Future<void> reload() async {
     if (_busy) return;
@@ -99,12 +161,12 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
       await future;
       return;
     }
-    final uid = _requireUser();
+    final scope = _requireScope();
     final generation = _generation;
     _busy = true;
     try {
-      final records = await _repository.load(uid);
-      if (_isCurrent(uid, generation)) state = AsyncData(records);
+      final records = await _repository.load(scope);
+      if (_isCurrent(scope, generation)) state = AsyncData(records);
     } finally {
       if (ref.mounted && generation == _generation) _busy = false;
     }
@@ -113,44 +175,40 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
   Future<FoodWasteRecord> save(
     FoodWasteRecord record, {
     WasteDuplicateWarning? confirmedDuplicate,
+    WasteScope? expectedScope,
   }) async {
-    final uid = _requireUser();
+    final scope = _requireScope(expectedScope);
     record.validate();
     if (record.id != null &&
-        !state.requireValue.any((r) => r.id == record.id)) {
+        !state.requireValue.any((existing) => existing.id == record.id)) {
       throw StateError('The record no longer exists.');
     }
     final generation = _generation;
     final matches = state.requireValue
-        .where((r) => r.id != record.id && _similarWaste(r, record))
+        .where(
+          (existing) =>
+              existing.id != record.id && _similarWaste(existing, record),
+        )
         .toList();
     final confirmation = confirmedDuplicate;
     final confirmed =
         confirmation != null &&
-        confirmation._uid == uid &&
+        confirmation._scope == scope &&
         confirmation._generation == generation &&
         identical(confirmation._draft, record) &&
         confirmation._matches.length == matches.length &&
-        matches.every((r) => confirmation._matches.contains(r));
+        matches.every(confirmation._matches.contains);
     if (matches.isNotEmpty && !confirmed) {
-      throw WasteDuplicateWarning._(uid, generation, record, matches);
+      throw WasteDuplicateWarning._(scope, generation, record, matches);
     }
+
     _busy = true;
     try {
-      final FoodWasteRecord saved;
-      if (record.id == null) {
-        saved = await _repository.create(uid, record);
-      } else {
-        await _repository.update(uid, record);
-        saved = record.copyWith(itemName: record.itemName.trim());
-      }
-      if (_isCurrent(uid, generation)) {
-        state = AsyncData(
-          newestWasteFirst([
-            ...state.requireValue.where((r) => r.id != saved.id),
-            saved,
-          ]),
-        );
+      final saved = record.id == null
+          ? await _repository.create(scope, record)
+          : await _repository.update(scope, record);
+      if (_isCurrent(scope, generation)) {
+        state = AsyncData(_upsert(state.requireValue, saved));
       }
       return saved;
     } finally {
@@ -158,20 +216,34 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
     }
   }
 
-  Future<void> delete(String id) async {
-    final uid = _requireUser();
-    if (!state.requireValue.any((r) => r.id == id)) {
+  Future<void> delete(String id, {WasteScope? expectedScope}) async {
+    final scope = _requireScope(expectedScope);
+    if (!state.requireValue.any((record) => record.id == id)) {
       throw StateError('Record changed.');
     }
     final generation = _generation;
     _busy = true;
     try {
-      await _repository.delete(uid, id);
-      if (_isCurrent(uid, generation)) {
-        state = AsyncData(state.requireValue.where((r) => r.id != id).toList());
+      await _repository.delete(scope, id);
+      if (_isCurrent(scope, generation)) {
+        state = AsyncData(
+          state.requireValue.where((record) => record.id != id).toList(),
+        );
       }
     } finally {
       if (ref.mounted && generation == _generation) _busy = false;
+    }
+  }
+
+  Future<void> rollbackCreated(
+    WasteScope capturedScope,
+    FoodWasteRecord record,
+  ) async {
+    await _repository.rollbackCreated(capturedScope, record);
+    if (_scope == capturedScope && state.asData != null) {
+      state = AsyncData(
+        state.requireValue.where((entry) => entry.id != record.id).toList(),
+      );
     }
   }
 
@@ -179,16 +251,16 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
     List<AutomaticWasteCandidate> candidates,
   ) async {
     if (candidates.isEmpty) return false;
-    final uid = _requireUser();
-    if (candidates.any((candidate) => candidate.uid != uid)) {
-      throw StateError('Account changed.');
+    final scope = _requireScope(candidates.first.scope);
+    if (candidates.any((candidate) => candidate.scope != scope)) {
+      throw const WasteScopeChangedException();
     }
     final generation = _generation;
     _busy = true;
     try {
-      final changed = await _repository.reconcileAutomatic(uid, candidates);
-      if (changed && _isCurrent(uid, generation)) {
-        state = AsyncData(await _repository.load(uid));
+      final changed = await _repository.reconcileAutomatic(scope, candidates);
+      if (!_isCurrent(scope, generation)) {
+        throw const WasteScopeChangedException();
       }
       return changed;
     } finally {
@@ -196,8 +268,11 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
     }
   }
 
-  Future<void> markNotWasted(FoodWasteRecord record) async {
-    final uid = _requireUser();
+  Future<void> markNotWasted(
+    FoodWasteRecord record, {
+    WasteScope? expectedScope,
+  }) async {
+    final scope = _requireScope(expectedScope);
     if (record.id == null ||
         !record.isAutomaticExpiry ||
         !state.requireValue.any((existing) => identical(existing, record))) {
@@ -206,8 +281,8 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
     final generation = _generation;
     _busy = true;
     try {
-      await _repository.markNotWasted(uid, record);
-      if (_isCurrent(uid, generation)) {
+      await _repository.markNotWasted(scope, record);
+      if (_isCurrent(scope, generation)) {
         state = AsyncData(
           state.requireValue.where((entry) => entry.id != record.id).toList(),
         );

@@ -4,6 +4,7 @@ import '../../../shopping_list/data/food_item_suggestions.dart';
 import '../../../pantry/data/services/pantry_firestore_service.dart';
 import '../../models/automatic_waste_candidate.dart';
 import '../../models/food_waste_record.dart';
+import '../../models/waste_scope.dart';
 import '../../models/waste_summary.dart';
 import '../providers/food_waste_provider.dart';
 import '../providers/pantry_waste_provider.dart';
@@ -34,16 +35,24 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
   String _reason = wasteReasons.first;
   late WasteEntrySource _entrySource;
   PantryWasteSource? _selectedStorage;
-  String? _openedUid;
+  WasteScope? _openedScope;
   bool _expired = false;
   bool _saving = false;
   bool _saved = false;
   bool _choosingDuplicate = false;
-  bool get _sameUser =>
+  bool get _sameScope =>
       !_expired &&
-      _openedUid != null &&
-      _openedUid == ref.read(wasteAuthUidProvider).asData?.value &&
-      ref.read(foodWasteRepositoryProvider).isCurrentUser(_openedUid!);
+      _openedScope != null &&
+      _openedScope == ref.read(wasteScopeProvider).asData?.value &&
+      ref.read(foodWasteRepositoryProvider).isCurrentScope(_openedScope!);
+
+  String get _scopeChangedMessage {
+    final currentUid = ref.read(wasteAuthUidProvider).asData?.value;
+    if (_openedScope?.actorUid != currentUid) {
+      return 'Your account changed. Go back and reopen Waste Tracker.';
+    }
+    return 'Your pantry context changed. Go back and reopen Waste Tracker.';
+  }
 
   @override
   void initState() {
@@ -51,9 +60,9 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
     final initial =
         widget.initialRecord ??
         widget.pantrySource?.draft(ref.read(wasteClockProvider)());
-    _openedUid =
-        widget.pantrySource?.uid ??
-        ref.read(wasteAuthUidProvider).asData?.value;
+    _openedScope =
+        widget.pantrySource?.scope ??
+        ref.read(wasteScopeProvider).asData?.value;
     _entrySource = widget.pantrySource == null
         ? WasteEntrySource.external
         : WasteEntrySource.storage;
@@ -394,7 +403,7 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
   Future<void> _save() async {
     if (_saving ||
         _saved ||
-        !_sameUser ||
+        !_sameScope ||
         !(_form.currentState?.validate() ?? false)) {
       return;
     }
@@ -427,7 +436,7 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
           return;
         }
         final confirmed = await _confirmStorageSave(storageSource, quantity);
-        if (!mounted || !_sameUser || confirmed != true) return;
+        if (!mounted || !_sameScope || confirmed != true) return;
         storageSource = _currentStorageSource();
         if (storageSource == null) {
           showWasteMessage(
@@ -472,14 +481,19 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
       );
       WasteDuplicateWarning? confirmation;
       FoodWasteRecord? saved;
-      while (mounted && _sameUser) {
+      final capturedScope = _openedScope!;
+      while (mounted && _sameScope) {
         try {
           saved = await ref
               .read(foodWasteProvider.notifier)
-              .save(record, confirmedDuplicate: confirmation);
+              .save(
+                record,
+                confirmedDuplicate: confirmation,
+                expectedScope: capturedScope,
+              );
           break;
         } on WasteDuplicateWarning catch (warning) {
-          if (!mounted || !_sameUser) return;
+          if (!mounted || !_sameScope) return;
           setState(() => _choosingDuplicate = true);
           bool answered = false;
           final saveAnyway = await showDialog<bool>(
@@ -515,13 +529,32 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
               );
             },
           );
-          if (!mounted || !_sameUser || saveAnyway != true) return;
+          if (!mounted || !_sameScope || saveAnyway != true) return;
           setState(() => _choosingDuplicate = false);
           confirmation = warning;
         }
       }
-      if (mounted && _sameUser && saved != null) {
+      if (mounted && saved != null) {
         if (storageSource != null) {
+          if (!_sameScope || storageSource.scope != capturedScope) {
+            var rollbackSucceeded = false;
+            try {
+              await ref
+                  .read(foodWasteProvider.notifier)
+                  .rollbackCreated(capturedScope, saved);
+              rollbackSucceeded = true;
+            } catch (rollbackError) {
+              debugPrint('Waste context rollback failed: $rollbackError');
+            }
+            if (!mounted) return;
+            showWasteMessage(
+              context,
+              rollbackSucceeded
+                  ? 'Your pantry context changed. Waste was not recorded. Please try again.'
+                  : "We couldn't fully complete this update. Please refresh and check your Waste records and stored quantity.",
+            );
+            return;
+          }
           Object? decrementError;
           try {
             await ref
@@ -535,13 +568,15 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
           if (decrementError != null) {
             var rollbackSucceeded = false;
             try {
-              await ref.read(foodWasteProvider.notifier).delete(saved.id!);
+              await ref
+                  .read(foodWasteProvider.notifier)
+                  .rollbackCreated(capturedScope, saved);
               rollbackSucceeded = true;
             } catch (rollbackError) {
               debugPrint('Waste compensation rollback failed: $rollbackError');
             }
-            _refreshStorageAfterFailure(storageSource.uid);
-            if (!mounted || !_sameUser) return;
+            _refreshStorageAfterFailure(storageSource.scope);
+            if (!mounted) return;
             showWasteMessage(
               context,
               rollbackSucceeded
@@ -552,11 +587,11 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
           }
         }
         _saved = true;
-        if (!mounted || !_sameUser) return;
+        if (!mounted || !_sameScope) return;
         Navigator.of(context).pop(true);
       }
     } catch (error) {
-      if (mounted && _sameUser) showWasteError(context, error);
+      if (mounted && _sameScope) showWasteError(context, error);
     } finally {
       if (mounted) {
         setState(() {
@@ -569,7 +604,7 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
 
   PantryWasteSource? _currentStorageSource() {
     final selected = _selectedStorage;
-    if (selected == null || selected.uid != _openedUid) return null;
+    if (selected == null || selected.scope != _openedScope) return null;
     final sources = ref.read(activeWastePantryProvider).asData?.value;
     if (sources == null) return null;
     for (final source in sources) {
@@ -599,8 +634,8 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
         false;
   }
 
-  void _refreshStorageAfterFailure(String uid) {
-    ref.invalidate(wastePantryItemsProvider(uid));
+  void _refreshStorageAfterFailure(WasteScope scope) {
+    ref.invalidate(wastePantryItemsProvider(scope));
     if (!mounted) return;
     setState(() {
       _selectedStorage = null;
@@ -655,28 +690,31 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
       firstDate: _date.isBefore(DateTime(1900)) ? _date : DateTime(1900),
       lastDate: _date.isAfter(today) ? _date : today,
     );
-    if (mounted && _sameUser && picked != null) setState(() => _date = picked);
+    if (mounted && _sameScope && picked != null) setState(() => _date = picked);
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(wasteAuthUidProvider, (previous, next) {
+    ref.listen(wasteScopeProvider, (previous, next) {
       if (next.asData != null &&
-          _openedUid != null &&
-          next.asData!.value != _openedUid) {
+          _openedScope != null &&
+          next.asData!.value != _openedScope) {
         _expired = true;
       }
     });
-    final auth = ref.watch(wasteAuthUidProvider);
+    final scope = ref.watch(wasteScopeProvider);
     final records = ref.watch(foodWasteProvider);
-    _openedUid ??= auth.asData?.value;
+    _openedScope ??= scope.asData?.value;
     final storage = _newRecord
         ? ref.watch(activeWastePantryProvider)
         : const AsyncData<List<PantryWasteSource>>([]);
     PantryWasteSource? liveSelection;
     final selectedId = _selectedStorage?.item.firestoreId;
     for (final source in storage.asData?.value ?? const <PantryWasteSource>[]) {
-      if (source.item.firestoreId == selectedId) liveSelection = source;
+      if (source.scope == _openedScope &&
+          source.item.firestoreId == selectedId) {
+        liveSelection = source;
+      }
     }
     final editing = widget.initialRecord != null;
     return PopScope(
@@ -685,15 +723,13 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
         appBar: AppBar(
           title: Text(editing ? 'Edit Waste Record' : 'Record Waste'),
         ),
-        body: auth.isLoading
+        body: scope.isLoading
             ? const Center(child: CircularProgressIndicator())
-            : !_sameUser
-            ? const Center(
+            : !_sameScope
+            ? Center(
                 child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text(
-                    'Your account changed. Go back and reopen Waste Tracker.',
-                  ),
+                  padding: const EdgeInsets.all(24),
+                  child: Text(_scopeChangedMessage),
                 ),
               )
             : Center(

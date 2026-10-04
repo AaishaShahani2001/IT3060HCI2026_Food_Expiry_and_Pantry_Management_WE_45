@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/data/food_waste_repository.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/food_waste_record.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/waste_scope.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/data/services/pantry_firestore_service.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/removed_pantry_item.dart';
@@ -23,32 +24,117 @@ FoodWasteRecord draft({
 );
 
 class WasteTestSession {
-  final pantry = FakeWastePantryService();
-  final store = FakeWasteFirestore();
-  final changes = StreamController<String?>.broadcast();
-  String? uid = 'alice';
-  late final repository = FoodWasteRepository(
-    firestore: store,
-    currentUid: () => uid,
-  );
-  void seed(String uid, String id, FoodWasteRecord record) {
-    store.documents['users/$uid/waste_records/$id'] = record.toMap();
+  WasteTestSession({
+    FakeWasteFirestore? store,
+    FakeWastePantryService? pantry,
+    String? initialUid = 'alice',
+  }) : store = store ?? FakeWasteFirestore(),
+       pantry = pantry ?? FakeWastePantryService(),
+       uid = initialUid {
+    if (initialUid != null) {
+      _scopes[initialUid] = WasteScope.personal(actorUid: initialUid);
+      this.pantry.setScope(_scopes[initialUid]!);
+    }
+    repository = FoodWasteRepository(
+      firestore: this.store,
+      currentUid: () => uid,
+      scopeStream: _watchScope,
+    );
   }
 
-  Stream<String?> auth() async* {
-    yield uid;
-    yield* changes.stream;
+  final FakeWastePantryService pantry;
+  final FakeWasteFirestore store;
+  final changes = StreamController<String?>.broadcast(sync: true);
+  final _scopes = <String, WasteScope>{};
+  final _scopeChanges = <String, StreamController<WasteScope>>{};
+  String? uid;
+  late final FoodWasteRepository repository;
+
+  void seed(String uid, String id, FoodWasteRecord record) {
+    store.documents['users/$uid/waste_records/$id'] = record.toMap();
+    store.notifyDocument('users/$uid/waste_records/$id');
+  }
+
+  void seedScope(WasteScope scope, String id, FoodWasteRecord record) {
+    final path = '${scope.collectionPath}/$id';
+    store.documents[path] = record.toMap();
+    store.notifyDocument(path);
+  }
+
+  WasteScope scopeFor(String userId) =>
+      _scopes[userId] ?? WasteScope.personal(actorUid: userId);
+
+  Stream<String?> auth() {
+    StreamSubscription<String?>? subscription;
+    late final StreamController<String?> controller;
+    controller = StreamController<String?>(
+      sync: true,
+      onListen: () {
+        controller.add(uid);
+        subscription = changes.stream.listen(
+          controller.add,
+          onError: controller.addError,
+        );
+      },
+      onCancel: () => subscription?.cancel(),
+    );
+    return controller.stream;
   }
 
   void changeUser(String? value) {
     uid = value;
+    if (value != null) {
+      _scopes.putIfAbsent(value, () => WasteScope.personal(actorUid: value));
+      pantry.setScope(_scopes[value]!);
+    }
     changes.add(value);
+  }
+
+  Stream<WasteScope> _watchScope(String userId) {
+    final changes = _scopeChanges[userId] ??=
+        StreamController<WasteScope>.broadcast(sync: true);
+    StreamSubscription<WasteScope>? subscription;
+    late final StreamController<WasteScope> controller;
+    controller = StreamController<WasteScope>(
+      sync: true,
+      onListen: () {
+        controller.add(scopeFor(userId));
+        subscription = changes.stream.listen(
+          controller.add,
+          onError: controller.addError,
+        );
+      },
+      onCancel: () => subscription?.cancel(),
+    );
+    return controller.stream;
+  }
+
+  void changeScope(WasteScope scope) {
+    _scopes[scope.actorUid] = scope;
+    pantry.setScope(scope);
+    (_scopeChanges[scope.actorUid] ??= StreamController<WasteScope>.broadcast(
+      sync: true,
+    )).add(scope);
+  }
+
+  void failScope(String userId, Object error) {
+    (_scopeChanges[userId] ??= StreamController<WasteScope>.broadcast(
+      sync: true,
+    )).addError(error);
+  }
+
+  Future<void> dispose() async {
+    await changes.close();
+    for (final controller in _scopeChanges.values) {
+      await controller.close();
+    }
   }
 }
 
 class FakeWastePantryService implements PantryFirestoreService {
   final items = <String, List<PantryItem>>{};
   final _listeners = <String, Set<MultiStreamController<List<PantryItem>>>>{};
+  final _storageKeys = <String, String>{};
   final decrements = <(String, String, double)>[];
   Object? decrementError;
   Future<void>? decrementGate;
@@ -57,26 +143,46 @@ class FakeWastePantryService implements PantryFirestoreService {
   int markAsUsedUpCalls = 0;
   int deletePantryItemCalls = 0;
 
+  String _key(String uid) => _storageKeys[uid] ?? uid;
+
+  void setScope(WasteScope scope) {
+    _storageKeys[scope.actorUid] = scope.isShared
+        ? 'pantry:${scope.pantryId}'
+        : scope.actorUid;
+    _publish(scope.actorUid);
+  }
+
   void seed(String uid, PantryItem item) {
-    items[uid] = [...?items[uid]?.where((r) => r.id != item.id), item];
-    for (final listener
-        in _listeners[uid] ?? <MultiStreamController<List<PantryItem>>>{}) {
-      listener.add(List.of(items[uid]!));
-    }
+    final key = _key(uid);
+    items[key] = [...?items[key]?.where((r) => r.id != item.id), item];
+    _publishStorage(key);
   }
 
   void remove(String uid, String firestoreId) {
-    items[uid] = [
-      for (final item in items[uid] ?? const <PantryItem>[])
+    final key = _key(uid);
+    items[key] = [
+      for (final item in items[key] ?? const <PantryItem>[])
         if (item.firestoreId != firestoreId) item,
     ];
-    _publish(uid);
+    _publishStorage(key);
   }
 
   void _publish(String uid) {
     for (final listener
         in _listeners[uid] ?? <MultiStreamController<List<PantryItem>>>{}) {
-      listener.add(List.of(items[uid] ?? const <PantryItem>[]));
+      listener.add(List.of(items[_key(uid)] ?? const <PantryItem>[]));
+    }
+  }
+
+  void _publishStorage(String key) {
+    final users = <String>{
+      ..._listeners.keys.where((uid) => _key(uid) == key),
+      ..._storageKeys.entries
+          .where((entry) => entry.value == key)
+          .map((entry) => entry.key),
+    };
+    for (final uid in users) {
+      _publish(uid);
     }
   }
 
@@ -84,7 +190,7 @@ class FakeWastePantryService implements PantryFirestoreService {
   Stream<List<PantryItem>> watchPantryItems({required String userId}) =>
       Stream.multi((controller) {
         (_listeners[userId] ??= {}).add(controller);
-        controller.add(List.of(items[userId] ?? []));
+        controller.add(List.of(items[_key(userId)] ?? []));
         controller.onCancel = () => _listeners[userId]?.remove(controller);
       });
 
@@ -98,7 +204,8 @@ class FakeWastePantryService implements PantryFirestoreService {
     await decrementGate;
     beforeDecrement?.call();
     if (decrementError case final error?) throw error;
-    final matches = (items[userId] ?? const <PantryItem>[])
+    final key = _key(userId);
+    final matches = (items[key] ?? const <PantryItem>[])
         .where((item) => item.firestoreId == itemId)
         .toList();
     if (matches.isEmpty) throw PantryItemNotFoundException(itemId);
