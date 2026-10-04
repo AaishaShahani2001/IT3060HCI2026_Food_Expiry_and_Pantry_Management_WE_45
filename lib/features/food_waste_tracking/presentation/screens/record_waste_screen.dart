@@ -76,6 +76,7 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
     _date = initial?.wastedAt.toLocal() ?? ref.read(wasteClockProvider)();
     _unit = initial?.unit ?? wasteUnits.first;
     _reason = initial?.reason ?? wasteReasons.first;
+    _storageFocus.addListener(_handleStorageFocusChange);
     _quantity.addListener(_refreshStorageValue);
   }
 
@@ -102,6 +103,12 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
         : _selectedStorage!.estimatedValueFor(quantity);
     final text = wasteNumber(value);
     if (_value.text != text) _value.text = text;
+  }
+
+  void _handleStorageFocusChange() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _setEntrySource(WasteEntrySource source) {
@@ -279,7 +286,24 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
 
   Widget _storageItemField(AsyncValue<List<PantryWasteSource>> storage) {
     if (storage.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Semantics(
+        label: 'Loading stored items',
+        child: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+              SizedBox(width: 12),
+              Flexible(child: Text('Loading stored items...')),
+            ],
+          ),
+        ),
+      );
     }
     if (storage.hasError) {
       return const Text(
@@ -292,75 +316,77 @@ class _RecordWasteScreenState extends ConsumerState<RecordWasteScreen> {
         'No stored items with remaining quantity are available.',
       );
     }
-    return RawAutocomplete<PantryWasteSource>(
-      textEditingController: _storageSearch,
-      focusNode: _storageFocus,
-      displayStringForOption: (source) => source.item.name,
-      optionsBuilder: (value) {
-        final query = value.text.trim().toLowerCase();
-        return sources
-            .where((source) {
-              if (query.isEmpty) return true;
-              final item = source.item;
-              return item.name.toLowerCase().contains(query) ||
-                  item.category.label.toLowerCase().contains(query) ||
-                  item.location.label.toLowerCase().contains(query);
-            })
-            .take(8);
-      },
-      onSelected: _selectStorage,
-      fieldViewBuilder: (context, controller, focus, submit) => TextFormField(
-        key: const ValueKey('waste-storage-item'),
-        controller: controller,
-        focusNode: focus,
-        onChanged: (value) {
-          final selected = _selectedStorage;
-          if (selected != null && value.trim() != selected.item.name) {
+    final query = _storageSearch.text.trim().toLowerCase();
+
+    final filteredSources = sources
+        .where((source) {
+          if (query.isEmpty) return true;
+
+          final item = source.item;
+          return item.name.toLowerCase().contains(query) ||
+              item.category.label.toLowerCase().contains(query) ||
+              item.location.label.toLowerCase().contains(query);
+        })
+        .take(8)
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextFormField(
+          key: const ValueKey('waste-storage-item'),
+          controller: _storageSearch,
+          focusNode: _storageFocus,
+          onChanged: (value) {
             setState(() {
-              _selectedStorage = null;
-              _name.clear();
-              _quantity.clear();
-              _value.text = '0';
+              final selected = _selectedStorage;
+              if (selected != null && value.trim() != selected.item.name) {
+                _selectedStorage = null;
+                _name.clear();
+                _quantity.clear();
+                _value.text = '0';
+              }
             });
-          }
-        },
-        decoration: _fieldDecoration(
-          'Search stored item',
-          icon: const Icon(Icons.search),
+          },
+          decoration: _fieldDecoration(
+            'Search stored item',
+            icon: const Icon(Icons.search),
+          ),
+          validator: (_) => _selectedStorage == null
+              ? 'Select an item from My Storage.'
+              : null,
         ),
-        validator: (_) =>
-            _selectedStorage == null ? 'Select an item from My Storage.' : null,
-      ),
-      optionsViewBuilder: (context, select, options) => Align(
-        alignment: Alignment.topLeft,
-        child: Material(
-          elevation: 3,
-          borderRadius: BorderRadius.circular(12),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: (MediaQuery.sizeOf(context).width - 72)
-                  .clamp(0, 528)
-                  .toDouble(),
-              maxHeight: 280,
-            ),
-            child: ListView(
-              padding: EdgeInsets.zero,
-              shrinkWrap: true,
-              children: [
-                for (final source in options)
-                  ListTile(
-                    title: Text(source.item.name),
-                    subtitle: Text(
-                      '${source.item.category.label} • ${source.item.location.label}\n${source.item.quantityLabel} remaining',
+        if (_storageFocus.hasFocus && filteredSources.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Material(
+            elevation: 3,
+            borderRadius: BorderRadius.circular(12),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 280),
+              child: ListView(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                children: [
+                  for (final source in filteredSources)
+                    ListTile(
+                      title: Text(source.item.name),
+                      subtitle: Text(
+                        '${source.item.category.label} • '
+                        '${source.item.location.label}\n'
+                        '${source.item.quantityLabel} remaining',
+                      ),
+                      isThreeLine: true,
+                      onTap: () {
+                        _selectStorage(source);
+                        _storageFocus.unfocus();
+                      },
                     ),
-                    isThreeLine: true,
-                    onTap: () => select(source),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ),
+        ],
+      ],
     );
   }
 

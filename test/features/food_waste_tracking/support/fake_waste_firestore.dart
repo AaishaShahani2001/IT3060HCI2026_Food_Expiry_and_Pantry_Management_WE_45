@@ -20,6 +20,7 @@ class FakeWasteFirestore extends Fake implements FirebaseFirestore {
   int addCalls = 0;
   int updateCalls = 0;
   int commitCalls = 0;
+  final batchDeletePaths = <List<String>>[];
   int transactionCalls = 0;
   int transactionSetCalls = 0;
   int _nextId = 0;
@@ -276,6 +277,7 @@ class _Batch extends Fake implements WriteBatch {
     store.commitCalls++;
     await store.deleteGate;
     if (store.deleteError case final error?) throw error;
+    store.batchDeletePaths.add(List.of(paths));
     for (final path in paths) {
       store.documents.remove(path);
       store.notifyDocument(path);
