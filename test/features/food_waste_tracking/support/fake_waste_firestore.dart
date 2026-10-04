@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -13,6 +15,7 @@ class FakeWasteFirestore extends Fake implements FirebaseFirestore {
   Object? deleteError;
   Object? updateError;
   Object? transactionError;
+  void Function(String path)? afterAdd;
   int readCalls = 0;
   int addCalls = 0;
   int updateCalls = 0;
@@ -20,6 +23,13 @@ class FakeWasteFirestore extends Fake implements FirebaseFirestore {
   int transactionCalls = 0;
   int transactionSetCalls = 0;
   int _nextId = 0;
+  bool _transactionBusy = false;
+  Completer<void>? _transactionIdle;
+  final _listeners =
+      <String, Set<StreamController<QuerySnapshot<Map<String, dynamic>>>>>{};
+
+  int activeListeners(String collectionPath) =>
+      _listeners[collectionPath]?.length ?? 0;
 
   @override
   CollectionReference<Map<String, dynamic>> collection(String path) =>
@@ -34,12 +44,39 @@ class FakeWasteFirestore extends Fake implements FirebaseFirestore {
     Duration timeout = const Duration(seconds: 30),
     int maxAttempts = 5,
   }) async {
+    while (_transactionBusy) {
+      await _transactionIdle!.future;
+    }
+    _transactionBusy = true;
+    _transactionIdle = Completer<void>();
     transactionCalls++;
-    if (transactionError case final error?) throw error;
-    final transaction = _Transaction(this);
-    final result = await transactionHandler(transaction);
-    transaction.commit();
-    return result;
+    try {
+      if (transactionError case final error?) throw error;
+      final transaction = _Transaction(this);
+      final result = await transactionHandler(transaction);
+      transaction.commit();
+      return result;
+    } finally {
+      _transactionBusy = false;
+      _transactionIdle!.complete();
+    }
+  }
+
+  QuerySnapshot<Map<String, dynamic>> snapshot(String path) => _QuerySnapshot([
+    for (final entry in documents.entries)
+      if (entry.key.startsWith('$path/') &&
+          !entry.key.substring(path.length + 1).contains('/'))
+        _QueryDocument(entry.key.split('/').last, Map.of(entry.value)),
+  ]);
+
+  void notifyDocument(String documentPath) {
+    final separator = documentPath.lastIndexOf('/');
+    if (separator < 0) return;
+    final collectionPath = documentPath.substring(0, separator);
+    final value = snapshot(collectionPath);
+    for (final listener in List.of(_listeners[collectionPath] ?? const {})) {
+      if (!listener.isClosed) listener.add(value);
+    }
   }
 }
 
@@ -66,6 +103,8 @@ class _Collection extends Fake
     await store.addGate;
     if (store.addError case final error?) throw error;
     store.documents[reference.path] = Map.of(data);
+    store.notifyDocument(reference.path);
+    store.afterAdd?.call(reference.path);
     return reference;
   }
 
@@ -74,12 +113,35 @@ class _Collection extends Fake
     store.readCalls++;
     await store.readGate;
     if (store.readError case final error?) throw error;
-    return _QuerySnapshot([
-      for (final entry in store.documents.entries)
-        if (entry.key.startsWith('$path/') &&
-            !entry.key.substring(path.length + 1).contains('/'))
-          _QueryDocument(entry.key.split('/').last, Map.of(entry.value)),
-    ]);
+    return store.snapshot(path);
+  }
+
+  @override
+  Stream<QuerySnapshot<Map<String, dynamic>>> snapshots({
+    bool includeMetadataChanges = false,
+    ListenSource source = ListenSource.defaultSource,
+  }) {
+    var canceled = false;
+    late final StreamController<QuerySnapshot<Map<String, dynamic>>> controller;
+    controller = StreamController<QuerySnapshot<Map<String, dynamic>>>(
+      sync: true,
+      onListen: () async {
+        store.readCalls++;
+        await store.readGate;
+        if (canceled) return;
+        if (store.readError case final error?) {
+          controller.addError(error);
+          return;
+        }
+        (store._listeners[path] ??= {}).add(controller);
+        controller.add(store.snapshot(path));
+      },
+      onCancel: () {
+        canceled = true;
+        store._listeners[path]?.remove(controller);
+      },
+    );
+    return controller.stream;
   }
 }
 
@@ -108,6 +170,7 @@ class _Document extends Fake
       throw FirebaseException(plugin: 'cloud_firestore', code: 'not-found');
     }
     document.addAll(data.cast<String, dynamic>());
+    store.notifyDocument(path);
   }
 
   @override
@@ -179,9 +242,11 @@ class _Transaction extends Fake implements Transaction {
     DocumentReference<Object?> documentReference,
     Map<Object, Object?> data,
   ) {
+    if (store.updateError case final error?) throw error;
     if (!store.documents.containsKey(documentReference.path)) {
       throw FirebaseException(plugin: 'cloud_firestore', code: 'not-found');
     }
+    store.updateCalls++;
     _updates[documentReference.path] = data.cast<String, dynamic>();
     return this;
   }
@@ -189,9 +254,11 @@ class _Transaction extends Fake implements Transaction {
   void commit() {
     for (final entry in _sets.entries) {
       store.documents[entry.key] = Map.of(entry.value);
+      store.notifyDocument(entry.key);
     }
     for (final entry in _updates.entries) {
       store.documents[entry.key]!.addAll(entry.value);
+      store.notifyDocument(entry.key);
     }
   }
 }
@@ -211,6 +278,7 @@ class _Batch extends Fake implements WriteBatch {
     if (store.deleteError case final error?) throw error;
     for (final path in paths) {
       store.documents.remove(path);
+      store.notifyDocument(path);
     }
   }
 }

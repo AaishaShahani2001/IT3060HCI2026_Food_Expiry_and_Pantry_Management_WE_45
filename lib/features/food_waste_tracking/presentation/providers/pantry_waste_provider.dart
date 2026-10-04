@@ -5,6 +5,7 @@ import '../../../pantry/domain/utils/expiry_status.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
 import '../../models/automatic_waste_candidate.dart';
 import '../../models/food_waste_record.dart';
+import '../../models/waste_scope.dart';
 import 'food_waste_provider.dart';
 
 final wastePantryServiceProvider = Provider<PantryFirestoreService>(
@@ -15,9 +16,10 @@ final wastePantryServiceProvider = Provider<PantryFirestoreService>(
 // previous account while switching subscriptions. A UID-keyed stream prevents
 // stale data from becoming a suggestion for the next account. No new schema.
 final wastePantryItemsProvider = StreamProvider.autoDispose
-    .family<List<PantryItem>, String>(
-      (ref, uid) =>
-          ref.watch(wastePantryServiceProvider).watchPantryItems(userId: uid),
+    .family<List<PantryItem>, WasteScope>(
+      (ref, scope) => ref
+          .watch(wastePantryServiceProvider)
+          .watchPantryItems(userId: scope.actorUid),
     );
 
 String wasteUnitFor(PantryUnit unit) => switch (unit) {
@@ -32,9 +34,11 @@ String wasteUnitFor(PantryUnit unit) => switch (unit) {
 };
 
 class PantryWasteSource {
-  const PantryWasteSource(this.uid, this.item);
-  final String uid;
+  const PantryWasteSource(this.scope, this.item);
+  final WasteScope scope;
   final PantryItem item;
+
+  String get uid => scope.actorUid;
 
   double estimatedValueFor(double quantity) {
     if (!quantity.isFinite || quantity <= 0) return 0;
@@ -69,7 +73,7 @@ class PantryWasteSource {
     final value = calculateRemainingValue(item);
     final normalizedExpiry = wasteExpiryDate(expiryDate);
     return AutomaticWasteCandidate(
-      uid: uid,
+      scope: scope,
       record: FoodWasteRecord(
         id: automaticWasteEventId(pantryItemId, normalizedExpiry),
         itemName: item.name,
@@ -88,22 +92,22 @@ class PantryWasteSource {
 
 final activeWastePantryProvider = Provider<AsyncValue<List<PantryWasteSource>>>(
   (ref) {
-    final auth = ref.watch(wasteAuthUidProvider);
-    final uid = auth.asData?.value;
-    if (auth.isLoading ||
-        uid == null ||
-        !ref.watch(foodWasteRepositoryProvider).isCurrentUser(uid)) {
+    final scopeAsync = ref.watch(wasteScopeProvider);
+    final scope = scopeAsync.asData?.value;
+    if (scopeAsync.isLoading ||
+        scope == null ||
+        !ref.watch(foodWasteRepositoryProvider).isCurrentScope(scope)) {
       return const AsyncData([]);
     }
     return ref
-        .watch(wastePantryItemsProvider(uid))
+        .watch(wastePantryItemsProvider(scope))
         .whenData(
           (items) => [
             for (final item in items)
               if (item.isConnectedToFirestore &&
                   item.quantity.isFinite &&
                   item.quantity > 0)
-                PantryWasteSource(uid, item),
+                PantryWasteSource(scope, item),
           ],
         );
   },
@@ -111,16 +115,16 @@ final activeWastePantryProvider = Provider<AsyncValue<List<PantryWasteSource>>>(
 
 final expiredWastePantryProvider =
     Provider<AsyncValue<List<PantryWasteSource>>>((ref) {
-      final auth = ref.watch(wasteAuthUidProvider);
-      final uid = auth.asData?.value;
-      if (auth.isLoading ||
-          uid == null ||
-          !ref.watch(foodWasteRepositoryProvider).isCurrentUser(uid)) {
+      final scopeAsync = ref.watch(wasteScopeProvider);
+      final scope = scopeAsync.asData?.value;
+      if (scopeAsync.isLoading ||
+          scope == null ||
+          !ref.watch(foodWasteRepositoryProvider).isCurrentScope(scope)) {
         return const AsyncData([]);
       }
       final now = ref.watch(wasteClockProvider)().toLocal();
       return ref
-          .watch(wastePantryItemsProvider(uid))
+          .watch(wastePantryItemsProvider(scope))
           .whenData(
             (items) => [
               for (final item in items)
@@ -133,7 +137,7 @@ final expiredWastePantryProvider =
                           referenceDate: now,
                         ) ==
                         ExpiryStatus.expired)
-                  PantryWasteSource(uid, item),
+                  PantryWasteSource(scope, item),
             ],
           );
     });
@@ -152,8 +156,8 @@ class PantryWasteActions {
     PantryWasteSource source,
     FoodWasteRecord saved,
   ) async {
-    if (!ref.read(foodWasteRepositoryProvider).isCurrentUser(source.uid) ||
-        ref.read(wasteAuthUidProvider).asData?.value != source.uid ||
+    if (!ref.read(foodWasteRepositoryProvider).isCurrentScope(source.scope) ||
+        ref.read(wasteScopeProvider).asData?.value != source.scope ||
         saved.id == null ||
         !ref
             .read(foodWasteProvider)
@@ -163,7 +167,10 @@ class PantryWasteActions {
       throw const PantryAccessDeniedException();
     }
 
-    final items = ref.read(wastePantryItemsProvider(source.uid)).asData?.value;
+    final items = ref
+        .read(wastePantryItemsProvider(source.scope))
+        .asData
+        ?.value;
     final current = items
         ?.where((item) => item.firestoreId == source.item.firestoreId)
         .firstOrNull;

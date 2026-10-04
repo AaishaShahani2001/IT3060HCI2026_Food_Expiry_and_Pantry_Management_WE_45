@@ -1,13 +1,15 @@
 import 'dart:convert';
 
 import 'food_waste_record.dart';
+import 'waste_scope.dart';
 
 class AutomaticWasteCandidate {
-  const AutomaticWasteCandidate({required this.uid, required this.record});
+  const AutomaticWasteCandidate({required this.scope, required this.record});
 
-  final String uid;
+  final WasteScope scope;
   final FoodWasteRecord record;
 
+  String get uid => scope.actorUid;
   String get eventId => record.id!;
 }
 
