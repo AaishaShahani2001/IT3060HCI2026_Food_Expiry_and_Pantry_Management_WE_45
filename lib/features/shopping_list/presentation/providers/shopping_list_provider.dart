@@ -6,6 +6,7 @@ import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/low_stock_eligibility.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_item_metadata.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_list_repository.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_scope.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
 
 final shoppingListRepositoryProvider = Provider<ShoppingListRepository>(
@@ -18,6 +19,25 @@ final shoppingAuthUidProvider = StreamProvider<String?>((ref) {
       .authStateChanges()
       .map((user) => user?.uid)
       .distinct();
+});
+
+/// Resolves Personal versus Family/Shared Shopping from the existing active
+/// Pantry context. Auth or profile changes rebuild this provider, which cancels
+/// the previous scope listener before the Shopping collection is switched.
+final shoppingScopeProvider = StreamProvider<ShoppingScope?>((ref) {
+  final repository = ref.watch(shoppingListRepositoryProvider);
+  return ref
+      .watch(shoppingAuthUidProvider)
+      .when(
+        skipLoadingOnReload: false,
+        skipLoadingOnRefresh: false,
+        data: (uid) => uid == null
+            ? Stream<ShoppingScope?>.value(null)
+            : repository.watchScope(uid).map<ShoppingScope?>((scope) => scope),
+        error: (error, stackTrace) =>
+            Stream<ShoppingScope?>.error(error, stackTrace),
+        loading: () => const Stream<ShoppingScope?>.empty(),
+      );
 });
 
 enum ShoppingDuplicateAction { increaseQuantity, moveToBuy, addAnyway }
@@ -38,7 +58,7 @@ class ShoppingQuantityLimitException implements Exception {
 }
 
 class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
-  String? _uid;
+  ShoppingScope? _scope;
   int _generation = 0;
   Completer<void> _idle = Completer<void>()..complete();
   bool get _mutationInProgress => !_idle.isCompleted;
@@ -57,33 +77,56 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
   @override
   Future<List<ShoppingItem>> build() async {
     final generation = ++_generation;
-    _uid = null;
+    _scope = null;
     _mutationInProgress = false;
     ref.onDispose(() => _mutationInProgress = false);
     final repository = ref.watch(shoppingListRepositoryProvider);
-    final uid = await ref.watch(shoppingAuthUidProvider.future);
+    final scope = await ref.watch(shoppingScopeProvider.future);
     if (!ref.mounted || generation != _generation) return [];
-    _uid = uid;
-    if (uid == null) return [];
-    final items = await repository.getShoppingItems(uid);
-    return _isCurrent(generation, uid) ? items : [];
+    _scope = scope;
+    if (scope == null) return [];
+
+    final initial = Completer<List<ShoppingItem>>();
+    late final StreamSubscription<List<ShoppingItem>> subscription;
+    subscription = repository
+        .watchShoppingItems(scope)
+        .listen(
+          (items) {
+            if (!_isCurrent(generation, scope)) return;
+            if (!initial.isCompleted) {
+              initial.complete(items);
+            } else {
+              state = AsyncData(items);
+            }
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!_isCurrent(generation, scope)) return;
+            if (!initial.isCompleted) {
+              initial.completeError(error, stackTrace);
+            } else {
+              state = AsyncError(error, stackTrace);
+            }
+          },
+        );
+    ref.onDispose(() => unawaited(subscription.cancel()));
+    return initial.future;
   }
 
-  bool _isCurrent(int generation, String uid) =>
+  bool _isCurrent(int generation, ShoppingScope scope) =>
       ref.mounted &&
       generation == _generation &&
-      _uid == uid &&
-      _repository.isCurrentUser(uid);
+      _scope == scope &&
+      _repository.isCurrentScope(scope);
 
-  String _requireUser() {
-    final uid = _uid;
-    if (uid == null || !_repository.isCurrentUser(uid)) {
+  ShoppingScope _requireScope() {
+    final scope = _scope;
+    if (scope == null || !_repository.isCurrentScope(scope)) {
       throw StateError('Please sign in again to use your shopping list.');
     }
     if (state.isLoading || state.asData == null || _mutationInProgress) {
       throw StateError('Please wait for the current shopping operation.');
     }
-    return uid;
+    return scope;
   }
 
   Future<void> reload() async {
@@ -93,12 +136,12 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
       await future;
       return;
     }
-    final uid = _requireUser();
+    final scope = _requireScope();
     final generation = _generation;
     _mutationInProgress = true;
     try {
-      final items = await _repository.getShoppingItems(uid);
-      if (_isCurrent(generation, uid)) state = AsyncData(items);
+      final items = await _repository.getShoppingItemsForScope(scope);
+      if (_isCurrent(generation, scope)) state = AsyncData(items);
       // Retain valid data on a failed refresh; the caller supplies feedback.
     } finally {
       if (ref.mounted && generation == _generation) _mutationInProgress = false;
@@ -108,8 +151,13 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
   String _normalizedName(String name) =>
       name.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
 
+  List<ShoppingItem> _upsert(
+    Iterable<ShoppingItem> items,
+    ShoppingItem replacement,
+  ) => [...items.where((item) => item.id != replacement.id), replacement];
+
   ShoppingItem? findDuplicate(String name, {String? excludeId}) {
-    _requireUser();
+    _requireScope();
     final matches = state.requireValue
         .where(
           (item) =>
@@ -139,7 +187,7 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
     ShoppingDuplicateAction? duplicateAction,
     ShoppingItem? confirmedDuplicate,
   }) async {
-    final uid = _requireUser();
+    final scope = _requireScope();
     if (item.id != null ||
         item.name.trim().isEmpty ||
         item.quantity < 1 ||
@@ -179,9 +227,12 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
     final generation = _generation;
     _mutationInProgress = true;
     try {
-      final createdItem = await _repository.addShoppingItem(uid, item);
-      if (_isCurrent(generation, uid)) {
-        state = AsyncData([...state.requireValue, createdItem]);
+      final createdItem = await _repository.addShoppingItemForScope(
+        scope,
+        item,
+      );
+      if (_isCurrent(generation, scope)) {
+        state = AsyncData(_upsert(state.requireValue, createdItem));
       }
       return createdItem;
     } finally {
@@ -193,7 +244,7 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
     ShoppingItem item, {
     ShoppingItem? confirmedDuplicate,
   }) async {
-    _requireUser();
+    _requireScope();
     final originals = state.requireValue.where((saved) => saved.id == item.id);
     if (item.id == null || originals.isEmpty) {
       throw StateError('The shopping item changed. Please refresh.');
@@ -216,30 +267,33 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
   Future<void> deleteItem(String itemId) => deleteItems([itemId]);
 
   Future<void> deleteItems(List<String> itemIds) async {
-    final uid = _requireUser();
+    final scope = _requireScope();
     final generation = _generation;
     final ids = itemIds.toSet();
     if (ids.isEmpty) return;
-    final visibleIds = state.requireValue.map((item) => item.id).toSet();
+    final previous = state.requireValue;
+    final visibleIds = previous.map((item) => item.id).toSet();
     if (!ids.every(visibleIds.contains)) {
       throw StateError('The shopping list changed. Reload before deleting.');
     }
     _mutationInProgress = true;
     try {
-      await _repository.deleteShoppingItems(uid, ids.toList());
-      if (_isCurrent(generation, uid)) {
+      await _repository.deleteShoppingItemsForScope(scope, ids.toList());
+      if (_isCurrent(generation, scope)) {
         state = AsyncData(
           state.requireValue.where((item) => !ids.contains(item.id)).toList(),
         );
       }
-      // On any failure, leave the displayed list intact and let the UI report it.
+    } catch (_) {
+      if (_isCurrent(generation, scope)) state = AsyncData(previous);
+      rethrow;
     } finally {
       if (ref.mounted && generation == _generation) _mutationInProgress = false;
     }
   }
 
   Future<void> updateItem(String itemId, ShoppingItem item) async {
-    final uid = _requireUser();
+    final scope = _requireScope();
     final generation = _generation;
     final previous = state.requireValue;
     if (item.id != itemId || !previous.any((saved) => saved.id == itemId)) {
@@ -265,9 +319,15 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
         if (saved.id == itemId) updated else saved,
     ]);
     try {
-      await _repository.updateShoppingItem(uid, updated);
+      await _repository.updateShoppingItemForScope(scope, updated);
+      if (_isCurrent(generation, scope)) {
+        state = AsyncData([
+          for (final saved in state.requireValue)
+            if (saved.id == itemId) updated else saved,
+        ]);
+      }
     } catch (_) {
-      if (_isCurrent(generation, uid)) state = AsyncData(previous);
+      if (_isCurrent(generation, scope)) state = AsyncData(previous);
       rethrow;
     } finally {
       if (ref.mounted && generation == _generation) _mutationInProgress = false;
@@ -275,7 +335,7 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
   }
 
   Future<void> togglePurchased(String itemId, bool isPurchased) async {
-    _requireUser();
+    _requireScope();
     final matches = state.requireValue.where((item) => item.id == itemId);
     if (matches.isEmpty) {
       throw StateError('The shopping item changed. Refresh before updating.');
@@ -287,7 +347,7 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
     PantryItem pantryItem, {
     double? threshold,
   }) async {
-    _requireUser();
+    final scope = _requireScope();
     final effectiveThreshold = threshold ?? pantryItem.minQuantity;
     if (!hasEligibleShoppingLowStockExpiry(pantryItem)) {
       throw const ExpiredLowStockSuggestionException();
@@ -299,23 +359,35 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
       throw ArgumentError('This Pantry item is not a low-stock suggestion.');
     }
     if (findDuplicate(pantryItem.name) != null) return null;
-    return addItem(
-      ShoppingItem(
-        name: pantryItem.name.trim(),
-        quantity: 1,
-        unit: pantryItem.unit,
-        category: shoppingCategoryForPantryItem(pantryItem),
-        source: 'low_stock',
-        sourcePantryItemId: pantryItem.firestoreId,
-      ),
-    );
+    final generation = _generation;
+    _mutationInProgress = true;
+    try {
+      final result = await _repository.createLowStockIfAbsent(
+        scope: scope,
+        pantryItemId: pantryItem.firestoreId!,
+        item: ShoppingItem(
+          name: pantryItem.name.trim(),
+          quantity: 1,
+          unit: pantryItem.unit,
+          category: shoppingCategoryForPantryItem(pantryItem),
+          source: 'low_stock',
+          sourcePantryItemId: pantryItem.firestoreId,
+        ),
+      );
+      if (_isCurrent(generation, scope)) {
+        state = AsyncData(_upsert(state.requireValue, result.item));
+      }
+      return result.created ? result.item : null;
+    } finally {
+      if (ref.mounted && generation == _generation) _mutationInProgress = false;
+    }
   }
 
   Future<int> addLowStockSuggestions(
     Iterable<PantryItem> pantryItems, {
     Map<PantryCategory, int>? categoryThresholds,
   }) async {
-    _requireUser();
+    _requireScope();
     var addedCount = 0;
     for (final pantryItem in pantryItems) {
       final added = await addLowStockSuggestion(
@@ -334,7 +406,7 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
   /// duplicate dialog or changes a manual item. The owner and stock episode are
   /// rechecked after each wait, before issuing a write.
   Future<LowStockShoppingResult> ensureLowStockItem({
-    required String expectedUid,
+    required ShoppingScope expectedScope,
     required String pantryItemId,
     required String name,
     required bool reactivateBought,
@@ -344,10 +416,10 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
     while (ref.mounted && _mutationInProgress) {
       await _idle.future;
     }
-    if (!ref.mounted || _uid != expectedUid || !stillEligible()) {
+    if (!ref.mounted || _scope != expectedScope || !stillEligible()) {
       return LowStockShoppingResult.unchanged;
     }
-    final uid = _requireUser();
+    final scope = _requireScope();
     if (pantryItemId.trim().isEmpty || name.trim().isEmpty) {
       throw ArgumentError('A saved Pantry item is required.');
     }
@@ -355,9 +427,10 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
     _mutationInProgress = true;
     try {
       // Refresh before matching: another screen/device may have added an item
-      // since this notifier loaded. This is not a cross-device transaction.
-      final items = await _repository.getShoppingItems(uid);
-      if (!_isCurrent(generation, uid) || !stillEligible()) {
+      // since this notifier loaded. The linked create below is protected by a
+      // Firestore transaction.
+      final items = await _repository.getShoppingItemsForScope(scope);
+      if (!_isCurrent(generation, scope) || !stillEligible()) {
         return LowStockShoppingResult.unchanged;
       }
       state = AsyncData(items);
@@ -382,8 +455,8 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
             ..sort((a, b) => a.id!.compareTo(b.id!));
       if (linked.isNotEmpty && reactivateBought) {
         final updated = linked.first.copyWith(isPurchased: false);
-        await _repository.updateShoppingItem(uid, updated);
-        if (_isCurrent(generation, uid)) {
+        await _repository.updateShoppingItemForScope(scope, updated);
+        if (_isCurrent(generation, scope)) {
           state = AsyncData([
             for (final item in items)
               if (item.id == updated.id) updated else item,
@@ -393,19 +466,22 @@ class ShoppingListNotifier extends AsyncNotifier<List<ShoppingItem>> {
       }
       // Startup Bought matches, including manual Bought items, are respected.
       if (matches.isNotEmpty) return LowStockShoppingResult.unchanged;
-      final created = await _repository.addShoppingItem(
-        uid,
-        ShoppingItem(
+      final result = await _repository.createLowStockIfAbsent(
+        scope: scope,
+        pantryItemId: pantryItemId,
+        item: ShoppingItem(
           name: name.trim(),
           quantity: 1,
           source: 'low_stock',
           sourcePantryItemId: pantryItemId,
         ),
       );
-      if (_isCurrent(generation, uid)) {
-        state = AsyncData([...items, created]);
+      if (_isCurrent(generation, scope)) {
+        state = AsyncData(_upsert(items, result.item));
       }
-      return LowStockShoppingResult.added;
+      return result.created
+          ? LowStockShoppingResult.added
+          : LowStockShoppingResult.unchanged;
     } finally {
       if (ref.mounted && generation == _generation) _mutationInProgress = false;
     }

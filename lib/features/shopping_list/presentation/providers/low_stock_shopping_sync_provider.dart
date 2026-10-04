@@ -5,6 +5,7 @@ import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/
 import 'package:food_expiry_and_pantry_management/features/pantry/presentation/providers/pantry_providers.dart';
 
 import '../../data/low_stock_eligibility.dart';
+import '../../data/shopping_scope.dart';
 import 'shopping_list_provider.dart';
 
 class LowStockSyncFeedback {
@@ -20,11 +21,14 @@ final lowStockShoppingSyncProvider = StreamProvider<LowStockSyncFeedback>((
   ref,
 ) {
   final uid = ref.watch(shoppingAuthUidProvider).asData?.value;
-  if (uid == null) return const Stream.empty();
+  final scope = ref.watch(shoppingScopeProvider).asData?.value;
+  if (uid == null || scope == null || scope.actorUid != uid) {
+    return const Stream.empty();
+  }
   final service = ref.watch(pantryFirestoreServiceProvider);
   // Keep the Shopping notifier alive, but never rescan on Shopping changes.
   ref.listen(shoppingListProvider, (_, _) {});
-  final sync = _LowStockSync(ref, uid);
+  final sync = _LowStockSync(ref, uid, scope);
   final subscription = service
       .watchPantryItems(userId: uid)
       .listen(
@@ -48,9 +52,10 @@ class _StockJob {
 }
 
 class _LowStockSync {
-  _LowStockSync(this.ref, this.uid);
+  _LowStockSync(this.ref, this.uid, this.scope);
   final Ref ref;
   final String uid;
+  final ShoppingScope scope;
   final feedback = StreamController<LowStockSyncFeedback>();
   final _queue = <_StockJob>[];
   Map<String, PantryItem> _items = {};
@@ -65,7 +70,8 @@ class _LowStockSync {
       !_stopped &&
       ref.mounted &&
       ref.read(shoppingAuthUidProvider).asData?.value == uid &&
-      ref.read(shoppingListRepositoryProvider).isCurrentUser(uid);
+      ref.read(shoppingScopeProvider).asData?.value == scope &&
+      ref.read(shoppingListRepositoryProvider).isCurrentScope(scope);
 
   bool _low(PantryItem item) =>
       hasEligibleShoppingLowStockExpiry(item) &&
@@ -118,7 +124,7 @@ class _LowStockSync {
           final result = await ref
               .read(shoppingListProvider.notifier)
               .ensureLowStockItem(
-                expectedUid: uid,
+                expectedScope: scope,
                 pantryItemId: job.id,
                 name: item.name,
                 reactivateBought: job.reactivateBought,
