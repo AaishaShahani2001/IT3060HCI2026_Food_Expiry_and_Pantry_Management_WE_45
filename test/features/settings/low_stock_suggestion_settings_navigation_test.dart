@@ -11,11 +11,6 @@ import 'package:food_expiry_and_pantry_management/features/shopping_list/present
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class _TestUserName extends CurrentUserNameNotifier {
-  @override
-  Future<String> build() async => 'Test user';
-}
-
 void main() {
   Future<GoRouter> openSettings(
     WidgetTester tester, {
@@ -51,7 +46,9 @@ void main() {
         overrides: [
           sharedPreferencesProvider.overrideWithValue(preferences),
           shoppingAuthUidProvider.overrideWith((ref) => Stream.value('alice')),
-          currentUserNameProvider.overrideWith(_TestUserName.new),
+          currentUserNameProvider.overrideWithValue(
+            const AsyncData('Test user'),
+          ),
           settingsUserEmailProvider.overrideWithValue('alice@example.com'),
         ],
         child: MaterialApp.router(

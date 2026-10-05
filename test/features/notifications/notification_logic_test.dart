@@ -87,6 +87,18 @@ void main() {
     expect(parsed.expiryDate, DateTime(2026, 10, 3));
     expect(parsed.createdAt, DateTime.fromMillisecondsSinceEpoch(0));
     expect(AppNotification.tryParse('bad', {'type': 'Expiring soon'}), isNull);
+
+    final timed = AppNotification.tryParse(
+      'expiringSoon_milk_2026-10-03_1447',
+      {
+        'userId': 'alice',
+        'type': 'expiringSoon',
+        'title': 'Milk expires tomorrow',
+        'message': 'Use it soon to avoid food waste.',
+        'createdAt': null,
+      },
+    );
+    expect(timed?.expiryDate, DateTime(2026, 10, 3, 14, 47));
   });
 
   test('plans expiring, expired, and low-stock copy from pantry status', () {
@@ -203,6 +215,30 @@ void main() {
       memory: soon.memory,
     );
     expect(redated.create.single.alertKey, 'expiringSoon_milk_2026-10-05');
+  });
+
+  test('changing only the expiry time creates a fresh reminder event', () {
+    final first = plan([
+      item(
+        id: 'milk',
+        name: 'Milk',
+        expiry: DateTime(2026, 10, 3, 10, 32),
+      ),
+    ]);
+    final updated = plan(
+      [
+        item(
+          id: 'milk',
+          name: 'Milk',
+          expiry: DateTime(2026, 10, 3, 18, 15),
+        ),
+      ],
+      existingKeys: {for (final alert in first.create) alert.alertKey},
+    );
+
+    expect(first.create.single.alertKey, 'expiringSoon_milk_2026-10-03_1032');
+    expect(updated.create.single.alertKey, 'expiringSoon_milk_2026-10-03_1815');
+    expect(updated.create.single.expiryDate, DateTime(2026, 10, 3, 18, 15));
   });
 
   test(

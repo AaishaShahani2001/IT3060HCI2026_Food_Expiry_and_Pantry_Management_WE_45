@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/providers/theme_mode_provider.dart';
+import '../../../pantry/presentation/providers/pantry_providers.dart';
+import '../../../expiry/domain/repositories/expiry_repository.dart';
 import '../../../expiry/domain/services/expiry_notification_provider.dart';
+import '../../../expiry/presentation/providers/expiry_provider.dart';
 import '../../../expiry/presentation/providers/expiry_notification_settings_provider.dart';
 import '../../domain/models/app_notification.dart';
 import '../providers/notification_providers.dart';
@@ -35,6 +38,8 @@ class _NotificationPopupHostState extends ConsumerState<NotificationPopupHost>
   bool _flushScheduled = false;
   Timer? _dismissTimer;
   Timer? _eligibilityTimer;
+  Timer? _reminderTimer;
+  DateTime? _scheduledReminderAt;
   int _session = 0;
 
   @override
@@ -60,7 +65,7 @@ class _NotificationPopupHostState extends ConsumerState<NotificationPopupHost>
   bool _enabled(AppNotification notification) {
     final settings = ref.read(expiryNotificationSettingsProvider);
     if (!settings.notificationsEnabled) return false;
-    final expiry = notification.expiryDate;
+    final expiry = _expiryDate(notification);
     if (expiry != null) {
       final now = ref.read(notificationClockProvider)();
       final days = DateTime(
@@ -69,7 +74,17 @@ class _NotificationPopupHostState extends ConsumerState<NotificationPopupHost>
         expiry.day,
       ).difference(DateTime(now.year, now.month, now.day)).inDays;
       if (notification.type == AppNotificationType.expiringSoon &&
-          (days < 0 || days > settings.daysBefore)) {
+          !ref.read(expiryAlertsProvider).hasValue) {
+        return false;
+      }
+      final alert = _expiryAlert(notification);
+      if (notification.type == AppNotificationType.expiringSoon &&
+          (notification.expiryDate != null &&
+              notification.expiryDate != expiry ||
+              alert?.notificationEnabled == false ||
+              days < 0 ||
+              days > (alert?.reminderDays ?? settings.daysBefore) ||
+              now.isBefore(_reminderAt(expiry, alert, settings)))) {
         return false;
       }
       if (notification.type == AppNotificationType.expired && days >= 0) {
@@ -83,9 +98,102 @@ class _NotificationPopupHostState extends ConsumerState<NotificationPopupHost>
     };
   }
 
+  DateTime? _expiryDate(AppNotification notification) {
+    final itemId = notification.pantryItemId;
+    if (itemId == null) return notification.expiryDate;
+    final items = ref.read(pantryItemsProvider).asData?.value;
+    if (items == null) return notification.expiryDate;
+    for (final item in items) {
+      if (item.id == itemId || item.firestoreId == itemId) {
+        return item.expiryDate ?? notification.expiryDate;
+      }
+    }
+    return notification.expiryDate;
+  }
+
+  ExpiryAlert? _expiryAlert(AppNotification notification) {
+    final itemId = notification.pantryItemId;
+    if (itemId == null) return null;
+    final alerts = ref.read(expiryAlertsProvider).asData?.value;
+    if (alerts == null) return null;
+    final items = ref.read(pantryItemsProvider).asData?.value ?? const [];
+    final item = items.where(
+      (item) => item.id == itemId || item.firestoreId == itemId,
+    );
+    final pantryItem = item.isEmpty ? null : item.first;
+    for (final alert in alerts) {
+      if (alert.itemId == itemId) return alert;
+      if (pantryItem != null &&
+          (alert.itemId == pantryItem.id ||
+              alert.itemId == pantryItem.firestoreId)) {
+        return alert;
+      }
+    }
+    return null;
+  }
+
+  DateTime _reminderAt(
+    DateTime expiry,
+    ExpiryAlert? alert,
+    ExpiryNotificationSettingsState settings,
+  ) {
+    final reminderDays = alert?.reminderDays ?? settings.daysBefore;
+    return DateTime(
+      expiry.year,
+      expiry.month,
+      expiry.day - reminderDays,
+      expiry.hour,
+      expiry.minute,
+    );
+  }
+
+  void _scheduleNextReminder(List<AppNotification> notifications) {
+    final settings = ref.read(expiryNotificationSettingsProvider);
+    final now = ref.read(notificationClockProvider)();
+    DateTime? next;
+    if (!ref.read(expiryAlertsProvider).hasValue) {
+      _reminderTimer?.cancel();
+      _reminderTimer = null;
+      _scheduledReminderAt = null;
+      return;
+    }
+    if (settings.notificationsEnabled && settings.expiringSoonEnabled) {
+      for (final notification in notifications) {
+        if (!notification.isActive ||
+            notification.isRead ||
+            notification.type != AppNotificationType.expiringSoon ||
+            notification.userId != _userId) {
+          continue;
+        }
+        final expiry = _expiryDate(notification);
+        if (expiry == null) continue;
+        if (notification.expiryDate != null &&
+            notification.expiryDate != expiry) {
+          continue;
+        }
+        final alert = _expiryAlert(notification);
+        if (alert?.notificationEnabled == false) continue;
+        final reminderAt = _reminderAt(expiry, alert, settings);
+        if (now.isBefore(reminderAt) &&
+            (next == null || reminderAt.isBefore(next))) {
+          next = reminderAt;
+        }
+      }
+    }
+    if (next == _scheduledReminderAt) return;
+    _reminderTimer?.cancel();
+    _scheduledReminderAt = next;
+    if (next == null) return;
+    _reminderTimer = Timer(next.difference(now), () {
+      _scheduledReminderAt = null;
+      _refresh();
+    });
+  }
+
   void _receive(List<AppNotification> notifications) {
     final uid = ref.read(notificationUserIdProvider).asData?.value;
     if (uid == null || uid != _userId) return;
+    _scheduleNextReminder(notifications);
     for (final notification in notifications) {
       if (notification.userId != uid ||
           _seen.contains(notification.alertKey) ||
@@ -164,6 +272,7 @@ class _NotificationPopupHostState extends ConsumerState<NotificationPopupHost>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _eligibilityTimer?.cancel();
+    _reminderTimer?.cancel();
     _dismissTimer?.cancel();
     super.dispose();
   }
@@ -185,11 +294,17 @@ class _NotificationPopupHostState extends ConsumerState<NotificationPopupHost>
       _flushScheduled = false;
       _visible = [];
       _dismissTimer?.cancel();
+      _reminderTimer?.cancel();
+      _reminderTimer = null;
+      _scheduledReminderAt = null;
     }
     ref.listen(notificationCenterProvider, (_, next) {
       final notifications = next.asData?.value;
       if (notifications != null) _receive(notifications);
     });
+    ref.listen(expiryNotificationSettingsProvider, (_, _) => _refresh());
+    ref.listen(expiryAlertsProvider, (_, _) => _refresh());
+    ref.listen(pantryItemsProvider, (_, _) => _refresh());
     // Also handles an already-loaded provider when this host is remounted.
     final snapshot = ref.watch(notificationCenterProvider).asData?.value;
     if (snapshot != null) _receive(snapshot);

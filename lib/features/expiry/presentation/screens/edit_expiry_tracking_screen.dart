@@ -50,7 +50,33 @@ class _EditExpiryTrackingScreenState
 
     if (picked != null) {
       setState(() {
-        _expiryDate = picked;
+        _expiryDate = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          _expiryDate.hour,
+          _expiryDate.minute,
+        );
+      });
+    }
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_expiryDate),
+      helpText: 'Expiry time',
+    );
+
+    if (picked != null) {
+      setState(() {
+        _expiryDate = DateTime(
+          _expiryDate.year,
+          _expiryDate.month,
+          _expiryDate.day,
+          picked.hour,
+          picked.minute,
+        );
       });
     }
   }
@@ -95,12 +121,13 @@ class _EditExpiryTrackingScreenState
 
     final dateStr =
         "${_expiryDate.day}/${_expiryDate.month}/${_expiryDate.year}";
+    final timeStr = TimeOfDay.fromDateTime(_expiryDate).format(context);
     await ref
         .read(expiryNotificationServiceProvider)
         .showExpiryNotification(
           title: "Expiry Tracking Updated",
           body:
-              "Updated tracking for ${widget.alert.itemName} (Expires: $dateStr)",
+              "Updated tracking for ${widget.alert.itemName} (Expires: $dateStr at $timeStr)",
         );
 
     if (mounted) {
@@ -140,6 +167,15 @@ class _EditExpiryTrackingScreenState
                 ),
                 trailing: const Icon(Icons.calendar_today),
                 onTap: _pickDate,
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Expiry time'),
+                subtitle: Text(
+                  TimeOfDay.fromDateTime(_expiryDate).format(context),
+                ),
+                trailing: const Icon(Icons.schedule),
+                onTap: _pickTime,
               ),
               const SizedBox(height: 20),
               DropdownButtonFormField<int>(
