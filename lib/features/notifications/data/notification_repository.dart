@@ -31,22 +31,31 @@ class FirestoreNotificationRepository implements NotificationRepository {
 
   @override
   Stream<List<AppNotification>> watchActive(String userId, {int limit = 50}) {
-    // Order by createdAt only. Combining that sort with a deletedAt filter
-    // needs a composite index that is not created in Firebase yet.
-    return _notifications(userId)
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
-        .snapshots()
-        .map((snapshot) {
-          final items = <AppNotification>[];
-          for (final doc in snapshot.docs) {
-            final parsed = AppNotification.tryParse(doc.id, doc.data());
-            if (parsed != null && parsed.deletedAt == null) {
-              items.add(parsed);
-            }
-          }
-          return List<AppNotification>.unmodifiable(items);
-        });
+    return _watch(userId, limit: limit);
+  }
+
+  @override
+  Stream<List<AppNotification>> watchAll(String userId) {
+    return _watch(userId, limit: null);
+  }
+
+  /// Order by createdAt only. Combining that sort with a deletedAt filter
+  /// needs a composite index that is not created in Firebase yet.
+  Stream<List<AppNotification>> _watch(String userId, {required int? limit}) {
+    Query<Map<String, dynamic>> query = _notifications(
+      userId,
+    ).orderBy('createdAt', descending: true);
+    if (limit != null) query = query.limit(limit);
+    return query.snapshots().map((snapshot) {
+      final items = <AppNotification>[];
+      for (final doc in snapshot.docs) {
+        final parsed = AppNotification.tryParse(doc.id, doc.data());
+        if (parsed != null && parsed.deletedAt == null) {
+          items.add(parsed);
+        }
+      }
+      return List<AppNotification>.unmodifiable(items);
+    });
   }
 
   @override

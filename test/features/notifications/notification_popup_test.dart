@@ -157,9 +157,11 @@ void main() {
   );
 
   testWidgets(
-    'shows the popup at the currently saved expiry time minus reminder days',
+    'shows the popup at the saved notification time, not the expiry clock time',
     (tester) async {
-      now = DateTime(2026, 10, 5, 10, 31);
+      await prefs.setInt('expiry_notif_hour', 9);
+      await prefs.setInt('expiry_notif_minute', 0);
+      now = DateTime(2026, 10, 5, 8, 59);
       expiryAlerts = [
         ExpiryAlert(
           id: 'alice_milk',
@@ -183,11 +185,130 @@ void main() {
       expect(popup, findsNothing);
       expect(service.titles, isEmpty);
 
-      now = DateTime(2026, 10, 5, 10, 32);
+      now = DateTime(2026, 10, 5, 9);
       await tester.pump(const Duration(minutes: 1));
       await tester.pumpAndSettle();
       expect(popup, findsOneWidget);
       expect(service.titles, ['Milk expiry alert']);
+    },
+  );
+
+  testWidgets(
+    'changing 8:00 to 10:00 reschedules the future popup once',
+    (tester) async {
+      await prefs.setInt('expiry_notif_hour', 8);
+      await prefs.setInt('expiry_notif_minute', 0);
+      now = DateTime(2026, 10, 5, 7, 30);
+      expiryAlerts = [
+        ExpiryAlert(
+          id: 'alice_milk',
+          userId: 'alice',
+          itemId: 'milk',
+          itemName: 'Milk',
+          expiryDate: DateTime(2026, 10, 6, 15, 45),
+          daysUntilExpiry: 1,
+          status: 'active',
+          priority: 'medium',
+          message: 'Milk expiry reminder',
+          isRead: false,
+          createdAt: DateTime(2026, 10, 5),
+          reminderDays: 1,
+        ),
+      ];
+      repository.seed(
+        note('Milk', expiry: DateTime(2026, 10, 6, 15, 45), itemId: 'milk'),
+      );
+      await pumpHost(tester);
+      expect(popup, findsNothing);
+
+      final settings = container.read(expiryNotificationSettingsProvider);
+      await container
+          .read(expiryNotificationSettingsProvider.notifier)
+          .saveSettings(
+            settings.copyWith(
+              notificationTime: const TimeOfDay(hour: 10, minute: 0),
+            ),
+          );
+      await tester.pumpAndSettle();
+
+      now = DateTime(2026, 10, 5, 8);
+      await tester.pump(const Duration(minutes: 1));
+      await tester.pumpAndSettle();
+      expect(popup, findsNothing);
+      expect(service.titles, isEmpty);
+
+      now = DateTime(2026, 10, 5, 10);
+      await tester.pump(const Duration(minutes: 1));
+      await tester.pumpAndSettle();
+      expect(popup, findsOneWidget);
+      expect(service.titles, ['Milk expiry alert']);
+
+      await tester.pump(const Duration(minutes: 1));
+      await tester.pumpAndSettle();
+      expect(service.titles, ['Milk expiry alert']);
+    },
+  );
+
+  testWidgets(
+    'a shared item notifies only the signed-in user at their saved time',
+    (tester) async {
+      await prefs.setInt('expiry_notif_hour', 21);
+      await prefs.setInt('expiry_notif_minute', 0);
+      now = DateTime(2026, 10, 5, 20, 59);
+      expiryAlerts = [
+        ExpiryAlert(
+          id: 'alice_shared-milk',
+          userId: 'alice',
+          itemId: 'shared-milk',
+          itemName: 'Milk',
+          expiryDate: DateTime(2026, 10, 6, 7, 15),
+          daysUntilExpiry: 1,
+          status: 'active',
+          priority: 'medium',
+          message: 'Milk expiry reminder',
+          isRead: false,
+          createdAt: DateTime(2026, 10, 5),
+          reminderDays: 1,
+        ),
+        ExpiryAlert(
+          id: 'bob_shared-milk',
+          userId: 'bob',
+          itemId: 'shared-milk',
+          itemName: 'Milk',
+          expiryDate: DateTime(2026, 10, 6, 7, 15),
+          daysUntilExpiry: 1,
+          status: 'active',
+          priority: 'medium',
+          message: 'Milk expiry reminder',
+          isRead: false,
+          createdAt: DateTime(2026, 10, 5),
+          reminderDays: 1,
+        ),
+      ];
+      repository.seed(
+        note(
+          'Alice milk',
+          expiry: DateTime(2026, 10, 6, 7, 15),
+          itemId: 'shared-milk',
+        ),
+      );
+      repository.seed(
+        note(
+          'Bob milk',
+          uid: 'bob',
+          expiry: DateTime(2026, 10, 6, 7, 15),
+          itemId: 'shared-milk',
+        ),
+      );
+      await pumpHost(tester);
+      expect(popup, findsNothing);
+
+      now = DateTime(2026, 10, 5, 21);
+      await tester.pump(const Duration(minutes: 1));
+      await tester.pumpAndSettle();
+      expect(find.text('Alice milk expiry alert'), findsOneWidget);
+      expect(find.text('Bob milk expiry alert'), findsNothing);
+      expect(service.titles, ['Alice milk expiry alert']);
     },
   );
 

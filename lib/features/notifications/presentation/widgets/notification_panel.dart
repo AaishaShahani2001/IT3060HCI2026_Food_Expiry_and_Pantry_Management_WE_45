@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../domain/models/app_notification.dart';
 import '../../domain/notification_planner.dart';
 import '../../domain/notification_repository.dart';
@@ -121,10 +123,58 @@ class NotificationPanel extends ConsumerWidget {
               },
             ),
           ),
+          if (latest.isNotEmpty)
+            const _SeeAllNotificationsButton(
+              key: ValueKey('notification-see-all'),
+            ),
         ],
       ),
     );
   }
+}
+
+class _SeeAllNotificationsButton extends StatelessWidget {
+  const _SeeAllNotificationsButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: colorScheme.surface,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Divider(height: 1),
+          TextButton(
+            onPressed: () => openAllNotifications(context),
+            style: TextButton.styleFrom(
+              foregroundColor: colorScheme.primary,
+              minimumSize: const Size.fromHeight(48),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('See All'),
+                Icon(Icons.chevron_right_rounded, size: 18),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Closes the preview, then opens the full notification list.
+///
+/// The push waits until the next frame. Popping the preview and pushing a
+/// route in the same turn rebuilds the navigator while it is still building.
+void openAllNotifications(BuildContext context) {
+  final router = GoRouter.of(context);
+  Navigator.of(context, rootNavigator: true).pop();
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    router.push(AppRoutes.notifications);
+  });
 }
 
 class _PanelHeader extends StatelessWidget {
@@ -196,14 +246,14 @@ class _NotificationList extends StatelessWidget {
       itemCount: notifications.length,
       separatorBuilder: (context, index) => const Divider(height: 1),
       itemBuilder: (context, index) {
-        return _NotificationRow(notification: notifications[index]);
+        return NotificationTile(notification: notifications[index]);
       },
     );
   }
 }
 
-class _NotificationRow extends ConsumerWidget {
-  const _NotificationRow({required this.notification});
+class NotificationTile extends ConsumerWidget {
+  const NotificationTile({required this.notification, super.key});
 
   final AppNotification notification;
 

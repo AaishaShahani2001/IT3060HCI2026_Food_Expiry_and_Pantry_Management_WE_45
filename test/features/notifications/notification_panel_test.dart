@@ -3,14 +3,26 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:food_expiry_and_pantry_management/core/router/app_router.dart';
+import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
 import 'package:food_expiry_and_pantry_management/core/theme/app_theme.dart';
 import 'package:food_expiry_and_pantry_management/features/notifications/domain/models/app_notification.dart';
 import 'package:food_expiry_and_pantry_management/features/notifications/presentation/providers/notification_providers.dart';
+import 'package:food_expiry_and_pantry_management/features/notifications/presentation/screens/all_notifications_screen.dart';
 import 'package:food_expiry_and_pantry_management/features/notifications/presentation/widgets/notification_bell.dart';
+import 'package:go_router/go_router.dart';
 
 import 'memory_notification_repository.dart';
 
 void main() {
+  test('app router matches the all notifications location', () {
+    final match = appRouter.configuration.findMatch(
+      Uri.parse(AppRoutes.notifications),
+    );
+    expect(match.error, isNull);
+    expect(match.uri.path, AppRoutes.notifications);
+  });
+
   final clock = DateTime(2026, 10, 2, 12);
 
   AppNotification note({
@@ -166,6 +178,128 @@ void main() {
     );
     expect(find.text('Alert 4'), findsOneWidget);
     expect(find.text('Hidden oats'), findsNothing);
+    expect(find.text('See All'), findsOneWidget);
+  });
+
+  testWidgets(
+    'see all opens every notification for the signed-in user',
+    (tester) async {
+      final repository = MemoryNotificationRepository();
+      repository.seed(
+        note(id: 'other', title: 'Bob only', userId: 'bob'),
+      );
+      for (var index = 0; index < 6; index++) {
+        repository.seed(
+          note(
+            id: 'n$index',
+            title: index == 5 ? 'Hidden oats' : 'Alert $index',
+            createdAt: clock.subtract(Duration(days: index)),
+          ),
+        );
+      }
+
+      final uids = StreamController<String?>.broadcast();
+      addTearDown(uids.close);
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final router = GoRouter(
+        initialLocation: '/home',
+        routes: [
+          GoRoute(
+            path: '/home',
+            builder: (context, state) => const Scaffold(
+              body: Align(
+                alignment: Alignment.topRight,
+                child: NotificationBell(),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: AppRoutes.notifications,
+            builder: (context, state) => const AllNotificationsScreen(),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            notificationRepositoryProvider.overrideWithValue(repository),
+            notificationUserIdProvider.overrideWith((ref) => uids.stream),
+            notificationClockProvider.overrideWithValue(() => clock),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.light,
+            routerConfig: router,
+          ),
+        ),
+      );
+      uids.add('alice');
+      await tester.pump();
+      await tester.pump();
+      await openPanel(tester);
+
+      expect(find.text('Hidden oats'), findsNothing);
+      expect(find.text('Bob only'), findsNothing);
+      expect(find.text('Alert 0'), findsOneWidget);
+
+      await tester.tap(find.text('See All'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      expect(find.text('Hidden oats'), findsOneWidget);
+      expect(find.text('Bob only'), findsNothing);
+      expect(find.text('No notifications yet'), findsNothing);
+      expect(
+        tester.getTopLeft(find.text('Alert 0')).dy,
+        lessThan(tester.getTopLeft(find.text('Hidden oats')).dy),
+      );
+
+      await tester.tap(find.text('Alert 0'));
+      await tester.pumpAndSettle();
+      expect(repository.docs['alice']!['n0']!.isRead, isTrue);
+      expect(repository.docs['bob']!['other']!.isRead, isFalse);
+    },
+  );
+
+  testWidgets('all notifications explains an empty list in both themes', (
+    tester,
+  ) async {
+    final repository = MemoryNotificationRepository();
+    final uids = StreamController<String?>.broadcast();
+    addTearDown(uids.close);
+
+    Future<void> pumpTheme(ThemeData theme) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            notificationRepositoryProvider.overrideWithValue(repository),
+            notificationUserIdProvider.overrideWith((ref) => uids.stream),
+            notificationClockProvider.overrideWithValue(() => clock),
+          ],
+          child: MaterialApp(
+            theme: theme,
+            home: const AllNotificationsScreen(),
+          ),
+        ),
+      );
+      uids.add('alice');
+      await tester.pump();
+      await tester.pump();
+    }
+
+    await pumpTheme(AppTheme.light);
+    expect(find.text('Notifications'), findsOneWidget);
+    expect(find.text('No notifications yet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await pumpTheme(AppTheme.dark);
+    expect(find.text('No notifications yet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('shows expiring, expired, and low-stock rows', (tester) async {

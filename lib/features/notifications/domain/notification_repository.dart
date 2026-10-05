@@ -7,6 +7,12 @@ import 'notification_planner.dart';
 abstract class NotificationRepository {
   Stream<List<AppNotification>> watchActive(String userId, {int limit = 50});
 
+  /// Every active notification for [userId], newest first.
+  ///
+  /// Unlike [watchActive], this stream is not capped, so the full list screen
+  /// is not limited to the preview's five rows.
+  Stream<List<AppNotification>> watchAll(String userId);
+
   Future<Set<String>> fetchAlertKeys(String userId);
 
   Future<StockMemory> fetchStockMemory(String userId);
