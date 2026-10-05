@@ -6,54 +6,222 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function ownsAlert() {
-      return signedIn() && resource.data.userId == request.auth.uid;
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
     }
 
-    // Each user has their own alert, including for one shared pantry item.
-    match /expiry_alerts/{alertId} {
+    function pantryPath(pantryId) {
+      return /databases/$(database)/documents/pantries/$(pantryId);
+    }
+
+    function memberPath(pantryId, userId) {
+      return /databases/$(database)/documents/pantries/$(pantryId)/members/$(userId);
+    }
+
+    function invitePath(inviteCode) {
+      return /databases/$(database)/documents/pantryInvites/$(inviteCode);
+    }
+
+    function isPantryMember(pantryId) {
+      return signedIn()
+          && exists(memberPath(pantryId, request.auth.uid))
+          && get(memberPath(pantryId, request.auth.uid)).data.uid
+              == request.auth.uid;
+    }
+
+    function isPantryOwner(pantryId) {
+      return isPantryMember(pantryId)
+          && get(pantryPath(pantryId)).data.ownerId == request.auth.uid
+          && get(memberPath(pantryId, request.auth.uid)).data.role == 'owner';
+    }
+
+    function isValidInviteForPantry(pantryId, inviteCode) {
+      return inviteCode is string
+          && inviteCode.size() > 0
+          && exists(invitePath(inviteCode))
+          && get(invitePath(inviteCode)).data.pantryId == pantryId
+          && get(invitePath(inviteCode)).data.ownerId
+              == get(pantryPath(pantryId)).data.ownerId
+          && get(invitePath(inviteCode)).data.pantryType
+              == get(pantryPath(pantryId)).data.type;
+    }
+
+    match /users/{userId} {
+      allow read, create, update, delete: if isSelf(userId);
+
+      match /pantryItems/{itemId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      match /shopping_items/{itemId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      match /waste_records/{recordId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if isSelf(userId);
+
+        allow create: if isSelf(userId)
+            && request.resource.data.userId == request.auth.uid;
+
+        allow update: if isSelf(userId)
+            && resource.data.userId == request.auth.uid
+            && request.resource.data.userId == resource.data.userId;
+
+        allow delete: if false;
+      }
+
+      match /notificationMeta/{docId} {
+        allow read, write: if isSelf(userId);
+      }
+    }
+
+    // Collection-group membership recovery. The uid equality constraint in
+    // the client query must match the authenticated user for every result.
+    match /{path=**}/members/{memberId} {
+      allow list: if signedIn()
+          && resource.data.uid == request.auth.uid;
+    }
+
+    match /pantryInvites/{inviteCode} {
+      // The invite code is a bearer secret: signed-in users may validate an
+      // exact code, but may not enumerate invite documents.
+      allow get: if signedIn();
+      allow list: if signedIn()
+          && resource.data.pantryId is string
+          && isPantryMember(resource.data.pantryId);
+
       allow create: if signedIn()
-                    && request.resource.data.userId == request.auth.uid
-                    && alertId == request.auth.uid + '_' + request.resource.data.itemId;
+          && inviteCode.size() > 0
+          && request.resource.data.keys().hasAll([
+            'pantryId',
+            'pantryType',
+            'ownerId'
+          ])
+          && request.resource.data.pantryId is string
+          && request.resource.data.ownerId == request.auth.uid
+          && getAfter(pantryPath(request.resource.data.pantryId)).data.ownerId
+              == request.auth.uid
+          && getAfter(pantryPath(request.resource.data.pantryId)).data.type
+              == request.resource.data.pantryType
+          && getAfter(memberPath(
+                request.resource.data.pantryId,
+                request.auth.uid
+              )).data.uid == request.auth.uid
+          && getAfter(memberPath(
+                request.resource.data.pantryId,
+                request.auth.uid
+              )).data.role == 'owner';
 
-      allow read: if ownsAlert();
-
-      allow update: if ownsAlert()
-                    && request.resource.data.userId == request.auth.uid;
-
-      allow delete: if ownsAlert();
+      allow update, delete: if false;
     }
 
-    // In-app notification center. Soft delete is an update; hard deletes stay closed.
-    // Publish this block in Firebase Console. The catch-all rule below still
-    // allows any signed-in user until that catch-all is removed or narrowed.
-    match /users/{userId}/notifications/{notificationId} {
-      allow read: if request.auth != null
-                  && request.auth.uid == userId;
+    match /pantries/{pantryId} {
+      allow get, list: if isPantryMember(pantryId);
 
-      allow create: if request.auth != null
-                    && request.auth.uid == userId
-                    && request.resource.data.userId == request.auth.uid;
+      // Pantry creation and the owner's membership must be one atomic batch.
+      allow create: if signedIn()
+          && request.resource.data.ownerId == request.auth.uid
+          && getAfter(memberPath(pantryId, request.auth.uid)).data.uid
+              == request.auth.uid
+          && getAfter(memberPath(pantryId, request.auth.uid)).data.role
+              == 'owner';
 
-      allow update: if request.auth != null
-                    && request.auth.uid == userId
-                    && resource.data.userId == request.auth.uid
-                    && request.resource.data.userId == resource.data.userId;
+      allow update: if isPantryOwner(pantryId)
+          && resource.data.ownerId == request.auth.uid
+          && request.resource.data.ownerId == resource.data.ownerId;
 
       allow delete: if false;
+
+      match /members/{memberId} {
+        // A member may list the household roster. A constrained collection-group
+        // query may discover only the caller's own membership document.
+        allow get: if isPantryMember(pantryId)
+            || (signedIn() && memberId == request.auth.uid
+                && resource.data.uid == request.auth.uid);
+        allow list: if isPantryMember(pantryId)
+            || (signedIn() && resource.data.uid == request.auth.uid);
+
+        // Owners add ordinary members. The only owner-membership creation is
+        // the atomic pantry-creation batch above.
+        allow create: if signedIn()
+            && request.resource.data.uid == memberId
+            && (
+              (isPantryOwner(pantryId)
+                && memberId != request.auth.uid
+                && request.resource.data.role == 'member')
+              ||
+              (memberId == request.auth.uid
+                && request.resource.data.role == 'owner'
+                && getAfter(pantryPath(pantryId)).data.ownerId
+                    == request.auth.uid)
+              ||
+              (memberId == request.auth.uid
+                && request.resource.data.role == 'member'
+                && request.resource.data.keys().hasAll(['inviteCode'])
+                && isValidInviteForPantry(
+                  pantryId,
+                  request.resource.data.inviteCode
+                ))
+            );
+
+        // Members may edit their non-authority metadata, but uid and role are
+        // immutable. Owners may edit non-owner members without promoting them.
+        allow update: if signedIn()
+            && resource.data.uid == memberId
+            && request.resource.data.uid == resource.data.uid
+            && (
+              (memberId == request.auth.uid
+                && isPantryMember(pantryId)
+                && request.resource.data.role == resource.data.role)
+              ||
+              (isPantryOwner(pantryId)
+                && memberId != get(pantryPath(pantryId)).data.ownerId
+                && resource.data.role == 'member'
+                && request.resource.data.role == 'member')
+            );
+
+        allow delete: if signedIn()
+            && resource.data.uid == memberId
+            && resource.data.role == 'member'
+            && (
+              (memberId == request.auth.uid && isPantryMember(pantryId))
+              || isPantryOwner(pantryId)
+            );
+      }
+
+      match /items/{itemId} {
+        allow read, write: if isPantryMember(pantryId);
+      }
+
+      match /shopping_items/{itemId} {
+        allow read, write: if isPantryMember(pantryId);
+      }
+
+      match /waste_records/{recordId} {
+        allow read, write: if isPantryMember(pantryId);
+      }
     }
 
-    // Remembers which pantry items were last seen above the low-stock
-    // threshold so a low-stock alert is created only on a real crossing.
-    match /users/{userId}/notificationMeta/{docId} {
-      allow read, write: if request.auth != null
-                          && request.auth.uid == userId;
+    match /expiry_alerts/{alertId} {
+      allow create: if signedIn()
+          && request.resource.data.userId == request.auth.uid
+          && alertId
+              == request.auth.uid + '_' + request.resource.data.itemId;
+
+      allow read, delete: if signedIn()
+          && resource.data.userId == request.auth.uid;
+
+      allow update: if signedIn()
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.userId == request.auth.uid;
     }
 
-    // Rules are OR'd. This catch-all must not also match expiry_alerts, or a
-    // signed-in user could read and write another user's alert.
-    match /{collection}/{document=**} {
-      allow read, write: if signedIn() && collection != 'expiry_alerts';
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

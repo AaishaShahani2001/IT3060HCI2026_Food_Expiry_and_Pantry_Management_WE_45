@@ -281,28 +281,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       Center(
                         child: Column(
                           children: [
-                            Container(
-                              width: 72,
-                              height: 72,
-                              decoration: BoxDecoration(
-                                color: lightGreen,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Icon(
-                                Icons.kitchen_rounded,
-                                size: 38,
-                                color: primaryGreen,
-                              ),
-                            ),
-                            const SizedBox(height: 18),
-                            const Text(
-                              'PantryPal',
-                              style: TextStyle(
-                                fontSize: 30,
-                                fontWeight: FontWeight.w700,
-                                color: darkGreen,
-                                letterSpacing: -0.5,
-                              ),
+                            Image.asset(
+                              'assets/images/HCI_LOGO.png',
+                              width: 170,
+                              height: 120,
+                              fit: BoxFit.contain,
                             ),
                             const SizedBox(height: 6),
                             const Text(

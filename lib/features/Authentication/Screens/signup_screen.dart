@@ -199,41 +199,27 @@ class _SignupScreenState extends State<SignupScreen> {
                       // ------------------------------------------------
                       // BRANDING
                       // ------------------------------------------------
-                      Center(
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 72,
-                              height: 72,
-                              decoration: BoxDecoration(
-                                color: lightGreen,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Icon(
-                                Icons.kitchen_rounded,
-                                size: 38,
-                                color: primaryGreen,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'PantryPal',
-                              style: TextStyle(
-                                fontSize: 30,
-                                fontWeight: FontWeight.w700,
-                                color: darkGreen,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Create your pantry and start reducing waste.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 14, color: textGrey),
-                            ),
-                          ],
+                  Center(
+                    child: Column(
+                      children: [
+                        Image.asset(
+                          'assets/images/HCI_LOGO.png',
+                          width: 170,
+                          height: 120,
+                          fit: BoxFit.contain,
                         ),
-                      ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Create your pantry and start reducing waste.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: textGrey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
                       const SizedBox(height: 34),
 
