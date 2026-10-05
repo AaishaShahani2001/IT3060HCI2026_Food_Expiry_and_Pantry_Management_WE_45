@@ -90,7 +90,15 @@ class AppNotification {
     final alertKey = data['alertKey'];
     final stableKey = alertKey is String && alertKey.isNotEmpty ? alertKey : id;
     // Older expiry documents encode the date in their stable event key.
-    final dateMatch = RegExp(r'_(\d{4}-\d{2}-\d{2})$').firstMatch(stableKey);
+    final dateMatch = RegExp(
+      r'_(\d{4}-\d{2}-\d{2})(?:_(\d{4}))?$',
+    ).firstMatch(stableKey);
+    final fallbackExpiry = dateMatch == null
+        ? null
+        : DateTime.tryParse(
+            '${dateMatch.group(1)}'
+            '${dateMatch.group(2) == null ? '' : 'T${dateMatch.group(2)!.substring(0, 2)}:${dateMatch.group(2)!.substring(2)}:00'}',
+          );
     return AppNotification(
       id: id,
       userId: userId,
@@ -104,7 +112,7 @@ class AppNotification {
           parseNotificationDate(data['expiryDate']) ??
           (type == AppNotificationType.lowStock || dateMatch == null
               ? null
-              : DateTime.tryParse(dateMatch.group(1)!)),
+              : fallbackExpiry),
       isRead: data['isRead'] == true,
       createdAt:
           parseNotificationDate(data['createdAt']) ??

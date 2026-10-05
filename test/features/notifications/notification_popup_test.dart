@@ -11,6 +11,8 @@ import 'package:food_expiry_and_pantry_management/core/providers/theme_mode_prov
 import 'package:food_expiry_and_pantry_management/core/router/app_routes.dart';
 import 'package:food_expiry_and_pantry_management/features/expiry/domain/services/expiry_notification_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/expiry/domain/services/expiry_notification_service.dart';
+import 'package:food_expiry_and_pantry_management/features/expiry/domain/repositories/expiry_repository.dart';
+import 'package:food_expiry_and_pantry_management/features/expiry/presentation/providers/expiry_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/expiry/presentation/providers/expiry_notification_settings_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/notifications/domain/models/app_notification.dart';
 import 'package:food_expiry_and_pantry_management/features/notifications/presentation/providers/notification_providers.dart';
@@ -42,6 +44,7 @@ void main() {
   late ProviderContainer container;
   late DateTime now;
   var views = 0;
+  List<ExpiryAlert> expiryAlerts = const [];
 
   AppNotification note(
     String id, {
@@ -50,6 +53,7 @@ void main() {
     bool read = false,
     bool deleted = false,
     DateTime? expiry,
+    String? itemId,
   }) => AppNotification(
     id: id,
     userId: uid,
@@ -57,6 +61,7 @@ void main() {
     title: '$id expiry alert',
     message: 'Use it soon to avoid food waste.',
     alertKey: id,
+    pantryItemId: itemId,
     isRead: read,
     createdAt: DateTime(2026, 10, 5),
     expiryDate:
@@ -73,6 +78,7 @@ void main() {
     users = StreamController<String?>.broadcast();
     views = 0;
     now = DateTime(2026, 10, 5, 12);
+    expiryAlerts = const [];
   });
 
   tearDown(() async => users.close());
@@ -86,6 +92,7 @@ void main() {
           expiryNotificationServiceProvider.overrideWithValue(service),
           sharedPreferencesProvider.overrideWithValue(prefs),
           notificationClockProvider.overrideWithValue(() => now),
+          expiryAlertsProvider.overrideWithValue(AsyncData(expiryAlerts)),
         ],
         child: MaterialApp(
           builder: (context, child) => MediaQuery(
@@ -146,6 +153,41 @@ void main() {
       await tester.pumpAndSettle();
       expect(popup, findsOneWidget);
       expect(service.titles, ['grains expiry alert']);
+    },
+  );
+
+  testWidgets(
+    'shows the popup at the currently saved expiry time minus reminder days',
+    (tester) async {
+      now = DateTime(2026, 10, 5, 10, 31);
+      expiryAlerts = [
+        ExpiryAlert(
+          id: 'alice_milk',
+          userId: 'alice',
+          itemId: 'milk',
+          itemName: 'Milk',
+          expiryDate: DateTime(2026, 10, 6, 10, 32),
+          daysUntilExpiry: 1,
+          status: 'active',
+          priority: 'medium',
+          message: 'Milk expiry reminder',
+          isRead: false,
+          createdAt: DateTime(2026, 10, 5),
+          reminderDays: 1,
+        ),
+      ];
+      repository.seed(
+        note('Milk', expiry: DateTime(2026, 10, 6, 10, 32), itemId: 'milk'),
+      );
+      await pumpHost(tester);
+      expect(popup, findsNothing);
+      expect(service.titles, isEmpty);
+
+      now = DateTime(2026, 10, 5, 10, 32);
+      await tester.pump(const Duration(minutes: 1));
+      await tester.pumpAndSettle();
+      expect(popup, findsOneWidget);
+      expect(service.titles, ['Milk expiry alert']);
     },
   );
 

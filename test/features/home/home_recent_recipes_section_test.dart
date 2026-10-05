@@ -43,11 +43,6 @@ class _EmptyPantry extends PantryItemsNotifier {
   Stream<List<PantryItem>> build() => Stream.value(const []);
 }
 
-class _TestUserName extends CurrentUserNameNotifier {
-  @override
-  Future<String> build() async => 'Test user';
-}
-
 Recipe _recipe(String id, String name) {
   return Recipe(
     id: id,
@@ -225,7 +220,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          currentUserNameProvider.overrideWith(_TestUserName.new),
+          currentUserNameProvider.overrideWithValue(
+            const AsyncData('Test user'),
+          ),
           pantryItemsProvider.overrideWith(_EmptyPantry.new),
           pantrySummaryProvider.overrideWithValue((total: 0, lowStock: 0)),
           expirySummaryProvider.overrideWithValue((

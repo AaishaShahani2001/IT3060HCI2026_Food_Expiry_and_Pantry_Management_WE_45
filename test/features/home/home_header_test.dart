@@ -7,11 +7,6 @@ import 'package:food_expiry_and_pantry_management/features/home/presentation/wid
 
 String _name = '';
 
-class _Name extends CurrentUserNameNotifier {
-  @override
-  Future<String> build() async => _name;
-}
-
 String _headerText(WidgetTester tester) {
   final text = tester.widget<Text>(find.byType(Text).first);
   return text.textSpan!.toPlainText();
@@ -47,7 +42,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         key: UniqueKey(),
-        overrides: [currentUserNameProvider.overrideWith(_Name.new)],
+        overrides: [
+          currentUserNameProvider.overrideWithValue(AsyncData(_name)),
+        ],
         child: MaterialApp(
           theme: theme ?? AppTheme.light,
           builder: (context, child) => MediaQuery(
