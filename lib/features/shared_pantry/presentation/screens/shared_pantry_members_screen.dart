@@ -22,6 +22,8 @@ class _SharedPantryMembersScreenState extends State<SharedPantryMembersScreen> {
 
   DocumentSnapshot<Map<String, dynamic>>? _pantry;
 
+  String _inviteCode = '';
+
   @override
   void initState() {
     super.initState();
@@ -34,10 +36,16 @@ class _SharedPantryMembersScreenState extends State<SharedPantryMembersScreen> {
         widget.pantryId,
       );
 
+      final inviteCode =
+      await SharedPantryService.instance.getInviteCodeForPantry(
+        widget.pantryId,
+      );
+
       if (!mounted) return;
 
       setState(() {
         _pantry = pantry;
+        _inviteCode = inviteCode ?? '';
       });
     } catch (e) {
       if (!mounted) return;
@@ -371,8 +379,6 @@ class _SharedPantryMembersScreenState extends State<SharedPantryMembersScreen> {
 
     final pantryName = pantryData?['name']?.toString() ?? 'Shared Pantry';
 
-    final inviteCode = pantryData?['inviteCode']?.toString() ?? '';
-
     final currentUser = _auth.currentUser;
 
     final isOwner = pantryData?['ownerId'] == currentUser?.uid;
@@ -486,7 +492,7 @@ class _SharedPantryMembersScreenState extends State<SharedPantryMembersScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    inviteCode.isEmpty ? '------' : inviteCode,
+                    _inviteCode.isEmpty ? '------' : _inviteCode,
                     style: const TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.w900,
