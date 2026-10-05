@@ -68,6 +68,9 @@ class SettingsScreen extends ConsumerWidget {
               detail: (email == null || email.isEmpty)
                   ? AppStrings.noEmailAvailable
                   : email,
+              onTap: () {
+                context.push(AppRoutes.profile);
+              },
             ),
 
             const SizedBox(height: 12),

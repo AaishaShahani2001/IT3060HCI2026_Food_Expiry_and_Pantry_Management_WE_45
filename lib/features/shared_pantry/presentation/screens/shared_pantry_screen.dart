@@ -58,14 +58,25 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
     try {
       final pantry = await _pantryService.getCurrentUserPantry();
 
-      final inviteCode =
-      await _pantryService.getCurrentPantryInviteCode();
+      String inviteCode = '';
 
+      if (pantry != null) {
+        final data = pantry.data() ?? {};
+        final ownerId = data['ownerId']?.toString() ?? '';
+        final currentUserId = _pantryService.currentUserId;
+
+        final isOwner = ownerId.isNotEmpty && ownerId == currentUserId;
+
+        if (isOwner) {
+          inviteCode =
+              await _pantryService.getCurrentPantryInviteCode() ?? '';
+        }
+      }
       if (!mounted) return;
 
       setState(() {
         _currentPantry = pantry;
-        _currentInviteCode = inviteCode ?? '';
+        _currentInviteCode = inviteCode;
         _isLoadingPantry = false;
       });
     } catch (_) {
@@ -872,6 +883,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                   ),
                 ],
               ),
+    if (isOwner) ...[
               const SizedBox(height: 22),
               Text(
                 'INVITE CODE',
@@ -968,6 +980,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
                 'Share this code with household members so they can join this pantry.',
                 style: TextStyle(color: textGrey, fontSize: 11.5, height: 1.4),
               ),
+    ],
               const SizedBox(height: 22),
               Row(
                 children: [
