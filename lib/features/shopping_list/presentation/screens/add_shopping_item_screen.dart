@@ -311,13 +311,13 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
             _isEditing
                 ? '${existing.name} is already in your shopping list. Save this as a separate entry?'
                 : existing.isPurchased
-                ? '${existing.name} is already marked as Bought. Move it to To Buy with quantity ${requested.quantity} ${shoppingUnitLabel(requested.unit)}, or add another entry?'
-                : '${existing.name} is already in your shopping list with quantity ${existing.quantity} ${shoppingUnitLabel(existing.unit)}. '
+                ? '${existing.name} is already marked as Bought. Move it to To Buy with quantity ${shoppingQuantityLabel(requested.quantity, requested.unit)}, or add another entry?'
+                : '${existing.name} is already in your shopping list with quantity ${shoppingQuantityLabel(existing.quantity, existing.unit)}. '
                       '${!sameUnit
                           ? 'The units differ, so add a separate entry or change the unit.'
                           : total > 100
                           ? 'Maximum quantity is 100. You can add a separate entry or change your quantity.'
-                          : 'Increase it to $total ${shoppingUnitLabel(existing.unit)}, or add another entry?'}',
+                          : 'Increase it to ${shoppingQuantityLabel(total, existing.unit)}, or add another entry?'}',
           ),
           actions: [
             TextButton(
@@ -393,6 +393,7 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
       }
     });
     final auth = ref.watch(shoppingAuthUidProvider);
+    final scope = ref.watch(shoppingScopeProvider).asData?.value;
     _formUid ??= auth.asData?.value;
     final shopping = ref.watch(shoppingListProvider);
     final pantry = ref.watch(shoppingPantryItemsProvider);
@@ -463,6 +464,42 @@ class _AddShoppingItemScreenState extends ConsumerState<AddShoppingItemScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
+                              if (scope?.isShared == true) ...[
+                                Container(
+                                  key: const ValueKey(
+                                    'shared-shopping-add-hint',
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colors.primaryContainer.withValues(
+                                      alpha: 0.55,
+                                    ),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.groups_outlined,
+                                        size: 20,
+                                        color: colors.onPrimaryContainer,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          'Items added here are visible to all household members.',
+                                          style: textTheme.bodySmall?.copyWith(
+                                            color: colors.onPrimaryContainer,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                              ],
                               Container(
                                 padding: const EdgeInsets.all(20),
                                 decoration: BoxDecoration(

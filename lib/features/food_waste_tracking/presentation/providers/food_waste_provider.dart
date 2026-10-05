@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:food_expiry_and_pantry_management/features/shared_pantry/data/shared_pantry_service.dart';
 
 import '../../data/food_waste_repository.dart';
 import '../../models/automatic_waste_candidate.dart';
@@ -12,6 +13,27 @@ import '../../models/waste_summary.dart';
 final foodWasteRepositoryProvider = Provider<FoodWasteRepository>(
   (ref) => FoodWasteRepository(),
 );
+
+typedef WastePantryDisplayNameLoader =
+    Future<String?> Function(String pantryId);
+
+/// Reads display-only household metadata from the canonical Pantry document.
+/// Personal versus shared scope remains owned by [wasteScopeProvider].
+final wastePantryDisplayNameLoaderProvider =
+    Provider<WastePantryDisplayNameLoader>((ref) {
+      return (pantryId) async {
+        final pantry = await SharedPantryService.instance.getPantry(pantryId);
+        final name = pantry.data()?['name']?.toString().trim();
+        return name == null || name.isEmpty ? null : name;
+      };
+    });
+
+/// Family-keying prevents a previous household name from being reused while a
+/// different Pantry name is loading.
+final wastePantryDisplayNameProvider = FutureProvider.autoDispose
+    .family<String?, String>((ref, pantryId) {
+      return ref.watch(wastePantryDisplayNameLoaderProvider)(pantryId);
+    });
 
 final wasteAuthUidProvider = StreamProvider<String?>(
   (ref) => FirebaseAuth.instance

@@ -9,6 +9,7 @@ import 'package:food_expiry_and_pantry_management/features/pantry/presentation/u
 import 'package:food_expiry_and_pantry_management/features/pantry/presentation/widgets/pantry_item_form.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/food_item_suggestions.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_item_metadata.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_scope.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/domain/models/shopping_reminder.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/shopping_error_message.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/shopping_snackbar.dart';
@@ -69,6 +70,69 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   }
 
   String? get _uid => ref.read(shoppingAuthUidProvider).asData?.value;
+
+  String? _pantryDisplayName(ShoppingScope scope) {
+    final pantryId = scope.pantryId;
+    if (!scope.isShared || pantryId == null) return null;
+    return ref.read(shoppingPantryDisplayNameProvider(pantryId)).asData?.value;
+  }
+
+  String _selectionDeleteMessage(int count, ShoppingScope? scope) {
+    if (scope?.isShared != true) {
+      return 'This will remove $count ${count == 1 ? 'item' : 'items'} from your Shopping List.';
+    }
+    final pantryName = _pantryDisplayName(scope!);
+    final listName = pantryName == null
+        ? 'the shared Shopping List'
+        : 'the $pantryName Shopping List';
+    final subject = count == 1 ? 'this item' : 'these $count items';
+    return 'This will remove $subject from $listName for everyone.';
+  }
+
+  Widget _shoppingScopeTitle(
+    BuildContext context,
+    ShoppingScope? scope,
+    String? pantryName,
+  ) {
+    final textTheme = Theme.of(context).textTheme;
+    final colors = Theme.of(context).colorScheme;
+    final title = switch (scope) {
+      ShoppingScope(isShared: false) => 'My Shopping List',
+      ShoppingScope(isShared: true) =>
+        pantryName == null
+            ? 'Shared Shopping List'
+            : '$pantryName Shopping List',
+      _ => 'Shopping List',
+    };
+    final subtitle = switch (scope) {
+      ShoppingScope(isShared: false) => 'Only visible to you',
+      ShoppingScope(isShared: true) => 'Shared with household members',
+      _ => null,
+    };
+    final titleWidget = Text(
+      title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: textTheme.headlineMedium?.copyWith(
+        fontSize: 20,
+        color: colors.onSurface,
+      ),
+    );
+    if (subtitle == null) return titleWidget;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        titleWidget,
+        Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: textTheme.labelSmall?.copyWith(color: colors.onSurfaceVariant),
+        ),
+      ],
+    );
+  }
 
   bool _sameSession(String? uid, int token) =>
       mounted && token == _operationToken && uid != null && uid == _uid;
@@ -436,13 +500,13 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   Future<void> _confirmSelectionDelete() async {
     final count = _selectedIds.length;
     if (count == 0) return;
+    final scope = ref.read(shoppingScopeProvider).asData?.value;
     await _confirmDelete(
       _selectedIds.toList(),
       titleOverride: count == 1
           ? 'Delete selected item?'
           : 'Delete selected items?',
-      messageOverride:
-          'This will remove $count ${count == 1 ? 'item' : 'items'} from your Shopping List.',
+      messageOverride: _selectionDeleteMessage(count, scope),
       successMessage: '$count ${count == 1 ? 'item' : 'items'} deleted.',
     );
   }
@@ -1321,6 +1385,13 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     });
     final textTheme = Theme.of(context).textTheme;
     final auth = ref.watch(shoppingAuthUidProvider);
+    final shoppingScope = ref.watch(shoppingScopeProvider).asData?.value;
+    final pantryId = shoppingScope?.isShared == true
+        ? shoppingScope?.pantryId
+        : null;
+    final pantryName = pantryId == null
+        ? null
+        : ref.watch(shoppingPantryDisplayNameProvider(pantryId)).asData?.value;
     final itemsAsync = ref.watch(shoppingListProvider);
 
     Widget body;
@@ -1355,6 +1426,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
+          toolbarHeight: _selectionMode ? kToolbarHeight : 72,
           leading: _selectionMode
               ? IconButton(
                   onPressed: _isBusy ? null : _cancelSelection,
@@ -1362,15 +1434,15 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                   tooltip: 'Cancel selection',
                 )
               : null,
-          title: Text(
-            _selectionMode
-                ? '${_selectedIds.length} selected'
-                : AppStrings.shoppingListTitle,
-            style: textTheme.headlineMedium?.copyWith(
-              fontSize: 20,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
+          title: _selectionMode
+              ? Text(
+                  '${_selectedIds.length} selected',
+                  style: textTheme.headlineMedium?.copyWith(
+                    fontSize: 20,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                )
+              : _shoppingScopeTitle(context, shoppingScope, pantryName),
           actions: _selectionMode
               ? [
                   IconButton(

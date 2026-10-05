@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
+import 'package:food_expiry_and_pantry_management/features/shared_pantry/data/shared_pantry_service.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/low_stock_eligibility.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_item_metadata.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_list_repository.dart';
@@ -12,6 +13,27 @@ import 'package:food_expiry_and_pantry_management/features/shopping_list/models/
 final shoppingListRepositoryProvider = Provider<ShoppingListRepository>(
   (ref) => ShoppingListRepository(),
 );
+
+typedef ShoppingPantryDisplayNameLoader =
+    Future<String?> Function(String pantryId);
+
+/// Reads display-only household metadata from the canonical Pantry document.
+/// Personal versus shared scope remains owned by [shoppingScopeProvider].
+final shoppingPantryDisplayNameLoaderProvider =
+    Provider<ShoppingPantryDisplayNameLoader>((ref) {
+      return (pantryId) async {
+        final pantry = await SharedPantryService.instance.getPantry(pantryId);
+        final name = pantry.data()?['name']?.toString().trim();
+        return name == null || name.isEmpty ? null : name;
+      };
+    });
+
+/// Family-keying prevents a previous household name from being reused while a
+/// different Pantry name is loading.
+final shoppingPantryDisplayNameProvider = FutureProvider.autoDispose
+    .family<String?, String>((ref, pantryId) {
+      return ref.watch(shoppingPantryDisplayNameLoaderProvider)(pantryId);
+    });
 
 // Feature-scoped: no changes to the team's authentication implementation.
 final shoppingAuthUidProvider = StreamProvider<String?>((ref) {

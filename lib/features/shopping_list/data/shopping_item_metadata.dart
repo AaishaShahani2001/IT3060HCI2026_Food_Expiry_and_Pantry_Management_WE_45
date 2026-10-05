@@ -111,6 +111,23 @@ String shoppingUnitLabel(PantryUnit unit) => switch (unit) {
   PantryUnit.boxes => 'boxes',
 };
 
+String shoppingQuantityUnitLabel(int quantity, PantryUnit unit) {
+  if (quantity != 1) return shoppingUnitLabel(unit);
+  return switch (unit) {
+    PantryUnit.items => 'pc',
+    PantryUnit.packs => 'pack',
+    PantryUnit.bottles => 'bottle',
+    PantryUnit.boxes => 'box',
+    PantryUnit.kg => 'kg',
+    PantryUnit.g => 'g',
+    PantryUnit.liters => 'L',
+    PantryUnit.ml => 'ml',
+  };
+}
+
+String shoppingQuantityLabel(int quantity, PantryUnit unit) =>
+    '$quantity ${shoppingQuantityUnitLabel(quantity, unit)}';
+
 String shoppingCategoryForPantryItem(PantryItem item) {
   final catalogueCategory = foodItemCategoryFor(item.name);
   if (catalogueCategory != 'Other') return catalogueCategory;
