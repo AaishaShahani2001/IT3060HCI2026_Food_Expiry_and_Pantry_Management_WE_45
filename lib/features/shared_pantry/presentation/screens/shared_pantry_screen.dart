@@ -25,6 +25,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
   bool _isCreating = false;
   bool _isJoining = false;
   bool _isLeaving = false;
+  String _currentInviteCode = '';
 
   DocumentSnapshot<Map<String, dynamic>>? _currentPantry;
 
@@ -57,10 +58,14 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
     try {
       final pantry = await _pantryService.getCurrentUserPantry();
 
+      final inviteCode =
+      await _pantryService.getCurrentPantryInviteCode();
+
       if (!mounted) return;
 
       setState(() {
         _currentPantry = pantry;
+        _currentInviteCode = inviteCode ?? '';
         _isLoadingPantry = false;
       });
     } catch (_) {
@@ -68,6 +73,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
 
       setState(() {
         _currentPantry = null;
+        _currentInviteCode = '';
         _isLoadingPantry = false;
       });
     }
@@ -753,7 +759,7 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
     final data = pantry.data() ?? {};
 
     final pantryName = data['name']?.toString() ?? 'Shared Pantry';
-    final inviteCode = data['inviteCode']?.toString() ?? '';
+    final inviteCode = _currentInviteCode;
     final ownerId = data['ownerId']?.toString() ?? '';
     final currentUserId = _pantryService.currentUserId;
 

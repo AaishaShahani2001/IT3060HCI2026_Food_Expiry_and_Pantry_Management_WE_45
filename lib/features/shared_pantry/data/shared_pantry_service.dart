@@ -95,18 +95,30 @@ class SharedPantryService {
 
     final inviteCode = _generateInviteCode();
 
+    final inviteRef =
+    _firestore.collection('pantryInvites').doc(inviteCode);
+
     final batch = _firestore.batch();
 
-    // Create pantry
+// Create pantry
     batch.set(
       pantryRef,
       {
         'name': name,
         'type': pantryType,
-        'inviteCode': inviteCode,
         'ownerId': user.uid,
-        'createdAt':
-        FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+    );
+
+// Create secure invite lookup document
+    batch.set(
+      inviteRef,
+      {
+        'pantryId': pantryRef.id,
+        'pantryType': pantryType,
+        'ownerId': user.uid,
+        'createdAt': FieldValue.serverTimestamp(),
       },
     );
 
@@ -155,33 +167,35 @@ class SharedPantryService {
       throw Exception('Please enter an invite code.');
     }
 
-    final query = await _firestore
-        .collection('pantries')
-        .where('inviteCode', isEqualTo: code)
-        .limit(1)
+    final inviteDoc = await _firestore
+        .collection('pantryInvites')
+        .doc(code)
         .get();
 
-    if (query.docs.isEmpty) {
+    if (!inviteDoc.exists) {
       throw Exception('Invalid invite code.');
     }
 
-    final pantryDoc = query.docs.first;
+    final inviteData = inviteDoc.data();
 
-    final pantryId = pantryDoc.id;
+    if (inviteData == null) {
+      throw Exception('Invalid invite code.');
+    }
 
-    final pantryData = pantryDoc.data();
+    final pantryId = inviteData['pantryId'];
+
+    if (pantryId is! String || pantryId.isEmpty) {
+      throw Exception('Invalid pantry invite.');
+    }
 
     final pantryType =
-        (pantryData['type'] as String?)
+        (inviteData['pantryType'] as String?)
             ?.trim()
             .toLowerCase() ??
             'shared';
 
-    if (pantryType != 'family' &&
-        pantryType != 'shared') {
-      throw Exception(
-        'This pantry has an invalid pantry type.',
-      );
+    if (pantryType != 'family' && pantryType != 'shared') {
+      throw Exception('This pantry has an invalid pantry type.');
     }
 
     // Check whether user already belongs
@@ -199,7 +213,11 @@ class SharedPantryService {
       );
     }
 
-    final memberRef = pantryDoc.reference.collection('members').doc(user.uid);
+    final pantryRef =
+    _firestore.collection('pantries').doc(pantryId);
+
+    final memberRef =
+    pantryRef.collection('members').doc(user.uid);
 
     final batch = _firestore.batch();
 
@@ -234,6 +252,33 @@ class SharedPantryService {
   // ------------------------------------------------------------
   // GET CURRENT USER'S PANTRY
   // ------------------------------------------------------------
+
+  Future<String?> getCurrentPantryInviteCode() async {
+    final user = _auth.currentUser;
+
+    if (user == null) {
+      throw Exception('You must be logged in.');
+    }
+
+    final pantryId = await getCurrentPantryId();
+
+    if (pantryId == null || pantryId.isEmpty) {
+      return null;
+    }
+
+    final query = await _firestore
+        .collection('pantryInvites')
+        .where('pantryId', isEqualTo: pantryId)
+        .where('ownerId', isEqualTo: user.uid)
+        .limit(1)
+        .get();
+
+    if (query.docs.isEmpty) {
+      return null;
+    }
+
+    return query.docs.first.id;
+  }
 
   Future<DocumentSnapshot<Map<String, dynamic>>> getCurrentUserPantry() async {
     final user = _auth.currentUser;
@@ -522,5 +567,19 @@ class SharedPantryService {
     throw Exception(
       'Invalid pantry type: $pantryType',
     );
+  }
+
+  Future<String?> getInviteCodeForPantry(String pantryId) async {
+    final query = await _firestore
+        .collection('pantryInvites')
+        .where('pantryId', isEqualTo: pantryId)
+        .limit(1)
+        .get();
+
+    if (query.docs.isEmpty) {
+      return null;
+    }
+
+    return query.docs.first.id;
   }
 }
