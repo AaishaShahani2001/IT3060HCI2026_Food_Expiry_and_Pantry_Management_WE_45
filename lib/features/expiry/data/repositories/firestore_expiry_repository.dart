@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../domain/expiry_alert_id.dart';
 import '../../domain/repositories/expiry_repository.dart';
 
 class FirestoreExpiryRepository implements ExpiryRepository {
@@ -23,7 +24,7 @@ class FirestoreExpiryRepository implements ExpiryRepository {
     final userId = _currentUserId;
 
     if (userId == null) {
-      return _localAlerts.values.toList();
+      return dedupeExpiryAlerts(_localAlerts.values);
     }
 
     try {
@@ -35,41 +36,36 @@ class FirestoreExpiryRepository implements ExpiryRepository {
           .map((document) => ExpiryAlert.fromMap(document.id, document.data()))
           .toList();
 
-      final map = <String, ExpiryAlert>{};
-      for (final a in firestoreAlerts) {
-        map[a.itemId] = a;
-        map[a.id] = a;
-      }
-      for (final a in _localAlerts.values) {
-        map[a.itemId] = a;
-        map[a.id] = a;
-      }
-
-      return map.values.toList();
+      return dedupeExpiryAlerts([
+        ...firestoreAlerts,
+        ..._localAlerts.values.where(
+          (alert) => alert.userId.isEmpty || alert.userId == userId,
+        ),
+      ]);
     } catch (e) {
-      return _localAlerts.values.toList();
+      return dedupeExpiryAlerts(_localAlerts.values);
     }
   }
 
   @override
   Future<void> saveAlert(ExpiryAlert alert) async {
-    _localAlerts[alert.itemId] = alert;
-    _localAlerts[alert.id] = alert;
+    if (alert.itemId.trim().isEmpty) return;
 
     final userId = _currentUserId;
+    final alertToSave = userId == null
+        ? alert
+        : scopedExpiryAlert(alert: alert, userId: userId);
+    _rememberLocally(alertToSave);
 
     if (userId == null) {
       return;
     }
 
-    final alertToSave = alert.userId.isEmpty
-        ? alert.copyWith(userId: userId)
-        : alert;
-
     try {
       await _alertsCollection
           .doc(alertToSave.id)
           .set(alertToSave.toMap(), SetOptions(merge: true));
+      await _deleteOwnedLegacy(userId, alertToSave.itemId);
     } catch (e) {
       // Ignore or log error gracefully
     }
@@ -90,20 +86,17 @@ class FirestoreExpiryRepository implements ExpiryRepository {
     }
 
     try {
-      final document = _alertsCollection.doc(alertId);
-      final snapshot = await document.get();
+      final updated = await _updateOwned(userId, alertId, {'isRead': true});
+      final itemId = updated ?? _itemIdFromAlertId(userId, alertId);
+      if (itemId == null) return;
 
-      if (!snapshot.exists) {
-        return;
+      final canonical = buildExpiryAlertId(userId, itemId);
+      if (canonical != alertId) {
+        await _updateOwned(userId, canonical, {'isRead': true});
       }
-
-      final data = snapshot.data();
-
-      if (data == null || data['userId'] != userId) {
-        return;
+      if (itemId != alertId && itemId != canonical) {
+        await _updateOwned(userId, itemId, {'isRead': true});
       }
-
-      await document.update({'isRead': true});
     } catch (e) {
       // Ignore or log error gracefully
     }
@@ -123,22 +116,71 @@ class FirestoreExpiryRepository implements ExpiryRepository {
     }
 
     try {
-      final document = _alertsCollection.doc(alertId);
-      final snapshot = await document.get();
+      final removedItemId = await _deleteOwned(userId, alertId);
+      final itemId = removedItemId ?? _itemIdFromAlertId(userId, alertId);
+      if (itemId == null) return;
 
-      if (!snapshot.exists) {
-        return;
+      final canonical = buildExpiryAlertId(userId, itemId);
+      if (canonical != alertId) {
+        await _deleteOwned(userId, canonical);
       }
-
-      final data = snapshot.data();
-
-      if (data == null || data['userId'] != userId) {
-        return;
-      }
-
-      await document.delete();
+      await _deleteOwnedLegacy(userId, itemId);
     } catch (e) {
       // Ignore or log error gracefully
     }
+  }
+
+  void _rememberLocally(ExpiryAlert alert) {
+    if (alert.itemId.isNotEmpty) {
+      _localAlerts[alert.itemId] = alert;
+    }
+    _localAlerts[alert.id] = alert;
+  }
+
+  /// Deletes `expiry_alerts/{itemId}` only when that document belongs to
+  /// [userId]. Another user's document at the same id is left untouched.
+  Future<void> _deleteOwnedLegacy(String userId, String itemId) async {
+    final canonical = buildExpiryAlertId(userId, itemId);
+    if (itemId.isEmpty || itemId == canonical) return;
+    await _deleteOwned(userId, itemId);
+  }
+
+  Future<String?> _deleteOwned(String userId, String documentId) async {
+    if (documentId.isEmpty) return null;
+    final snapshot = await _alertsCollection.doc(documentId).get();
+    if (!snapshot.exists) return null;
+    final data = snapshot.data();
+    if (data == null || data['userId'] != userId) return null;
+    await snapshot.reference.delete();
+    _localAlerts.remove(documentId);
+    final itemId = data['itemId'];
+    if (itemId is String && itemId == documentId) {
+      _localAlerts.remove(itemId);
+    }
+    return itemId is String && itemId.isNotEmpty ? itemId : null;
+  }
+
+  Future<String?> _updateOwned(
+    String userId,
+    String documentId,
+    Map<String, Object> fields,
+  ) async {
+    if (documentId.isEmpty) return null;
+    final snapshot = await _alertsCollection.doc(documentId).get();
+    if (!snapshot.exists) return null;
+    final data = snapshot.data();
+    if (data == null || data['userId'] != userId) return null;
+    await snapshot.reference.update(fields);
+    final itemId = data['itemId'];
+    return itemId is String && itemId.isNotEmpty ? itemId : null;
+  }
+
+  /// Item id encoded in `{userId}_{itemId}` when that document was never saved.
+  String? _itemIdFromAlertId(String userId, String alertId) {
+    final prefix = '${userId}_';
+    if (!alertId.startsWith(prefix)) return null;
+    final itemId = alertId.substring(prefix.length);
+    if (itemId.isEmpty) return null;
+    return itemId;
   }
 }

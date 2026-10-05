@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../expiry/domain/services/expiry_service.dart';
 import '../../../expiry/presentation/providers/expiry_provider.dart';
-import '../../../shopping/domain/models/shopping_item.dart';
-import '../../../shopping/presentation/providers/shopping_providers.dart';
+import '../../../shopping_list/data/shopping_item_metadata.dart';
+import '../../../shopping_list/models/shopping_item.dart';
+import '../../../shopping_list/presentation/providers/shopping_list_provider.dart';
+import '../../../shopping_list/presentation/shopping_error_message.dart';
 import '../../domain/models/pantry_item.dart';
 import '../../domain/utils/pantry_price_display.dart';
 import '../../domain/utils/expiry_status.dart';
@@ -38,6 +40,9 @@ class _PantryItemDetailsScreenState
     extends ConsumerState<PantryItemDetailsScreen> {
   /// True after a local delete/consume so we do not pop twice.
   bool _isLeaving = false;
+
+  /// Blocks a second tap while the shopping-list write is in flight.
+  bool _isAddingToShoppingList = false;
 
   /// Prefers the latest provider copy so edits and quantity stay in sync.
   PantryItem? _resolveItem() {
@@ -116,68 +121,73 @@ class _PantryItemDetailsScreenState
     );
   }
 
-  /// Copies this pantry item into the local shopping list if it is not there.
+  /// Copies this pantry item onto the Shopping List the Shop tab reads.
   Future<void> _addToShoppingList(PantryItem item) async {
-    final shoppingItems =
-        ref.read(shoppingItemsProvider).asData?.value ?? const <ShoppingItem>[];
-    final alreadyListed = shoppingItems.any(
-      (entry) =>
-          !entry.isCompleted &&
-          entry.name.toLowerCase() == item.name.toLowerCase(),
-    );
-
-    if (alreadyListed) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          content: Text('${item.name} is already on your shopping list'),
-        ),
-      );
-      return;
-    }
-
+    if (_isAddingToShoppingList) return;
+    _isAddingToShoppingList = true;
     try {
-      await ref
-          .read(shoppingItemsProvider.notifier)
-          .addItem(
-            ShoppingItem(
-              id: '',
-              name: item.name,
-              quantity: item.quantity > 0 ? item.quantity : 1,
-              unit: item.unit.displayLabel(item.quantity),
-              priority:
-                  item.isLowStock ||
-                      item.expiryStatus == ExpiryStatus.expired ||
-                      item.expiryStatus == ExpiryStatus.expiringSoon
-                  ? ShoppingItemPriority.high
-                  : ShoppingItemPriority.medium,
-            ),
-          );
+      await ref.read(shoppingListProvider.future);
+      if (!mounted) return;
+
+      final notifier = ref.read(shoppingListProvider.notifier);
+      final duplicate = notifier.findDuplicate(item.name);
+      if (duplicate != null && !duplicate.isPurchased) {
+        _showShoppingMessage('${item.name} is already on your shopping list');
+        return;
+      }
+
+      final shoppingItem = ShoppingItem(
+        name: item.name.trim(),
+        quantity: _shoppingListQuantity(item.quantity),
+        unit: item.unit,
+        category: shoppingCategoryForPantryItem(item),
+        sourcePantryItemId: item.isConnectedToFirestore
+            ? item.firestoreId
+            : null,
+      );
+      await notifier.addItem(
+        shoppingItem,
+        duplicateAction: duplicate == null
+            ? null
+            : ShoppingDuplicateAction.moveToBuy,
+        confirmedDuplicate: duplicate,
+      );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          content: Text('${item.name} added to your shopping list'),
-        ),
-      );
+      _showShoppingMessage('${item.name} added to your shopping list');
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      _showShoppingMessage(shoppingErrorMessage(error), isError: true);
+    } finally {
+      _isAddingToShoppingList = false;
+    }
+  }
+
+  /// Shopping List quantities are whole numbers from 1 to 100.
+  int _shoppingListQuantity(double quantity) {
+    if (!quantity.isFinite || quantity <= 0) return 1;
+    final rounded = quantity.round();
+    if (rounded < 1) return 1;
+    if (rounded > 100) return 100;
+    return rounded;
+  }
+
+  void _showShoppingMessage(String message, {bool isError = false}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor: Theme.of(context).colorScheme.error,
-          content: Text(error.toString()),
+          backgroundColor: isError
+              ? Theme.of(context).colorScheme.error
+              : null,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          content: Text(message),
         ),
       );
-    }
   }
 
   /// Opens a sheet to choose how much was consumed, then writes to Firestore.
