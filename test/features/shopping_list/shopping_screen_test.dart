@@ -15,6 +15,7 @@ import 'package:food_expiry_and_pantry_management/features/shopping_list/domain/
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item_draft.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/domain/services/shopping_reminder_notification_service.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_scope.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_list_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/low_stock_suggestion_settings_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/shopping_list/presentation/providers/shopping_pantry_provider.dart';
@@ -147,6 +148,7 @@ void main() {
     bool dark = false,
     List<PantryItem> pantryItems = const [],
     SharedPreferences? preferences,
+    ShoppingPantryDisplayNameLoader? pantryNameLoader,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -183,6 +185,9 @@ void main() {
         overrides: [
           shoppingListRepositoryProvider.overrideWithValue(session.repository),
           shoppingAuthUidProvider.overrideWith((ref) => session.auth()),
+          shoppingPantryDisplayNameLoaderProvider.overrideWithValue(
+            pantryNameLoader ?? (pantryId) async => 'Home',
+          ),
           shoppingPantryItemsProvider.overrideWithValue(AsyncData(pantryItems)),
           shoppingReminderSchedulerProvider.overrideWithValue(
             reminderScheduler,
@@ -236,6 +241,129 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('personal scope has a private Shopping header', (tester) async {
+    await openScreen(tester, seed: false);
+
+    expect(find.text('My Shopping List'), findsOneWidget);
+    expect(find.text('Only visible to you'), findsOneWidget);
+    expect(find.text('Shared with household members'), findsNothing);
+  });
+
+  testWidgets(
+    'shared Shopping header uses a loading fallback and never retains the old household name',
+    (tester) async {
+      final cabinName = Completer<String?>();
+      session.changeScope(
+        ShoppingScope.shared(actorUid: 'alice', pantryId: 'family-home'),
+      );
+      await openScreen(
+        tester,
+        seed: false,
+        size: const Size(320, 780),
+        pantryNameLoader: (pantryId) => pantryId == 'family-home'
+            ? Future.value('A Very Long Home Pantry Name For Everyone')
+            : cabinName.future,
+      );
+
+      expect(
+        find.text('A Very Long Home Pantry Name For Everyone Shopping List'),
+        findsOneWidget,
+      );
+      expect(find.text('Shared with household members'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      session.changeScope(
+        ShoppingScope.shared(actorUid: 'alice', pantryId: 'family-cabin'),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Shared Shopping List'), findsOneWidget);
+      expect(
+        find.text('A Very Long Home Pantry Name For Everyone Shopping List'),
+        findsNothing,
+      );
+
+      cabinName.complete('Cabin');
+      await tester.pumpAndSettle();
+      expect(find.text('Cabin Shopping List'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('shared add form explains household visibility', (tester) async {
+    session.changeScope(
+      ShoppingScope.shared(actorUid: 'alice', pantryId: 'family-home'),
+    );
+    await openScreen(tester, seed: false);
+    await tester.tap(find.byTooltip('Add shopping item'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Items added here are visible to all household members.'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('shared-shopping-add-hint')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('shared Shopping delete warning names the household impact', (
+    tester,
+  ) async {
+    final scope = ShoppingScope.shared(
+      actorUid: 'alice',
+      pantryId: 'family-home',
+    );
+    session.changeScope(scope);
+    session.store.seedCollection(scope.collectionPath, 'milk', 'Milk');
+    await openScreen(tester, seed: false);
+
+    await selectMilk(tester);
+    await tester.tap(find.byTooltip('Delete selected items'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'This will remove this item from the Home Shopping List for everyone.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Cancel'));
+  });
+
+  testWidgets('Shopping rows display singular and plural countable units', (
+    tester,
+  ) async {
+    session.store.documents.addAll({
+      'users/alice/shopping_items/one-bottle': const ShoppingItem(
+        name: 'Milk',
+        quantity: 1,
+        unit: PantryUnit.bottles,
+      ).toMap(),
+      'users/alice/shopping_items/two-bottles': const ShoppingItem(
+        name: 'Juice',
+        quantity: 2,
+        unit: PantryUnit.bottles,
+      ).toMap(),
+      'users/alice/shopping_items/one-pc': const ShoppingItem(
+        name: 'Apple',
+        quantity: 1,
+      ).toMap(),
+      'users/alice/shopping_items/two-pcs': const ShoppingItem(
+        name: 'Eggs',
+        quantity: 2,
+      ).toMap(),
+    });
+    await openScreen(tester, seed: false);
+
+    expect(find.text('1 bottle'), findsOneWidget);
+    expect(find.text('2 bottles'), findsOneWidget);
+    expect(find.text('1 pc'), findsOneWidget);
+    expect(find.text('2 pcs'), findsOneWidget);
+  });
+
   testWidgets('long press and tap selection never change purchased state', (
     tester,
   ) async {
@@ -273,7 +401,7 @@ void main() {
     expect(visibleState(tester).map((item) => item.isPurchased), before);
     await tester.tap(find.byTooltip('Cancel selection'));
     await tester.pumpAndSettle();
-    expect(find.text('Shopping List'), findsOneWidget);
+    expect(find.text('My Shopping List'), findsOneWidget);
     expect(find.byType(Checkbox), findsNWidgets(3));
   });
 
@@ -287,7 +415,7 @@ void main() {
       expect(find.text('3 selected'), findsOneWidget);
       await tester.tap(find.text('Deselect visible'));
       await tester.pumpAndSettle();
-      expect(find.text('Shopping List'), findsOneWidget);
+      expect(find.text('My Shopping List'), findsOneWidget);
       await selectMilk(tester);
       await tester.tap(find.text('Select all visible'));
       await tester.pumpAndSettle();
@@ -315,7 +443,7 @@ void main() {
       await confirmDelete(tester);
       expect(find.text('Your shopping list is empty'), findsOneWidget);
       expect(find.byTooltip('Add shopping item'), findsOneWidget);
-      expect(find.text('Shopping List'), findsOneWidget);
+      expect(find.text('My Shopping List'), findsOneWidget);
       expect(find.text('3 items deleted.'), findsOneWidget);
       expect(session.store.committedBatches.single.length, 3);
       expect(

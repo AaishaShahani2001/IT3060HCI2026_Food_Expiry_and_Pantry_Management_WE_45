@@ -24,6 +24,7 @@ void main() {
     bool history = false,
     Size size = const Size(430, 1600),
     double scale = 1,
+    WastePantryDisplayNameLoader? pantryNameLoader,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -33,6 +34,9 @@ void main() {
       ProviderScope(
         overrides: [
           foodWasteRepositoryProvider.overrideWithValue(session.repository),
+          wastePantryDisplayNameLoaderProvider.overrideWithValue(
+            pantryNameLoader ?? (pantryId) async => 'Home',
+          ),
           wastePantryServiceProvider.overrideWithValue(session.pantry),
           wasteAuthUidProvider.overrideWith((ref) => session.auth()),
           wasteClockProvider.overrideWithValue(() => wasteTestNow),
@@ -111,6 +115,95 @@ void main() {
         sourceExpiryDate: DateTime(2026, 9, 15),
       );
 
+  testWidgets('personal Waste Tracker header makes privacy clear', (
+    tester,
+  ) async {
+    await open(tester);
+
+    expect(find.text('My Waste Tracker'), findsOneWidget);
+    expect(find.text('Only visible to you'), findsOneWidget);
+    expect(find.text('Shared household waste'), findsNothing);
+  });
+
+  testWidgets('shared Waste header uses the pantry name without overflow', (
+    tester,
+  ) async {
+    final scope = WasteScope.shared(actorUid: 'alice', pantryId: 'family-home');
+    session.changeScope(scope);
+    await open(
+      tester,
+      size: const Size(320, 780),
+      pantryNameLoader: (_) async =>
+          'A Very Long Home Pantry Name For Everyone',
+    );
+
+    expect(
+      find.text('A Very Long Home Pantry Name For Everyone Waste Tracker'),
+      findsOneWidget,
+    );
+    expect(find.text('Shared household waste'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shared history keeps both Waste History and scope clear', (
+    tester,
+  ) async {
+    session.changeScope(
+      WasteScope.shared(actorUid: 'alice', pantryId: 'family-home'),
+    );
+    await open(tester, history: true);
+
+    expect(find.text('Home Waste History'), findsOneWidget);
+    expect(find.text('Shared household waste'), findsOneWidget);
+  });
+
+  testWidgets('shared single delete warns all household members', (
+    tester,
+  ) async {
+    final scope = WasteScope.shared(actorUid: 'alice', pantryId: 'family-home');
+    session.changeScope(scope);
+    session.seedScope(scope, 'apples', draft());
+    await open(tester, history: true);
+
+    await menu(tester, 'Apples', 'Delete');
+    expect(
+      find.text(
+        'This will remove this record from the Home Waste Tracker for all household members.',
+      ),
+      findsOneWidget,
+    );
+    await tap(tester, find.text('Cancel'));
+  });
+
+  testWidgets('Waste records display singular, plural, and measurement units', (
+    tester,
+  ) async {
+    session.seed('alice', 'one-pc', draft(name: 'Apple', quantity: 1));
+    session.seed('alice', 'two-pcs', draft(name: 'Eggs', quantity: 2));
+    session.seed(
+      'alice',
+      'one-bottle',
+      draft(name: 'Milk', quantity: 1, unit: 'bottle'),
+    );
+    session.seed(
+      'alice',
+      'two-bottles',
+      draft(name: 'Juice', quantity: 2, unit: 'bottle'),
+    );
+    session.seed(
+      'alice',
+      'kilograms',
+      draft(name: 'Rice', quantity: 1, unit: 'kg'),
+    );
+    await open(tester, history: true);
+
+    expect(find.text('1 pc • Expired'), findsOneWidget);
+    expect(find.text('2 pcs • Expired'), findsOneWidget);
+    expect(find.text('1 bottle • Expired'), findsOneWidget);
+    expect(find.text('2 bottles • Expired'), findsOneWidget);
+    expect(find.text('1 kg • Expired'), findsOneWidget);
+  });
+
   testWidgets(
     'compact balanced grid shows recent heading and first record on phone',
     (tester) async {
@@ -169,7 +262,7 @@ void main() {
       );
       await open(tester);
       expect(find.text('2 unit types'), findsOneWidget);
-      expect(find.text('2 bottle • 1.5 kg'), findsOneWidget);
+      expect(find.text('2 bottles • 1.5 kg'), findsOneWidget);
       expect(find.text('Rs. 1,450.50'), findsOneWidget);
       expect(
         find.textContaining('Most common reason: Expired (2/2)'),
@@ -358,6 +451,10 @@ void main() {
       );
       await menu(tester, 'Rice', 'Delete');
       expect(find.text('Delete waste record?'), findsOneWidget);
+      expect(
+        find.text('Are you sure you want to delete this record?'),
+        findsOneWidget,
+      );
       await tap(tester, find.text('Cancel'));
       expect(session.store.commitCalls, 0);
       await menu(tester, 'Rice', 'Delete');
@@ -388,7 +485,7 @@ void main() {
     await tap(tester, find.text('This Month'));
     expect(find.text('Month item'), findsOneWidget);
     await tap(tester, find.text('See all >'));
-    expect(find.text('Waste History'), findsOneWidget);
+    expect(find.text('My Waste History'), findsOneWidget);
     expect(find.text('Today item'), findsOneWidget);
     expect(find.text('Month item'), findsOneWidget);
   });
@@ -531,7 +628,7 @@ void main() {
       expect(find.byTooltip('Actions for Expired milk'), findsOneWidget);
 
       await tap(tester, find.byTooltip('Cancel selection'));
-      expect(find.text('Waste History'), findsOneWidget);
+      expect(find.text('My Waste History'), findsOneWidget);
       expect(find.byIcon(Icons.check_circle), findsNothing);
       expect(session.store.documents, hasLength(3));
     },
@@ -599,7 +696,7 @@ void main() {
       await tap(tester, find.byTooltip('Delete selected waste records'));
       expect(
         find.textContaining(
-          'Shared household records will be removed for all members.',
+          'These records will be removed from the Home Waste Tracker for all household members.',
         ),
         findsOneWidget,
       );
@@ -639,7 +736,7 @@ void main() {
       expect(session.store.documents, hasLength(2));
       expect(find.text('Family B'), findsOneWidget);
       expect(find.text('Family A'), findsNothing);
-      expect(find.text('Waste History'), findsOneWidget);
+      expect(find.text('Home Waste History'), findsOneWidget);
     },
   );
 

@@ -32,6 +32,60 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
   bool get _selecting =>
       _selectionScope != null && _selectedRecordIds.isNotEmpty;
   WasteScope? get _scope => ref.read(wasteScopeProvider).asData?.value;
+
+  String? _pantryDisplayName(WasteScope scope) {
+    final pantryId = scope.pantryId;
+    if (!scope.isShared || pantryId == null) return null;
+    return ref.read(wastePantryDisplayNameProvider(pantryId)).asData?.value;
+  }
+
+  Widget _scopeTitle(
+    BuildContext context,
+    WasteScope? scope,
+    String? pantryName,
+  ) {
+    final shared = scope?.isShared == true;
+    final title = scope == null
+        ? (widget.history ? 'Waste History' : 'Waste Tracker')
+        : shared
+        ? pantryName == null
+              ? (widget.history
+                    ? 'Shared Waste History'
+                    : 'Shared Waste Tracker')
+              : widget.history
+              ? '$pantryName Waste History'
+              : '$pantryName Waste Tracker'
+        : widget.history
+        ? 'My Waste History'
+        : 'My Waste Tracker';
+    final subtitle = scope == null
+        ? null
+        : shared
+        ? 'Shared household waste'
+        : 'Only visible to you';
+    final titleWidget = Text(
+      title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+    if (subtitle == null) return titleWidget;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        titleWidget,
+        Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
   bool _current(WasteScope? scope, int session) =>
       mounted &&
       scope != null &&
@@ -140,6 +194,7 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
   Future<void> _delete(FoodWasteRecord record) async {
     if (_busy || _scope == null || record.id == null) return;
     final scope = _scope;
+    final pantryName = _pantryDisplayName(scope!);
     final session = _session;
     setState(() => _busy = true);
     try {
@@ -162,7 +217,13 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
               color: Theme.of(context).colorScheme.error,
             ),
             title: const Text('Delete waste record?'),
-            content: const Text('Are you sure you want to delete this record?'),
+            content: Text(
+              scope.isShared
+                  ? pantryName == null
+                        ? 'This will remove this record from the shared Waste Tracker for all household members.'
+                        : 'This will remove this record from the $pantryName Waste Tracker for all household members.'
+                  : 'Are you sure you want to delete this record?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => answer(false),
@@ -212,6 +273,7 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
       return;
     }
     final session = _session;
+    final pantryName = _pantryDisplayName(scope);
     setState(() => _busy = true);
     try {
       final count = ids.length;
@@ -233,7 +295,11 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
           content: Text(
             'Deleting ${count == 1 ? 'this record' : 'these records'} will not '
             'restore Pantry quantities.'
-            '${scope.isShared ? ' Shared household records will be removed for all members.' : ''}',
+            '${scope.isShared
+                ? pantryName == null
+                      ? ' Shared household records will be removed for all members.'
+                      : ' These records will be removed from the $pantryName Waste Tracker for all household members.'
+                : ''}',
           ),
           actions: [
             TextButton(
@@ -607,6 +673,13 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
     });
     final auth = ref.watch(wasteAuthUidProvider);
     final scope = ref.watch(wasteScopeProvider);
+    final activeScope = scope.asData?.value;
+    final pantryId = activeScope?.isShared == true
+        ? activeScope?.pantryId
+        : null;
+    final pantryName = pantryId == null
+        ? null
+        : ref.watch(wastePantryDisplayNameProvider(pantryId)).asData?.value;
     final records = ref.watch(foodWasteProvider);
     final Widget body;
     if (auth.isLoading) {
@@ -656,6 +729,7 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
     }
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: _selecting ? kToolbarHeight : 72,
         leading: _selecting
             ? IconButton(
                 tooltip: 'Cancel selection',
@@ -663,13 +737,9 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
                 icon: const Icon(Icons.close),
               )
             : null,
-        title: Text(
-          _selecting
-              ? '${_selectedRecordIds.length} selected'
-              : widget.history
-              ? 'Waste History'
-              : 'Waste Tracker',
-        ),
+        title: _selecting
+            ? Text('${_selectedRecordIds.length} selected')
+            : _scopeTitle(context, activeScope, pantryName),
         actions: [
           if (_selecting)
             IconButton(

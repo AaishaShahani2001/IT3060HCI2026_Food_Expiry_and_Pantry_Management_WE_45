@@ -66,7 +66,7 @@ class WasteRecordTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${wasteNumber(record.quantity)} ${record.unit} • ${record.reason}',
+                    '${wasteQuantityLabel(record.quantity, record.unit)} • ${record.reason}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   if (record.isAutomaticExpiry) ...[

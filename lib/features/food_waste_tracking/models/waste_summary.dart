@@ -106,9 +106,14 @@ class WasteSummary {
   String get quantityDetail {
     final totals = quantitiesByUnit;
     if (totals.isEmpty) return 'No quantities yet';
-    if (totals.length == 1) return totals.keys.single;
+    if (totals.length == 1) {
+      final entry = totals.entries.single;
+      return wasteUnitLabel(entry.value, entry.key);
+    }
     return [
-      ...totals.entries.take(3).map((e) => '${wasteNumber(e.value)} ${e.key}'),
+      ...totals.entries
+          .take(3)
+          .map((entry) => wasteQuantityLabel(entry.value, entry.key)),
       if (totals.length > 3) '+${totals.length - 3} more',
     ].join(' • ');
   }
@@ -164,6 +169,26 @@ class WasteSummary {
 String wasteNumber(double value) => value == value.truncateToDouble()
     ? value.toStringAsFixed(0)
     : value.toString();
+
+String wasteUnitLabel(double quantity, String unit) {
+  if (quantity == 1) {
+    return switch (unit) {
+      'pcs' => 'pc',
+      _ => unit,
+    };
+  }
+  return switch (unit) {
+    'bottle' => 'bottles',
+    'pack' => 'packs',
+    'slice' => 'slices',
+    'portion' => 'portions',
+    'box' => 'boxes',
+    _ => unit,
+  };
+}
+
+String wasteQuantityLabel(double quantity, String unit) =>
+    '${wasteNumber(quantity)} ${wasteUnitLabel(quantity, unit)}';
 String wasteMoney(double value) {
   final parts = value.toStringAsFixed(2).split('.');
   final whole = parts.first.replaceAllMapped(

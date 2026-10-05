@@ -244,4 +244,17 @@ void main() {
     expect(pantryCategoryForShoppingCategory('Dairy'), PantryCategory.dairy);
     expect(shoppingUnitLabel(PantryUnit.liters), 'L');
   });
+
+  test('shopping quantity labels pluralize only countable units', () {
+    expect(shoppingQuantityLabel(1, PantryUnit.items), '1 pc');
+    expect(shoppingQuantityLabel(2, PantryUnit.items), '2 pcs');
+    expect(shoppingQuantityLabel(1, PantryUnit.bottles), '1 bottle');
+    expect(shoppingQuantityLabel(2, PantryUnit.bottles), '2 bottles');
+    expect(shoppingQuantityLabel(1, PantryUnit.packs), '1 pack');
+    expect(shoppingQuantityLabel(2, PantryUnit.packs), '2 packs');
+    expect(shoppingQuantityLabel(1, PantryUnit.boxes), '1 box');
+    expect(shoppingQuantityLabel(2, PantryUnit.boxes), '2 boxes');
+    expect(shoppingQuantityLabel(1, PantryUnit.kg), '1 kg');
+    expect(shoppingQuantityLabel(2, PantryUnit.ml), '2 ml');
+  });
 }
