@@ -25,6 +25,17 @@ void main() {
       expect(loaded.copyWith(itemName: 'Rice').id, 'generated');
     },
   );
+  test('recordedByUid is optional and round-trips when present', () {
+    final historical = FoodWasteRecord.fromMap('old', draft().toMap());
+    expect(historical.recordedByUid, isNull);
+    expect(historical.toMap().containsKey('recordedByUid'), isFalse);
+
+    final current = draft().copyWith(recordedByUid: 'alice');
+    expect(
+      FoodWasteRecord.fromMap('new', current.toMap()).recordedByUid,
+      'alice',
+    );
+  });
   test(
     'validates required fields and finite positive quantity/nonnegative value',
     () {

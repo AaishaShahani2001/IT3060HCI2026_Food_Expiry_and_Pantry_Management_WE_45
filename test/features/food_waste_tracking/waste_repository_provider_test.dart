@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/food_waste_record.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/waste_scope.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/food_waste_provider.dart';
 import 'support/waste_test_session.dart';
 
@@ -130,6 +131,7 @@ void main() {
       final saved = await notifier().save(draft(name: ' Apples '));
       expect(saved.id, isNotEmpty);
       expect(saved.itemName, 'Apples');
+      expect(saved.recordedByUid, 'alice');
       expect(
         session.store.documents['users/alice/waste_records/${saved.id}'],
         saved.toMap(),
@@ -164,8 +166,33 @@ void main() {
       expect(records().single.reason, 'Not Used');
       expect(session.store.addCalls, 0);
       expect(session.store.updateCalls, 1);
+      expect(
+        session.store.documents['users/alice/waste_records/id']!.containsKey(
+          'recordedByUid',
+        ),
+        isFalse,
+      );
     },
   );
+  test('editing preserves the original recordedByUid', () async {
+    session.seed(
+      'alice',
+      'id',
+      draft().copyWith(recordedByUid: 'original-member'),
+    );
+    await load();
+    final saved = await notifier().save(
+      records().single.copyWith(
+        itemName: 'Rice',
+        recordedByUid: 'untrusted-editor',
+      ),
+    );
+    expect(saved.recordedByUid, 'original-member');
+    expect(
+      session.store.documents['users/alice/waste_records/id']!['recordedByUid'],
+      'original-member',
+    );
+  });
   test(
     'delete persists after reload and preserves other user and parent document',
     () async {
@@ -184,27 +211,32 @@ void main() {
     () async {
       await load();
       final initialReads = session.store.readCalls;
-      await expectLater(session.repository.load('bob'), throwsStateError);
+      final bob = WasteScope.personal(actorUid: 'bob');
+      final alice = WasteScope.personal(actorUid: 'alice');
       await expectLater(
-        session.repository.create('bob', draft()),
-        throwsStateError,
+        session.repository.load(bob),
+        throwsA(isA<WasteScopeChangedException>()),
       );
       await expectLater(
-        session.repository.update('bob', draft().copyWith(id: 'id')),
-        throwsStateError,
+        session.repository.create(bob, draft()),
+        throwsA(isA<WasteScopeChangedException>()),
       );
       await expectLater(
-        session.repository.delete('bob', 'id'),
-        throwsStateError,
+        session.repository.update(bob, draft().copyWith(id: 'id')),
+        throwsA(isA<WasteScopeChangedException>()),
+      );
+      await expectLater(
+        session.repository.delete(bob, 'id'),
+        throwsA(isA<WasteScopeChangedException>()),
       );
       for (final id in ['', '../id', '..', '.']) {
         await expectLater(
-          session.repository.delete('alice', id),
+          session.repository.delete(alice, id),
           throwsArgumentError,
         );
       }
       await expectLater(
-        session.repository.create('alice', draft(quantity: double.nan)),
+        session.repository.create(alice, draft(quantity: double.nan)),
         throwsArgumentError,
       );
       expect(
@@ -222,7 +254,7 @@ void main() {
     session.store.documents.remove('users/alice/waste_records/id');
     await expectLater(
       notifier().save(records().single.copyWith(itemName: 'Changed')),
-      throwsA(isA<FirebaseException>()),
+      throwsStateError,
     );
     expect(session.store.documents, isEmpty);
     expect(records().single.itemName, 'Apples');
@@ -282,7 +314,10 @@ void main() {
       session.changeUser(null);
       await Future<void>.delayed(Duration.zero);
       expect(await load(), isEmpty);
-      await expectLater(notifier().save(draft()), throwsStateError);
+      await expectLater(
+        notifier().save(draft()),
+        throwsA(isA<WasteScopeChangedException>()),
+      );
     },
   );
   test('old pending write cannot enter new account state', () async {
@@ -310,7 +345,10 @@ void main() {
     final gate = Completer<void>();
     session.store.readGate = gate.future;
     final pending = notifier().reload();
-    final expectation = expectLater(pending, throwsStateError);
+    final expectation = expectLater(
+      pending,
+      throwsA(isA<WasteScopeChangedException>()),
+    );
     session.store.readGate = null;
     session.seed('bob', 'b', draft(name: 'Bob'));
     session.changeUser('bob');

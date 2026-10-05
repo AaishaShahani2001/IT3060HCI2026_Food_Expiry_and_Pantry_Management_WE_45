@@ -6,6 +6,7 @@ import 'package:food_expiry_and_pantry_management/core/theme/app_theme.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/automatic_waste_candidate.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/food_waste_record.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/waste_summary.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/waste_scope.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/food_waste_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/pantry_waste_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/screens/waste_tracker_screen.dart';
@@ -141,8 +142,10 @@ void main() {
   });
 
   test('automatic candidates use current Pantry price semantics safely', () {
-    FoodWasteRecord automatic(PantryItem item) =>
-        PantryWasteSource('alice', item).automaticCandidate().record;
+    FoodWasteRecord automatic(PantryItem item) => PantryWasteSource(
+      WasteScope.personal(actorUid: 'alice'),
+      item,
+    ).automaticCandidate().record;
 
     expect(
       automatic(

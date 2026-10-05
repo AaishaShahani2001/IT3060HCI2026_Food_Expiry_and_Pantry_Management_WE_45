@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:food_expiry_and_pantry_management/core/theme/app_theme.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/food_waste_record.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/waste_scope.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/food_waste_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/pantry_waste_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/screens/waste_tracker_screen.dart';
@@ -212,6 +215,85 @@ void main() {
     },
   );
 
+  testWidgets(
+    'My Storage shows loading without an empty state then selects on first tap',
+    (tester) async {
+      final gate = Completer<void>();
+      session.pantry.watchGate = gate.future;
+      session.pantry.seed(
+        'alice',
+        stock(
+          id: 'test-apple',
+          name: 'Test Apple',
+          quantity: 2,
+          unit: PantryUnit.items,
+          noExpiry: true,
+        ),
+      );
+
+      await open(tester);
+      await openForm(tester);
+      await tester.tap(find.byKey(const ValueKey('waste-source-storage')));
+      await tester.pump();
+
+      expect(find.text('Loading stored items...'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(
+        find.text('No stored items with remaining quantity are available.'),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('waste-storage-item')), findsNothing);
+
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Loading stored items...'), findsNothing);
+      expect(find.byKey(const ValueKey('waste-storage-item')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('waste-storage-item')),
+        'Test Apple',
+      );
+      await tester.pumpAndSettle();
+      final search = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byKey(const ValueKey('waste-storage-item')),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(search.focusNode.hasFocus, isTrue);
+
+      await tester.tap(find.text('Test Apple').last);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('waste-storage-details')),
+        findsOneWidget,
+      );
+      expect(find.text('Available: 2 items'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('waste-quantity')))
+            .enabled,
+        isNot(false),
+      );
+      expect(
+        tester
+            .widget<DropdownButtonFormField<String>>(
+              find.byType(DropdownButtonFormField<String>),
+            )
+            .initialValue,
+        'pcs',
+      );
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('waste-value')))
+            .controller!
+            .text,
+        '0',
+      );
+    },
+  );
+
   testWidgets('storage quantity validates positive and current availability', (
     tester,
   ) async {
@@ -309,8 +391,10 @@ void main() {
   );
 
   test('storage pricing reuses unit and proportional Pantry semantics', () {
-    double value(PantryItem item, double quantity) =>
-        PantryWasteSource('alice', item).estimatedValueFor(quantity);
+    double value(PantryItem item, double quantity) => PantryWasteSource(
+      WasteScope.personal(actorUid: 'alice'),
+      item,
+    ).estimatedValueFor(quantity);
 
     expect(
       value(
@@ -518,6 +602,172 @@ void main() {
     expect(session.pantry.decrements, isEmpty);
     expect(find.text('Takeaway rice'), findsOneWidget);
   });
+
+  testWidgets(
+    'shared My Storage writes household records and supports partial and full depletion',
+    (tester) async {
+      final scope = WasteScope.shared(
+        actorUid: 'alice',
+        pantryId: 'family-one',
+      );
+      session.changeScope(scope);
+      session.pantry.seed(
+        'alice',
+        stock(name: 'Milk', quantity: 2, noExpiry: true),
+      );
+      session.pantry.seed(
+        'alice',
+        stock(id: 'juice', name: 'Juice', quantity: 2, noExpiry: true),
+      );
+      await open(tester);
+
+      await openForm(tester);
+      await selectStorage(tester, 'Milk');
+      await enterQuantity(tester, '1');
+      await saveStorage(tester);
+      await openForm(tester);
+      await selectStorage(tester, 'Juice');
+      await enterQuantity(tester, '2');
+      await saveStorage(tester);
+
+      expect(
+        session.store.documents.keys,
+        everyElement(startsWith('pantries/family-one/waste_records/')),
+      );
+      expect(
+        session.store.documents.values,
+        everyElement(containsPair('recordedByUid', 'alice')),
+      );
+      final items = session.pantry.items['pantry:family-one']!;
+      expect(items.singleWhere((item) => item.name == 'Milk').quantity, 1);
+      final depleted = items.singleWhere((item) => item.name == 'Juice');
+      expect(depleted.quantity, 0);
+      expect(depleted.firestoreId, 'juice');
+      expect(session.pantry.decrements, [
+        ('alice', 'milk', 1.0),
+        ('alice', 'juice', 2.0),
+      ]);
+      expect(session.pantry.markAsUsedUpCalls, 0);
+      expect(session.pantry.deletePantryItemCalls, 0);
+    },
+  );
+
+  testWidgets('shared external Waste saves without changing Pantry', (
+    tester,
+  ) async {
+    final scope = WasteScope.shared(actorUid: 'alice', pantryId: 'family-one');
+    session.changeScope(scope);
+    session.pantry.seed(
+      'alice',
+      stock(name: 'Milk', quantity: 2, noExpiry: true),
+    );
+    await open(tester);
+    await openForm(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('waste-name')),
+      'Restaurant meal',
+    );
+    await tester.enterText(find.byKey(const ValueKey('waste-quantity')), '1');
+    await tester.enterText(find.byKey(const ValueKey('waste-value')), '900');
+    await tap(tester, find.byKey(const ValueKey('save-waste')));
+
+    expect(session.store.documents, hasLength(1));
+    expect(
+      session.store.documents.keys.single,
+      startsWith('pantries/family-one/waste_records/'),
+    );
+    expect(session.store.documents.values.single['recordedByUid'], 'alice');
+    expect(session.pantry.decrements, isEmpty);
+    expect(session.pantry.items['pantry:family-one']!.single.quantity, 2);
+  });
+
+  testWidgets('shared decrement failure rolls back only captured scope', (
+    tester,
+  ) async {
+    final personal = WasteScope.personal(actorUid: 'alice');
+    final shared = WasteScope.shared(actorUid: 'alice', pantryId: 'family-one');
+    session.seedScope(personal, 'personal-record', draft(name: 'Personal'));
+    session.changeScope(shared);
+    session.pantry.seed(
+      'alice',
+      stock(name: 'Milk', quantity: 2, noExpiry: true),
+    );
+    session.pantry.decrementError = StateError('decrement failed');
+    await open(tester);
+    await openForm(tester);
+    await selectStorage(tester, 'Milk');
+    await enterQuantity(tester, '1');
+    await saveStorage(tester);
+
+    expect(
+      session.store.documents.keys,
+      contains('${personal.collectionPath}/personal-record'),
+    );
+    expect(
+      session.store.documents.keys.where(
+        (path) => path.startsWith('${shared.collectionPath}/'),
+      ),
+      isEmpty,
+    );
+    expect(session.pantry.items['pantry:family-one']!.single.quantity, 2);
+  });
+
+  testWidgets('scope change before save prevents every write', (tester) async {
+    final familyA = WasteScope.shared(actorUid: 'alice', pantryId: 'family-a');
+    session.changeScope(familyA);
+    session.pantry.seed(
+      'alice',
+      stock(name: 'Milk', quantity: 2, noExpiry: true),
+    );
+    await open(tester);
+    await openForm(tester);
+    await selectStorage(tester, 'Milk');
+    await enterQuantity(tester, '1');
+
+    session.changeScope(
+      WasteScope.shared(actorUid: 'alice', pantryId: 'family-b'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Your pantry context changed.'), findsOneWidget);
+    expect(session.store.addCalls, 0);
+    expect(session.pantry.decrements, isEmpty);
+  });
+
+  testWidgets(
+    'scope change after create rolls back captured household before decrement',
+    (tester) async {
+      final familyA = WasteScope.shared(
+        actorUid: 'alice',
+        pantryId: 'family-a',
+      );
+      session.changeScope(familyA);
+      session.pantry.seed(
+        'alice',
+        stock(name: 'Milk', quantity: 2, noExpiry: true),
+      );
+      session.store.afterAdd = (_) => session.changeScope(
+        WasteScope.shared(actorUid: 'alice', pantryId: 'family-b'),
+      );
+      await open(tester);
+      await openForm(tester);
+      await selectStorage(tester, 'Milk');
+      await enterQuantity(tester, '1');
+      await openStorageConfirmation(tester);
+      await confirmStorage(tester);
+
+      expect(
+        session.store.documents.keys.where(
+          (path) => path.startsWith('${familyA.collectionPath}/'),
+        ),
+        isEmpty,
+      );
+      expect(session.store.addCalls, 1);
+      expect(session.store.commitCalls, 1);
+      expect(session.pantry.decrements, isEmpty);
+      expect(session.pantry.items['pantry:family-a']!.single.quantity, 2);
+    },
+  );
 
   testWidgets('latest quantity change rolls back Waste without clamping', (
     tester,

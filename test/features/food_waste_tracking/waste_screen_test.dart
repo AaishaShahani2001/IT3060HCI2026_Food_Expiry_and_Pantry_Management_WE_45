@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:food_expiry_and_pantry_management/core/theme/app_theme.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/food_waste_record.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/waste_scope.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/food_waste_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/screens/waste_tracker_screen.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/widgets/waste_summary_card.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/widgets/waste_period_selector.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
 import 'support/waste_test_session.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/pantry_waste_provider.dart';
 
@@ -87,6 +90,26 @@ void main() {
     await tap(tester, find.byTooltip('Actions for $name'));
     await tap(tester, find.text(action).last);
   }
+
+  Future<void> longPressRecord(WidgetTester tester, String name) async {
+    final target = find.text(name);
+    await reveal(tester, target);
+    await tester.longPress(target);
+    await tester.pumpAndSettle();
+  }
+
+  FoodWasteRecord automaticRecord({String name = 'Expired milk'}) =>
+      FoodWasteRecord(
+        itemName: name,
+        quantity: 1,
+        unit: 'bottle',
+        reason: 'Expired',
+        estimatedValue: 300,
+        wastedAt: wasteTestNow,
+        source: automaticExpiryWasteSource,
+        sourcePantryItemId: 'expired-milk',
+        sourceExpiryDate: DateTime(2026, 9, 15),
+      );
 
   testWidgets(
     'compact balanced grid shows recent heading and first record on phone',
@@ -481,6 +504,171 @@ void main() {
       expect(session.store.documents.length, 2);
       expect(find.text('Bob meal'), findsOneWidget);
       expect(find.text('Apples'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'long press selects manual records while automatic records stay unselectable',
+    (tester) async {
+      session.seed('alice', 'apples', draft());
+      session.seed('alice', 'rice', draft(name: 'Rice'));
+      session.seed('alice', 'automatic', automaticRecord());
+      await open(tester, history: true);
+
+      await longPressRecord(tester, 'Apples');
+      expect(find.text('1 selected'), findsOneWidget);
+      expect(find.byIcon(Icons.check_circle), findsOneWidget);
+
+      await tap(tester, find.text('Rice'));
+      expect(find.text('2 selected'), findsOneWidget);
+      expect(find.byIcon(Icons.check_circle), findsNWidgets(2));
+
+      await tester.longPress(find.text('Expired milk'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Expired milk'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 selected'), findsOneWidget);
+      expect(find.byTooltip('Actions for Expired milk'), findsOneWidget);
+
+      await tap(tester, find.byTooltip('Cancel selection'));
+      expect(find.text('Waste History'), findsOneWidget);
+      expect(find.byIcon(Icons.check_circle), findsNothing);
+      expect(session.store.documents, hasLength(3));
+    },
+  );
+
+  testWidgets(
+    'multi-delete confirms, deletes only selected personal Waste and leaves Pantry unchanged',
+    (tester) async {
+      session.seed('alice', 'apples', draft());
+      session.seed('alice', 'rice', draft(name: 'Rice'));
+      session.seed('alice', 'keep', draft(name: 'Keep me'));
+      final pantryItem = PantryItem(
+        id: 'milk',
+        firestoreId: 'milk',
+        name: 'Milk',
+        category: PantryCategory.dairy,
+        location: PantryLocation.refrigerator,
+        quantity: 2,
+        unit: PantryUnit.bottles,
+      );
+      session.pantry.seed('alice', pantryItem);
+      await open(tester, history: true);
+
+      await longPressRecord(tester, 'Apples');
+      await tap(tester, find.text('Rice'));
+      await tap(tester, find.byTooltip('Delete selected waste records'));
+      expect(find.text('Delete 2 waste records?'), findsOneWidget);
+      expect(
+        find.textContaining('will not restore Pantry quantities'),
+        findsOneWidget,
+      );
+      await tap(tester, find.text('Cancel'));
+      expect(session.store.commitCalls, 0);
+      expect(session.store.documents, hasLength(3));
+
+      await tap(tester, find.byTooltip('Delete selected waste records'));
+      await tap(tester, find.widgetWithText(FilledButton, 'Delete'));
+
+      expect(session.store.documents.keys, ['users/alice/waste_records/keep']);
+      expect(session.store.batchDeletePaths.single.toSet(), {
+        'users/alice/waste_records/apples',
+        'users/alice/waste_records/rice',
+      });
+      expect(session.pantry.items['alice']!.single.quantity, 2);
+      expect(session.pantry.decrements, isEmpty);
+      expect(session.pantry.markAsUsedUpCalls, 0);
+      expect(session.pantry.deletePantryItemCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'shared multi-delete uses captured household path and warns all members',
+    (tester) async {
+      final scope = WasteScope.shared(
+        actorUid: 'alice',
+        pantryId: 'family-one',
+      );
+      session.changeScope(scope);
+      session.seedScope(scope, 'apples', draft());
+      session.seedScope(scope, 'rice', draft(name: 'Rice'));
+      await open(tester, history: true);
+
+      await longPressRecord(tester, 'Apples');
+      await tap(tester, find.text('Rice'));
+      await tap(tester, find.byTooltip('Delete selected waste records'));
+      expect(
+        find.textContaining(
+          'Shared household records will be removed for all members.',
+        ),
+        findsOneWidget,
+      );
+      await tap(tester, find.widgetWithText(FilledButton, 'Delete'));
+
+      expect(session.store.documents, isEmpty);
+      expect(session.store.batchDeletePaths.single.toSet(), {
+        'pantries/family-one/waste_records/apples',
+        'pantries/family-one/waste_records/rice',
+      });
+    },
+  );
+
+  testWidgets(
+    'scope change during multi-delete confirmation cannot delete either household',
+    (tester) async {
+      final familyA = WasteScope.shared(
+        actorUid: 'alice',
+        pantryId: 'family-a',
+      );
+      final familyB = WasteScope.shared(
+        actorUid: 'alice',
+        pantryId: 'family-b',
+      );
+      session.changeScope(familyA);
+      session.seedScope(familyA, 'a', draft(name: 'Family A'));
+      session.seedScope(familyB, 'b', draft(name: 'Family B'));
+      await open(tester, history: true);
+
+      await longPressRecord(tester, 'Family A');
+      await tap(tester, find.byTooltip('Delete selected waste records'));
+      session.changeScope(familyB);
+      await tester.pumpAndSettle();
+      await tap(tester, find.widgetWithText(FilledButton, 'Delete'));
+
+      expect(session.store.commitCalls, 0);
+      expect(session.store.documents, hasLength(2));
+      expect(find.text('Family B'), findsOneWidget);
+      expect(find.text('Family A'), findsNothing);
+      expect(find.text('Waste History'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'account change during pending batch never redirects multi-delete',
+    (tester) async {
+      session.seed('alice', 'a', draft(name: 'Alice record'));
+      session.seed('bob', 'b', draft(name: 'Bob record'));
+      await open(tester, history: true);
+
+      await longPressRecord(tester, 'Alice record');
+      await tap(tester, find.byTooltip('Delete selected waste records'));
+      final gate = Completer<void>();
+      session.store.deleteGate = gate.future;
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pump();
+      expect(session.store.commitCalls, 1);
+
+      session.changeUser('bob');
+      await tester.pump();
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      expect(session.store.documents.keys, ['users/bob/waste_records/b']);
+      expect(session.store.batchDeletePaths.single, [
+        'users/alice/waste_records/a',
+      ]);
+      expect(find.text('Bob record'), findsOneWidget);
+      expect(find.text('Alice record'), findsNothing);
     },
   );
 
