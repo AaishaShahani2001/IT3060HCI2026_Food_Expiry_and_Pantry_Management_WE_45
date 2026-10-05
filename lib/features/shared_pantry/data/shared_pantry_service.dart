@@ -227,6 +227,7 @@ class SharedPantryService {
       'name': user.displayName ?? '',
       'email': user.email ?? '',
       'role': 'member',
+      'inviteCode': code,
       'joinedAt': FieldValue.serverTimestamp(),
     });
 
