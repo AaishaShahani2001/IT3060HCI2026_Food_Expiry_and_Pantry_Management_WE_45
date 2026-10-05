@@ -168,7 +168,7 @@ void main() {
         wasteTestNow,
       );
       expect(single.quantityValue, '5');
-      expect(single.quantityDetail, 'bottle');
+      expect(single.quantityDetail, 'bottles');
       final mixed = WasteSummary(
         [
           draft(quantity: 2, unit: 'bottle'),
@@ -181,7 +181,24 @@ void main() {
         wasteTestNow,
       );
       expect(mixed.quantityValue, '5 unit types');
-      expect(mixed.quantityDetail, '2 bottle • 2 g • 1.5 kg • +2 more');
+      expect(mixed.quantityDetail, '2 bottles • 2 g • 1.5 kg • +2 more');
+    },
+  );
+  test(
+    'quantity labels pluralize countable units without changing measures',
+    () {
+      expect(wasteQuantityLabel(1, 'pcs'), '1 pc');
+      expect(wasteQuantityLabel(2, 'pcs'), '2 pcs');
+      expect(wasteQuantityLabel(1, 'bottle'), '1 bottle');
+      expect(wasteQuantityLabel(2, 'bottle'), '2 bottles');
+      expect(wasteQuantityLabel(1, 'pack'), '1 pack');
+      expect(wasteQuantityLabel(2, 'pack'), '2 packs');
+      expect(wasteQuantityLabel(1, 'box'), '1 box');
+      expect(wasteQuantityLabel(2, 'box'), '2 boxes');
+      for (final unit in ['kg', 'g', 'L', 'ml']) {
+        expect(wasteQuantityLabel(1, unit), '1 $unit');
+        expect(wasteQuantityLabel(2, unit), '2 $unit');
+      }
     },
   );
   test('money uses grouped whole values or cents rounded to two places', () {

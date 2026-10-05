@@ -46,12 +46,13 @@ class ShoppingItemTile extends StatelessWidget {
             constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           ),
           Semantics(
-            label: 'Quantity: ${item.quantity} ${shoppingUnitLabel(item.unit)}',
+            label:
+                'Quantity: ${shoppingQuantityLabel(item.quantity, item.unit)}',
             excludeSemantics: true,
             child: ConstrainedBox(
               constraints: const BoxConstraints(minWidth: 30),
               child: Text(
-                '${item.quantity} ${shoppingUnitLabel(item.unit)}',
+                shoppingQuantityLabel(item.quantity, item.unit),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   fontWeight: FontWeight.w600,
