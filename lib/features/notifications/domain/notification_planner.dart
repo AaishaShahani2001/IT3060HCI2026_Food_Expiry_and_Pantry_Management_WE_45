@@ -202,7 +202,14 @@ void _addExpiry({
   required String title,
   required String message,
 }) {
-  final key = '${type.name}_${itemId}_${_dayStamp(expiry)}';
+  final timeStamp = expiry.hour == 0 &&
+          expiry.minute == 0 &&
+          expiry.second == 0 &&
+          expiry.millisecond == 0 &&
+          expiry.microsecond == 0
+      ? ''
+      : '_${expiry.hour.toString().padLeft(2, '0')}${expiry.minute.toString().padLeft(2, '0')}';
+  final key = '${type.name}_${itemId}_${_dayStamp(expiry)}$timeStamp';
   if (!reserved.add(key)) return;
   create.add(
     PlannedNotification(

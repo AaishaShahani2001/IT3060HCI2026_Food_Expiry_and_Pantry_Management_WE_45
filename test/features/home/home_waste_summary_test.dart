@@ -14,11 +14,6 @@ import 'package:food_expiry_and_pantry_management/features/pantry/presentation/p
 import 'package:food_expiry_and_pantry_management/features/expiry/presentation/providers/expiry_provider.dart';
 import '../food_waste_tracking/support/waste_test_session.dart';
 
-class _TestUserName extends CurrentUserNameNotifier {
-  @override
-  Future<String> build() async => 'Test user';
-}
-
 void main() {
   late WasteTestSession session;
   late GoRouter router;
@@ -63,7 +58,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          currentUserNameProvider.overrideWith(_TestUserName.new),
+          currentUserNameProvider.overrideWithValue(
+            const AsyncData('Test user'),
+          ),
           pantrySummaryProvider.overrideWithValue((total: 2, lowStock: 0)),
           expirySummaryProvider.overrideWithValue((
             total: 2,
