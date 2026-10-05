@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/food_waste_record.dart';
+import '../../models/waste_scope.dart';
 import '../../models/waste_summary.dart';
 import '../providers/food_waste_provider.dart';
 import '../providers/pantry_waste_provider.dart';
@@ -26,13 +27,39 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
   bool _reconcileScheduled = false;
   bool _reconcileAgain = false;
   int _session = 0;
-  String? get _uid => ref.read(wasteAuthUidProvider).asData?.value;
-  bool _current(String? uid, int session) =>
+  final Set<String> _selectedRecordIds = {};
+  WasteScope? _selectionScope;
+  bool get _selecting =>
+      _selectionScope != null && _selectedRecordIds.isNotEmpty;
+  WasteScope? get _scope => ref.read(wasteScopeProvider).asData?.value;
+  bool _current(WasteScope? scope, int session) =>
       mounted &&
-      uid != null &&
-      _uid == uid &&
+      scope != null &&
+      _scope == scope &&
       _session == session &&
-      ref.read(foodWasteRepositoryProvider).isCurrentUser(uid);
+      ref.read(foodWasteRepositoryProvider).isCurrentScope(scope);
+
+  void _toggleSelection(FoodWasteRecord record) {
+    final id = record.id;
+    final scope = _scope;
+    if (_busy || record.isAutomaticExpiry || id == null || scope == null) {
+      return;
+    }
+    if (_selectionScope != null && _selectionScope != scope) return;
+    setState(() {
+      _selectionScope ??= scope;
+      if (!_selectedRecordIds.add(id)) _selectedRecordIds.remove(id);
+      if (_selectedRecordIds.isEmpty) _selectionScope = null;
+    });
+  }
+
+  void _cancelSelection() {
+    if (!_selecting) return;
+    setState(() {
+      _selectedRecordIds.clear();
+      _selectionScope = null;
+    });
+  }
 
   @override
   void initState() {
@@ -61,11 +88,11 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
       if (!mounted || _reconciling) return;
       final records = ref.read(foodWasteProvider).asData?.value;
       final sources = ref.read(expiredWastePantryProvider).asData?.value;
-      final uid = _uid;
-      if (records == null || sources == null || uid == null) return;
+      final scope = _scope;
+      if (records == null || sources == null || scope == null) return;
       final existingIds = {for (final record in records) record.id};
       final candidates = sources
-          .where((source) => source.uid == uid)
+          .where((source) => source.scope == scope)
           .map((source) => source.automaticCandidate())
           .where((candidate) => !existingIds.contains(candidate.eventId))
           .toList();
@@ -93,7 +120,7 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
     FoodWasteRecord? record,
     PantryWasteSource? pantrySource,
   ]) async {
-    if (_busy || _uid == null) return;
+    if (_busy || _scope == null) return;
     setState(() => _busy = true);
     final session = _session;
     try {
@@ -111,8 +138,8 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
   }
 
   Future<void> _delete(FoodWasteRecord record) async {
-    if (_busy || _uid == null || record.id == null) return;
-    final uid = _uid;
+    if (_busy || _scope == null || record.id == null) return;
+    final scope = _scope;
     final session = _session;
     setState(() => _busy = true);
     try {
@@ -155,11 +182,92 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
           );
         },
       );
-      if (confirmed == true && _current(uid, session)) {
-        await ref.read(foodWasteProvider.notifier).delete(record.id!);
+      if (confirmed == true && _current(scope, session)) {
+        await ref
+            .read(foodWasteProvider.notifier)
+            .delete(record.id!, expectedScope: scope);
       }
     } catch (error) {
-      if (mounted && _current(uid, session)) {
+      if (mounted && _current(scope, session)) {
+        showWasteError(context, error, action: 'delete');
+      }
+    } finally {
+      if (mounted && session == _session) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _deleteSelected() async {
+    final scope = _selectionScope;
+    final ids = Set<String>.of(_selectedRecordIds);
+    if (_busy || scope == null || ids.isEmpty) return;
+    final records = ref.read(foodWasteProvider).asData?.value;
+    if (!_current(scope, _session) ||
+        records == null ||
+        ids.any(
+          (id) => !records.any(
+            (record) => record.id == id && !record.isAutomaticExpiry,
+          ),
+        )) {
+      _cancelSelection();
+      return;
+    }
+    final session = _session;
+    setState(() => _busy = true);
+    try {
+      final count = ids.length;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          icon: Icon(
+            Icons.delete_outline,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          title: Text(
+            count == 1
+                ? 'Delete 1 waste record?'
+                : 'Delete $count waste records?',
+          ),
+          content: Text(
+            'Deleting ${count == 1 ? 'this record' : 'these records'} will not '
+            'restore Pantry quantities.'
+            '${scope.isShared ? ' Shared household records will be removed for all members.' : ''}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true &&
+          _current(scope, session) &&
+          _selectionScope == scope &&
+          _selectedRecordIds.length == ids.length &&
+          _selectedRecordIds.containsAll(ids)) {
+        await ref
+            .read(foodWasteProvider.notifier)
+            .deleteMany(ids, expectedScope: scope);
+        if (mounted && _current(scope, session)) {
+          setState(() {
+            _selectedRecordIds.clear();
+            _selectionScope = null;
+          });
+        }
+      }
+    } catch (error) {
+      if (mounted && _current(scope, session)) {
         showWasteError(context, error, action: 'delete');
       }
     } finally {
@@ -168,8 +276,8 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
   }
 
   Future<void> _markNotWasted(FoodWasteRecord record) async {
-    if (_busy || _uid == null || record.id == null) return;
-    final uid = _uid;
+    if (_busy || _scope == null || record.id == null) return;
+    final scope = _scope;
     final session = _session;
     setState(() => _busy = true);
     try {
@@ -197,14 +305,16 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
           ],
         ),
       );
-      if (confirmed == true && _current(uid, session)) {
-        await ref.read(foodWasteProvider.notifier).markNotWasted(record);
-        if (mounted && _current(uid, session)) {
+      if (confirmed == true && _current(scope, session)) {
+        await ref
+            .read(foodWasteProvider.notifier)
+            .markNotWasted(record, expectedScope: scope);
+        if (mounted && _current(scope, session)) {
           showWasteMessage(context, '${record.itemName} marked as not wasted.');
         }
       }
     } catch (error) {
-      if (mounted && _current(uid, session)) {
+      if (mounted && _current(scope, session)) {
         showWasteError(context, error, action: 'update');
       }
     } finally {
@@ -213,18 +323,18 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
   }
 
   Future<void> _refresh() async {
-    if (_busy || _uid == null) return;
-    final uid = _uid;
+    if (_busy || _scope == null) return;
+    final scope = _scope;
     final session = _session;
     final hadData = ref.read(foodWasteProvider).asData != null;
     setState(() => _busy = true);
     try {
       await ref.read(foodWasteProvider.notifier).reload();
-      if (_current(uid, session)) {
-        ref.invalidate(wastePantryItemsProvider(uid!));
+      if (_current(scope, session)) {
+        ref.invalidate(wastePantryItemsProvider(scope!));
       }
     } catch (error) {
-      if (mounted && _current(uid, session)) {
+      if (mounted && _current(scope, session)) {
         debugPrint('Waste Tracker refresh error: $error');
         showWasteMessage(
           context,
@@ -299,13 +409,13 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
       ref.read(wasteClockProvider)(),
     );
     final visible = widget.history ? newestWasteFirst(records) : summary.recent;
-    final uid = _uid;
+    final scope = _scope;
     final session = _session;
     return RefreshIndicator(
       color: Theme.of(context).colorScheme.primary,
       onRefresh: _refresh,
       child: ListView(
-        key: ValueKey(('waste-scroll', uid)),
+        key: ValueKey(('waste-scroll', scope?.identity)),
         padding: const EdgeInsets.all(16),
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
@@ -449,20 +559,34 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
                 key: ValueKey(record.id),
                 record: record,
                 now: ref.read(wasteClockProvider)(),
+                selected:
+                    !record.isAutomaticExpiry &&
+                    record.id != null &&
+                    _selectedRecordIds.contains(record.id),
+                onTap: _selecting && !record.isAutomaticExpiry
+                    ? () {
+                        if (_current(scope, session)) _toggleSelection(record);
+                      }
+                    : null,
+                onLongPress: _busy || record.isAutomaticExpiry
+                    ? null
+                    : () {
+                        if (_current(scope, session)) _toggleSelection(record);
+                      },
                 onEdit: _busy || record.isAutomaticExpiry
                     ? null
                     : () {
-                        if (_current(uid, session)) _record(record);
+                        if (_current(scope, session)) _record(record);
                       },
                 onDelete: _busy || record.isAutomaticExpiry
                     ? null
                     : () {
-                        if (_current(uid, session)) _delete(record);
+                        if (_current(scope, session)) _delete(record);
                       },
                 onNotWasted: _busy || !record.isAutomaticExpiry
                     ? null
                     : () {
-                        if (_current(uid, session)) _markNotWasted(record);
+                        if (_current(scope, session)) _markNotWasted(record);
                       },
               ),
             ),
@@ -473,24 +597,40 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(wasteAuthUidProvider, (previous, next) {
+    ref.listen(wasteScopeProvider, (previous, next) {
       if (previous?.asData?.value != next.asData?.value) {
         _session++;
         _busy = false;
+        _selectedRecordIds.clear();
+        _selectionScope = null;
       }
     });
     final auth = ref.watch(wasteAuthUidProvider);
+    final scope = ref.watch(wasteScopeProvider);
     final records = ref.watch(foodWasteProvider);
     final Widget body;
     if (auth.isLoading) {
       body = const Center(child: CircularProgressIndicator());
     } else if (auth.hasError || auth.asData?.value == null) {
       body = const Center(child: Text('Sign in to view your waste records.'));
+    } else if (scope.isLoading ||
+        (!scope.hasError && scope.asData?.value == null)) {
+      body = const Center(child: CircularProgressIndicator());
+    } else if (scope.hasError || scope.asData?.value == null) {
+      body = const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Waste Tracker could not verify the active pantry. Please try again.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
     } else {
       body = records.when(
-        // A retry should not hide the existing error/retry affordance.
-        skipLoadingOnRefresh: true,
-        skipLoadingOnReload: records.retrying && records.hasError,
+        // Scope transitions must not render records from the previous scope.
+        skipLoadingOnRefresh: false,
+        skipLoadingOnReload: false,
         data: _list,
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
@@ -516,7 +656,28 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
     }
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.history ? 'Waste History' : 'Waste Tracker'),
+        leading: _selecting
+            ? IconButton(
+                tooltip: 'Cancel selection',
+                onPressed: _busy ? null : _cancelSelection,
+                icon: const Icon(Icons.close),
+              )
+            : null,
+        title: Text(
+          _selecting
+              ? '${_selectedRecordIds.length} selected'
+              : widget.history
+              ? 'Waste History'
+              : 'Waste Tracker',
+        ),
+        actions: [
+          if (_selecting)
+            IconButton(
+              tooltip: 'Delete selected waste records',
+              onPressed: _busy ? null : _deleteSelected,
+              icon: const Icon(Icons.delete_outline),
+            ),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(

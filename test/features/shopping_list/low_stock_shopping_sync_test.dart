@@ -521,6 +521,8 @@ void main() {
       );
       await tester.pumpWidget(app());
       await tester.pumpAndSettle();
+      await tester.runAsync(settle);
+      await tester.pumpAndSettle();
       expect(find.text('Home'), findsOneWidget);
       expect(
         find.text('Milk added to Shopping List — stock is low.'),

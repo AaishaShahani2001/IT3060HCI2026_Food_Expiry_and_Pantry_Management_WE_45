@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/router/app_router.dart';
 import '../../../firebase_options.dart';
 
@@ -75,7 +76,16 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
-    context.go(AppRoutes.onboarding);
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      // Existing logged-in user.
+      context.go(AppRoutes.home);
+    } else {
+      // User is not logged in.
+      // Show onboarding before login.
+      context.go(AppRoutes.onboarding);
+    }
   }
 
   @override

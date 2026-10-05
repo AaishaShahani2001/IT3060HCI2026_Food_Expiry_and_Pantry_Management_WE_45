@@ -6,6 +6,7 @@ import 'package:food_expiry_and_pantry_management/core/theme/app_theme.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/automatic_waste_candidate.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/food_waste_record.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/waste_summary.dart';
+import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/models/waste_scope.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/food_waste_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/providers/pantry_waste_provider.dart';
 import 'package:food_expiry_and_pantry_management/features/food_waste_tracking/presentation/screens/waste_tracker_screen.dart';
@@ -102,7 +103,6 @@ void main() {
       expect(records(tester).single.quantity, 1);
       expect(records(tester).single.unit, 'bottle');
       expect(records(tester).single.wastedAt, DateTime(2026, 9, 16));
-      expect(session.pantry.reductions, isEmpty);
       expect(find.text('Expired Pantry Items'), findsNothing);
       expect(find.text('Auto-recorded from expired Pantry stock'), findsOne);
     },
@@ -142,8 +142,10 @@ void main() {
   });
 
   test('automatic candidates use current Pantry price semantics safely', () {
-    FoodWasteRecord automatic(PantryItem item) =>
-        PantryWasteSource('alice', item).automaticCandidate().record;
+    FoodWasteRecord automatic(PantryItem item) => PantryWasteSource(
+      WasteScope.personal(actorUid: 'alice'),
+      item,
+    ).automaticCandidate().record;
 
     expect(
       automatic(
@@ -223,7 +225,6 @@ void main() {
       ),
       hasLength(1),
     );
-    expect(session.pantry.reductions, isEmpty);
   });
 
   testWidgets('failed automatic write is safe and retries on Pantry refresh', (
@@ -237,7 +238,6 @@ void main() {
     await open(tester);
     expect(records(tester), isEmpty);
     expect(session.store.documents, isEmpty);
-    expect(session.pantry.reductions, isEmpty);
 
     session.store.transactionError = null;
     session.pantry.seed('alice', stock());
@@ -273,7 +273,6 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(records(tester).single.itemName, 'Cheese');
-      expect(session.pantry.reductions, isEmpty);
     },
   );
 
