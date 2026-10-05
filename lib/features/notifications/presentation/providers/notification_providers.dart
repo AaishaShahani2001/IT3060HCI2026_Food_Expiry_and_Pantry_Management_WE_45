@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../expiry/presentation/providers/expiry_provider.dart';
@@ -116,37 +117,44 @@ class NotificationCenter extends Notifier<AsyncValue<List<AppNotification>>> {
 
     var opened = false;
     _subscription = repository
-        .watchActive(uid)
+        .watchAll(uid)
         .listen(
           (items) {
-            void apply() {
+            _applyWhenSafe(opened: opened, () {
               if (ticket != _ticket || !ref.mounted) return;
               _server = items;
               _reconcile();
-            }
-
-            if (!opened) {
-              Future<void>.microtask(apply);
-            } else {
-              apply();
-            }
+            });
           },
           onError: (Object error, StackTrace stack) {
-            void apply() {
+            _applyWhenSafe(opened: opened, () {
               if (ticket != _ticket || !ref.mounted) return;
               _snapshot = AsyncError(error, stack);
               state = _snapshot;
-            }
-
-            if (!opened) {
-              Future<void>.microtask(apply);
-            } else {
-              apply();
-            }
+            });
           },
         );
     opened = true;
     return _snapshot;
+  }
+
+  /// Applies a snapshot without notifying listeners in the middle of a build.
+  ///
+  /// The first event from a new listener can arrive while [build] is running.
+  /// A microtask can still run before the frame finishes, so a build-phase
+  /// update waits until the frame is done.
+  void _applyWhenSafe(void Function() apply, {required bool opened}) {
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    final duringBuild =
+        phase == SchedulerPhase.persistentCallbacks ||
+        phase == SchedulerPhase.midFrameMicrotasks;
+    if (duringBuild) {
+      SchedulerBinding.instance.addPostFrameCallback((_) => apply());
+    } else if (!opened) {
+      Future<void>.microtask(apply);
+    } else {
+      apply();
+    }
   }
 
   void retry() {

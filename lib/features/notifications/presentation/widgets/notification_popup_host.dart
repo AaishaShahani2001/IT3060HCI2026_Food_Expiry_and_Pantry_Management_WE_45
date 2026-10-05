@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/providers/theme_mode_provider.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
+import '../../../expiry/domain/expiry_reminder_time.dart';
 import '../../../expiry/domain/repositories/expiry_repository.dart';
 import '../../../expiry/domain/services/expiry_notification_provider.dart';
 import '../../../expiry/presentation/providers/expiry_provider.dart';
@@ -138,12 +140,11 @@ class _NotificationPopupHostState extends ConsumerState<NotificationPopupHost>
     ExpiryNotificationSettingsState settings,
   ) {
     final reminderDays = alert?.reminderDays ?? settings.daysBefore;
-    return DateTime(
-      expiry.year,
-      expiry.month,
-      expiry.day - reminderDays,
-      expiry.hour,
-      expiry.minute,
+    return expiryReminderAt(
+      expiry: expiry,
+      reminderDays: reminderDays,
+      hour: settings.notificationTime.hour,
+      minute: settings.notificationTime.minute,
     );
   }
 
@@ -151,6 +152,8 @@ class _NotificationPopupHostState extends ConsumerState<NotificationPopupHost>
     final settings = ref.read(expiryNotificationSettingsProvider);
     final now = ref.read(notificationClockProvider)();
     DateTime? next;
+    AppNotification? nextNotification;
+    DateTime? nextExpiry;
     if (!ref.read(expiryAlertsProvider).hasValue) {
       _reminderTimer?.cancel();
       _reminderTimer = null;
@@ -177,6 +180,8 @@ class _NotificationPopupHostState extends ConsumerState<NotificationPopupHost>
         if (now.isBefore(reminderAt) &&
             (next == null || reminderAt.isBefore(next))) {
           next = reminderAt;
+          nextNotification = notification;
+          nextExpiry = expiry;
         }
       }
     }
@@ -184,10 +189,58 @@ class _NotificationPopupHostState extends ConsumerState<NotificationPopupHost>
     _reminderTimer?.cancel();
     _scheduledReminderAt = next;
     if (next == null) return;
+    _logScheduledReminder(
+      notification: nextNotification!,
+      expiry: nextExpiry!,
+      scheduledAt: next,
+      settings: settings,
+      now: now,
+    );
     _reminderTimer = Timer(next.difference(now), () {
       _scheduledReminderAt = null;
       _refresh();
     });
+  }
+
+  void _logScheduledReminder({
+    required AppNotification notification,
+    required DateTime expiry,
+    required DateTime scheduledAt,
+    required ExpiryNotificationSettingsState settings,
+    required DateTime now,
+  }) {
+    if (!kDebugMode) return;
+    final hour = settings.notificationTime.hour.toString().padLeft(2, '0');
+    final minute = settings.notificationTime.minute.toString().padLeft(2, '0');
+    final zone = now.timeZoneName;
+    final offset = now.timeZoneOffset;
+    debugPrint(
+      'Expiry notification scheduling\n'
+      'Item: ${notification.pantryItemId ?? notification.alertKey}\n'
+      'Expiry: ${_logStamp(expiry)}\n'
+      'Alert date: ${_logDate(scheduledAt)}\n'
+      'Preferred time: $hour:$minute\n'
+      'Preference source: SharedPreferences expiry_notif_hour/expiry_notif_minute '
+      'via expiryNotificationSettingsProvider\n'
+      'Timezone: $zone (offset $offset)\n'
+      'Final schedule: ${_logStamp(scheduledAt)}\n'
+      'Current time: ${_logStamp(now)}\n'
+      'Notification ID: ${notification.alertKey}\n'
+      'Scheduler: NotificationPopupHost',
+    );
+  }
+
+  String _logDate(DateTime value) {
+    final local = value.toLocal();
+    String two(int part) => part.toString().padLeft(2, '0');
+    return '${local.year.toString().padLeft(4, '0')}-'
+        '${two(local.month)}-${two(local.day)}';
+  }
+
+  String _logStamp(DateTime value) {
+    final local = value.toLocal();
+    String two(int part) => part.toString().padLeft(2, '0');
+    return '${_logDate(local)} ${two(local.hour)}:${two(local.minute)}';
   }
 
   void _receive(List<AppNotification> notifications) {

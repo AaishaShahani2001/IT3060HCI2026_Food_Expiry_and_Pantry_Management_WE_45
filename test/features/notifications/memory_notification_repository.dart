@@ -8,8 +8,7 @@ import 'package:food_expiry_and_pantry_management/features/notifications/domain/
 class MemoryNotificationRepository implements NotificationRepository {
   final Map<String, Map<String, AppNotification>> docs = {};
   final Map<String, StockMemory> memory = {};
-  final Map<String, List<StreamController<List<AppNotification>>>> _listeners =
-      {};
+  final Map<String, List<_NotificationWatch>> _listeners = {};
 
   int failWrites = 0;
   bool failWatch = false;
@@ -34,23 +33,34 @@ class MemoryNotificationRepository implements NotificationRepository {
 
   @override
   Stream<List<AppNotification>> watchActive(String userId, {int limit = 50}) {
+    return _watch(userId, limit);
+  }
+
+  @override
+  Stream<List<AppNotification>> watchAll(String userId) {
+    return _watch(userId, null);
+  }
+
+  Stream<List<AppNotification>> _watch(String userId, int? limit) {
     if (failWatch) return Stream.error(watchError);
     late StreamController<List<AppNotification>> controller;
+    late _NotificationWatch watch;
     controller = StreamController<List<AppNotification>>(
       onListen: () {
         if (pauseWatch) return;
         scheduleMicrotask(() {
           if (!controller.isClosed) {
-            controller.add(activeOf(userId).take(limit).toList());
+            controller.add(_slice(activeOf(userId), limit));
           }
         });
       },
       onCancel: () {
-        _listeners[userId]?.remove(controller);
+        _listeners[userId]?.remove(watch);
         if (!controller.isClosed) controller.close();
       },
     );
-    _listeners.putIfAbsent(userId, () => []).add(controller);
+    watch = _NotificationWatch(controller, limit);
+    _listeners.putIfAbsent(userId, () => []).add(watch);
     return controller.stream;
   }
 
@@ -157,8 +167,22 @@ class MemoryNotificationRepository implements NotificationRepository {
 
   void _emit(String userId) {
     final items = activeOf(userId);
-    for (final controller in [...?_listeners[userId]]) {
-      if (!controller.isClosed) controller.add(items.take(50).toList());
+    for (final watch in [...?_listeners[userId]]) {
+      if (!watch.controller.isClosed) {
+        watch.controller.add(_slice(items, watch.limit));
+      }
     }
   }
+}
+
+class _NotificationWatch {
+  _NotificationWatch(this.controller, this.limit);
+
+  final StreamController<List<AppNotification>> controller;
+  final int? limit;
+}
+
+List<AppNotification> _slice(List<AppNotification> items, int? limit) {
+  if (limit == null || items.length <= limit) return items;
+  return items.take(limit).toList();
 }
