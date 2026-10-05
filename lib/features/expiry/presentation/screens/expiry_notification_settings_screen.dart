@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/notifications/browser_notification_service.dart';
 import '../../domain/services/expiry_notification_provider.dart';
 import '../providers/expiry_notification_settings_provider.dart';
 
@@ -24,6 +26,8 @@ class _ExpiryNotificationSettingsScreenState
   late int _daysBefore;
   late TimeOfDay _notificationTime;
   late String _frequency;
+  late BrowserNotificationPermission _browserPermission;
+  bool _browserBusy = false;
 
   @override
   void initState() {
@@ -36,6 +40,50 @@ class _ExpiryNotificationSettingsScreenState
     _daysBefore = settings.daysBefore;
     _notificationTime = settings.notificationTime;
     _frequency = settings.frequency;
+    _browserPermission = ref
+        .read(browserNotificationServiceProvider)
+        .permission;
+  }
+
+  Future<void> _enableBrowserPopups() async {
+    if (_browserBusy) return;
+    final browser = ref.read(browserNotificationServiceProvider);
+    // Start the permission prompt directly from the click, before persistence.
+    final permissionRequest = browser.requestPermission();
+    setState(() => _browserBusy = true);
+    try {
+      final permission = await permissionRequest;
+      if (!mounted) return;
+      setState(() => _browserPermission = permission);
+      if (permission == BrowserNotificationPermission.granted) {
+        final shown = await browser.show(
+          title: 'Expiry pop-ups enabled',
+          body: 'You will receive pop-ups for pantry items nearing expiry.',
+          tag: 'expiry-notification-test',
+        );
+        if (!shown && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'The browser could not show the test notification.',
+              ),
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not enable browser pop-ups. Check site notification permissions.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _browserBusy = false);
+    }
   }
 
   Future<void> _selectTime() async {
@@ -124,6 +172,59 @@ class _ExpiryNotificationSettingsScreenState
                   });
                 },
               ),
+
+              if (kIsWeb ||
+                  _browserPermission !=
+                      BrowserNotificationPermission.unavailable) ...[
+                const SizedBox(height: 16),
+                Material(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(18),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Browser pop-up notifications',
+                          style: theme.textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(switch (_browserPermission) {
+                          BrowserNotificationPermission.granted =>
+                            'Browser pop-ups are allowed. Send a test to check them.',
+                          BrowserNotificationPermission.denied =>
+                            'Notifications are blocked. Allow notifications in the browser site settings, then try again.',
+                          BrowserNotificationPermission.unavailable =>
+                            'Browser pop-ups require a supported browser using HTTPS or localhost. Alerts still appear inside the app.',
+                          BrowserNotificationPermission.notRequested =>
+                            'Allow browser notifications to see expiry pop-ups outside the app. Alerts also appear inside the app.',
+                        }, style: theme.textTheme.bodyMedium),
+                        if (_browserPermission !=
+                            BrowserNotificationPermission.unavailable) ...[
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: _browserBusy || !_notificationsEnabled
+                                ? null
+                                : _enableBrowserPopups,
+                            icon: const Icon(
+                              Icons.notifications_active_outlined,
+                            ),
+                            label: Text(
+                              _browserBusy
+                                  ? 'Please wait...'
+                                  : _browserPermission ==
+                                        BrowserNotificationPermission.granted
+                                  ? 'Send test pop-up'
+                                  : 'Enable browser pop-ups',
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 26),
 

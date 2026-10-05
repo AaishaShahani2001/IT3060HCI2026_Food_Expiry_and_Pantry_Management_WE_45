@@ -30,6 +30,7 @@ class AppNotification {
     required this.createdAt,
     this.pantryItemId,
     this.pantryItemName,
+    this.expiryDate,
     this.readAt,
     this.deletedAt,
   });
@@ -41,6 +42,7 @@ class AppNotification {
   final String message;
   final String? pantryItemId;
   final String? pantryItemName;
+  final DateTime? expiryDate;
 
   /// Stable id for one alert event. Also used as the Firestore document id.
   final String alertKey;
@@ -66,6 +68,7 @@ class AppNotification {
       message: message,
       pantryItemId: pantryItemId,
       pantryItemName: pantryItemName,
+      expiryDate: expiryDate,
       alertKey: alertKey,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt,
@@ -85,6 +88,9 @@ class AppNotification {
     if (message is! String) return null;
 
     final alertKey = data['alertKey'];
+    final stableKey = alertKey is String && alertKey.isNotEmpty ? alertKey : id;
+    // Older expiry documents encode the date in their stable event key.
+    final dateMatch = RegExp(r'_(\d{4}-\d{2}-\d{2})$').firstMatch(stableKey);
     return AppNotification(
       id: id,
       userId: userId,
@@ -93,7 +99,12 @@ class AppNotification {
       message: message,
       pantryItemId: _optionalString(data['pantryItemId']),
       pantryItemName: _optionalString(data['pantryItemName']),
-      alertKey: alertKey is String && alertKey.isNotEmpty ? alertKey : id,
+      alertKey: stableKey,
+      expiryDate:
+          parseNotificationDate(data['expiryDate']) ??
+          (type == AppNotificationType.lowStock || dateMatch == null
+              ? null
+              : DateTime.tryParse(dateMatch.group(1)!)),
       isRead: data['isRead'] == true,
       createdAt:
           parseNotificationDate(data['createdAt']) ??

@@ -71,7 +71,6 @@ class HomeHeader extends ConsumerWidget {
           icon: Icon(Icons.search, color: colorScheme.onSurface),
           tooltip: AppStrings.searchTooltip,
         ),
-        const NotificationSyncHost(),
         const NotificationBell(),
       ],
     );
