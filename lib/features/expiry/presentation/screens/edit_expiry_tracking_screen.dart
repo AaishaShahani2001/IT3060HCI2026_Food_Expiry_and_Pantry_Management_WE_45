@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
+import '../../domain/expiry_alert_id.dart';
 import '../../domain/repositories/expiry_repository.dart';
 import '../../domain/services/expiry_notification_provider.dart';
 import '../providers/expiry_provider.dart';
@@ -59,7 +60,10 @@ class _EditExpiryTrackingScreenState
     final userId = user?.uid ?? '';
 
     final updatedAlert = widget.alert.copyWith(
-      userId: widget.alert.userId.isEmpty ? userId : widget.alert.userId,
+      id: userId.isEmpty
+          ? widget.alert.id
+          : buildExpiryAlertId(userId, widget.alert.itemId),
+      userId: userId.isEmpty ? widget.alert.userId : userId,
       expiryDate: _expiryDate,
       daysUntilExpiry: _expiryDate.difference(DateTime.now()).inDays,
       reminderDays: _reminderDays,

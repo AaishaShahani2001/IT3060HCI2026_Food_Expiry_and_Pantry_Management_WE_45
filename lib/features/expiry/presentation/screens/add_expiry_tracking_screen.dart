@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
+import '../../domain/expiry_alert_id.dart';
 import '../../domain/repositories/expiry_repository.dart';
 import '../../domain/services/expiry_notification_provider.dart';
 import '../providers/expiry_provider.dart';
@@ -69,7 +70,7 @@ class _AddExpiryTrackingScreenState
     // 2. Save the expiry alert in repository
     if (userId.isNotEmpty) {
       final alert = ExpiryAlert(
-        id: item.id,
+        id: buildExpiryAlertId(userId, item.id),
         userId: userId,
         itemId: item.id,
         itemName: item.name,

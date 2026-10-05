@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,7 @@ import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../pantry/domain/models/pantry_item.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
+import '../../domain/expiry_alert_id.dart';
 import '../../domain/repositories/expiry_repository.dart';
 import '../../domain/services/expiry_service.dart';
 import '../providers/expiry_provider.dart';
@@ -391,7 +393,6 @@ Widget _expiryItemCard(
   PantryItem item,
 ) {
   final days = expiryService.daysUntilExpiry(item);
-  final alert = _alertFor(item, expiryService);
   final message = days == null
       ? 'No expiry date'
       : expiryService.expiryMessage(item);
@@ -402,7 +403,10 @@ Widget _expiryItemCard(
     message: message,
     urgency: expiryCardUrgency(days),
     onUpdate: () {
-      context.push(AppRoutes.editExpiryTracking, extra: alert);
+      context.push(
+        AppRoutes.editExpiryTracking,
+        extra: _alertFor(item, expiryService),
+      );
     },
     onStopTracking: () async {
       final confirm = await showStopTrackingDialog(
@@ -415,7 +419,9 @@ Widget _expiryItemCard(
         await ref
             .read(pantryItemsProvider.notifier)
             .updateItem(item.copyWith(clearExpiryDate: true));
-        await ref.read(deleteExpiryAlertProvider)(alert.id);
+        await ref.read(deleteExpiryAlertProvider)(
+          _alertFor(item, expiryService).id,
+        );
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Stopped tracking expiry for ${item.name}.')),
@@ -446,9 +452,10 @@ String _emptyMessage(ExpiryStatusFilter filter, int trackedCount) {
 
 ExpiryAlert _alertFor(PantryItem item, ExpiryService service) {
   final expiryDate = item.expiryDate ?? DateTime.now();
+  final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
   return ExpiryAlert(
-    id: item.id,
-    userId: '',
+    id: userId.isEmpty ? item.id : buildExpiryAlertId(userId, item.id),
+    userId: userId,
     itemId: item.id,
     itemName: item.name,
     expiryDate: expiryDate,
