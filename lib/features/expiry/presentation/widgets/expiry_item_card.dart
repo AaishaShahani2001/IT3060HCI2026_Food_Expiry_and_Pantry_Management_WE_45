@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../pantry/domain/models/pantry_item.dart';
+import '../../../pantry/domain/pantry_scope.dart';
 import '../../../pantry/domain/utils/expiry_status.dart';
 import '../../../pantry/presentation/widgets/pantry_item_image.dart';
+import '../../../pantry/presentation/widgets/pantry_scope_badge.dart';
 import '../../domain/services/expiry_service.dart';
 
 /// How strongly an expiry card should be emphasised.
@@ -33,6 +35,7 @@ class ExpiryItemCard extends StatelessWidget {
     required this.urgency,
     required this.onUpdate,
     required this.onStopTracking,
+    this.scope,
   });
 
   final PantryItem item;
@@ -40,6 +43,9 @@ class ExpiryItemCard extends StatelessWidget {
   final ExpiryCardUrgency urgency;
   final VoidCallback onUpdate;
   final VoidCallback onStopTracking;
+
+  /// Pantry this item belongs to. Omitted when the active pantry is unknown.
+  final PantryScope? scope;
 
   static const BorderRadius _radius = BorderRadius.all(Radius.circular(16));
   static const double _wideLayoutWidth = 700;
@@ -109,14 +115,25 @@ class ExpiryItemCard extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                item.name,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.2,
-                                ),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      item.name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            height: 1.2,
+                                          ),
+                                    ),
+                                  ),
+                                  if (scope != null) ...[
+                                    const SizedBox(width: 6),
+                                    PantryScopeBadge(scope: scope!),
+                                  ],
+                                ],
                               ),
                               const SizedBox(height: 2),
                               Text(
@@ -224,7 +241,8 @@ class ExpiryItemCard extends StatelessWidget {
       ExpiryCardUrgency.fresh => ', fresh',
       ExpiryCardUrgency.unknown => '',
     };
-    return '${item.name}, ${item.quantityLabel}, $location, ${message.toLowerCase()}$urgencyWord';
+    final pantry = scope == null ? '' : ', ${scope!.headerKind} pantry';
+    return '${item.name}$pantry, ${item.quantityLabel}, $location, ${message.toLowerCase()}$urgencyWord';
   }
 }
 

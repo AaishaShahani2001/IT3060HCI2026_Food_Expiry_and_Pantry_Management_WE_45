@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../pantry/domain/pantry_scope.dart';
+
 /// Pantry and expiry events shown in the Home notification panel.
 ///
 /// Firestore stores the enum name (`expiringSoon`), never a display label,
@@ -31,6 +33,8 @@ class AppNotification {
     this.pantryItemId,
     this.pantryItemName,
     this.expiryDate,
+    this.pantryScope,
+    this.pantryName,
     this.readAt,
     this.deletedAt,
   });
@@ -44,6 +48,13 @@ class AppNotification {
   final String? pantryItemName;
   final DateTime? expiryDate;
 
+  /// `personal` or `shared` for notifications created with a known pantry.
+  /// Null on older documents, which keep their original wording.
+  final String? pantryScope;
+
+  /// Household name captured when a shared notification was created.
+  final String? pantryName;
+
   /// Stable id for one alert event. Also used as the Firestore document id.
   final String alertKey;
   final bool isRead;
@@ -52,6 +63,15 @@ class AppNotification {
   final DateTime? deletedAt;
 
   bool get isActive => deletedAt == null;
+
+  /// Title plus pantry context when this notification recorded one.
+  ///
+  /// Older notifications have no [pantryScope] and keep [title] unchanged.
+  String get displayTitle {
+    final scope = PantryScope.tryParse(pantryScope, pantryName);
+    if (scope == null) return title;
+    return scope.notificationTitle(title);
+  }
 
   AppNotification copyWith({
     bool? isRead,
@@ -69,6 +89,8 @@ class AppNotification {
       pantryItemId: pantryItemId,
       pantryItemName: pantryItemName,
       expiryDate: expiryDate,
+      pantryScope: pantryScope,
+      pantryName: pantryName,
       alertKey: alertKey,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt,
@@ -107,6 +129,8 @@ class AppNotification {
       message: message,
       pantryItemId: _optionalString(data['pantryItemId']),
       pantryItemName: _optionalString(data['pantryItemName']),
+      pantryScope: _storedPantryScope(data['pantryScope']),
+      pantryName: _optionalString(data['pantryName']),
       alertKey: stableKey,
       expiryDate:
           parseNotificationDate(data['expiryDate']) ??
@@ -121,6 +145,14 @@ class AppNotification {
       deletedAt: parseNotificationDate(data['deletedAt']),
     );
   }
+}
+
+String? _storedPantryScope(Object? value) {
+  final scope = _optionalString(value)?.toLowerCase();
+  if (scope == 'personal' || scope == 'shared' || scope == 'family') {
+    return scope == 'family' ? 'shared' : scope;
+  }
+  return null;
 }
 
 String? _optionalString(Object? value) {

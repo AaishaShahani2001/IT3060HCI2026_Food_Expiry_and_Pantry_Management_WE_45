@@ -7,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../pantry/domain/models/pantry_item.dart';
+import '../../../pantry/presentation/providers/active_pantry_scope_provider.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
 import '../../domain/expiry_alert_id.dart';
 import '../../domain/repositories/expiry_repository.dart';
@@ -402,6 +403,7 @@ Widget _expiryItemCard(
     item: item,
     message: message,
     urgency: expiryCardUrgency(days),
+    scope: ref.watch(activePantryScopeProvider).asData?.value,
     onUpdate: () {
       context.push(
         AppRoutes.editExpiryTracking,
