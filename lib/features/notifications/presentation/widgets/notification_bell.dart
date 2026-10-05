@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../pantry/domain/models/pantry_item.dart';
+import '../../../pantry/domain/pantry_scope.dart';
+import '../../../pantry/presentation/providers/active_pantry_scope_provider.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
 import '../../../expiry/presentation/providers/expiry_notification_settings_provider.dart';
 import '../providers/notification_providers.dart';
@@ -43,7 +45,8 @@ class _NotificationSyncHostState extends ConsumerState<NotificationSyncHost>
     final uid = ref.read(notificationUserIdProvider).asData?.value;
     if (uid == null) return;
     final items = ref.read(pantryItemsProvider).asData?.value;
-    if (items != null) _queue(uid, items);
+    final scope = ref.read(activePantryScopeProvider).asData?.value;
+    if (items != null && scope != null) _queue(uid, items, scope);
   }
 
   @override
@@ -58,10 +61,12 @@ class _NotificationSyncHostState extends ConsumerState<NotificationSyncHost>
     super.dispose();
   }
 
-  String _signature(String uid, List<PantryItem> items) {
+  String _signature(String uid, List<PantryItem> items, PantryScope scope) {
     final now = ref.read(notificationClockProvider)();
     final days = ref.read(expiryNotificationSettingsProvider).daysBefore;
-    return '${now.year}-${now.month}-${now.day}|$days\n${_pantrySignature(uid, items)}';
+    return '${scope.kind}|${scope.householdName ?? ''}|'
+        '${now.year}-${now.month}-${now.day}|$days\n'
+        '${_pantrySignature(uid, items)}';
   }
 
   @override
@@ -73,21 +78,25 @@ class _NotificationSyncHostState extends ConsumerState<NotificationSyncHost>
     }
 
     ref.listen(expiryNotificationSettingsProvider, (_, next) => _refresh());
+    ref.listen(activePantryScopeProvider, (_, _) => _refresh());
 
     ref.listen<AsyncValue<List<PantryItem>>>(pantryItemsProvider, (
       previous,
       next,
     ) {
       final items = next.asData?.value;
-      if (items == null) return;
-      _queue(uid, items);
+      final scope = ref.read(activePantryScopeProvider).asData?.value;
+      if (items == null || scope == null) return;
+      _queue(uid, items, scope);
     });
 
     final current = ref.watch(pantryItemsProvider).asData?.value;
-    if (current != null) {
-      final signature = _signature(uid, current);
+    final scope = ref.watch(activePantryScopeProvider).asData?.value;
+    if (current != null && scope != null) {
+      final signature = _signature(uid, current, scope);
       if (_scheduledFor != signature) {
         final snapshot = current;
+        final snapshotScope = scope;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted ||
               _scheduledFor == signature ||
@@ -95,15 +104,15 @@ class _NotificationSyncHostState extends ConsumerState<NotificationSyncHost>
             return;
           }
           _scheduledFor = signature;
-          unawaited(_synchronize(ref, uid, snapshot));
+          unawaited(_synchronize(ref, uid, snapshot, snapshotScope));
         });
       }
     }
     return const SizedBox.shrink();
   }
 
-  void _queue(String userId, List<PantryItem> items) {
-    final signature = _signature(userId, items);
+  void _queue(String userId, List<PantryItem> items, PantryScope scope) {
+    final signature = _signature(userId, items, scope);
     if (_scheduledFor == signature) return;
     _scheduledFor = signature;
     Future<void>.microtask(() {
@@ -111,7 +120,7 @@ class _NotificationSyncHostState extends ConsumerState<NotificationSyncHost>
           ref.read(notificationUserIdProvider).asData?.value != userId) {
         return;
       }
-      unawaited(_synchronize(ref, userId, items));
+      unawaited(_synchronize(ref, userId, items, scope));
     });
   }
 }
@@ -128,11 +137,12 @@ Future<void> _synchronize(
   WidgetRef ref,
   String userId,
   List<PantryItem> items,
+  PantryScope scope,
 ) async {
   try {
     await ref
         .read(notificationSyncProvider)
-        .synchronize(userId: userId, items: items);
+        .synchronize(userId: userId, items: items, pantryScope: scope);
   } catch (error, stack) {
     log(
       'Could not refresh pantry notifications',

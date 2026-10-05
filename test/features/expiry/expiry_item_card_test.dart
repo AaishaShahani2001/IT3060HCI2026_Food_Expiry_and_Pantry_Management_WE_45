@@ -99,7 +99,7 @@ void main() {
     expect(find.byIcon(Icons.more_vert), findsOneWidget);
     expect(
       find.bySemanticsLabel(
-        'Milk, 2 bottles, refrigerator, expires today, urgent',
+        'Milk, Personal pantry, 2 bottles, refrigerator, expires today, urgent',
       ),
       findsOneWidget,
     );

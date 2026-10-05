@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
+import '../../domain/pantry_scope.dart';
+import '../providers/active_pantry_scope_provider.dart';
 import '../providers/pantry_providers.dart';
 import '../utils/pantry_item_actions.dart';
 import '../widgets/expiry_status_indicator.dart';
@@ -72,6 +74,7 @@ class _PantryItemsScreenState extends ConsumerState<PantryItemsScreen> {
     final filters = ref.watch(pantryFilterProvider);
     final locationCounts = ref.watch(pantryLocationCountsProvider);
     final viewMode = ref.watch(pantryViewModeProvider);
+    final scope = ref.watch(activePantryScopeProvider).asData?.value;
 
     ref.listen<String>(
       pantryFilterProvider.select((state) => state.searchQuery),
@@ -152,6 +155,8 @@ class _PantryItemsScreenState extends ConsumerState<PantryItemsScreen> {
               ),
               // Count label removed. Only the view toggle remains, on the right.
               const SliverToBoxAdapter(child: _AllItemsToolbar()),
+              if (scope != null)
+                SliverToBoxAdapter(child: _PantryScopeLine(scope: scope)),
               ..._listSlivers(itemsAsync, filteredItems, viewMode),
             ],
           ),
@@ -211,6 +216,29 @@ class _PantryItemsScreenState extends ConsumerState<PantryItemsScreen> {
 
         return [PantryItemsSliver(items: filteredItems, viewMode: viewMode)];
       },
+    );
+  }
+}
+
+class _PantryScopeLine extends StatelessWidget {
+  const _PantryScopeLine({required this.scope});
+
+  final PantryScope scope;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      child: Text(
+        scope.headerLabel,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }

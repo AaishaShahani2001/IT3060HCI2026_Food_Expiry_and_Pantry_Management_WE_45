@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
+import '../providers/active_pantry_scope_provider.dart';
 import '../providers/pantry_providers.dart';
 import '../utils/pantry_item_actions.dart';
 import '../widgets/expiry_status_indicator.dart';
@@ -198,6 +199,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
 
   Widget _buildHeader(BuildContext context, PantryFilterState filters) {
     final colorScheme = Theme.of(context).colorScheme;
+    final scope = ref.watch(activePantryScopeProvider).asData?.value;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
       child: Row(
@@ -208,7 +210,9 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'My Pantry',
+                  scope?.headerLabel ?? 'My Pantry',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,

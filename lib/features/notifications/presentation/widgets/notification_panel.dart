@@ -278,7 +278,7 @@ class NotificationTile extends ConsumerWidget {
     return Semantics(
       button: !notification.isRead,
       label:
-          '${notification.title}. ${notification.message}. $age. ${notification.isRead ? 'Read' : 'Unread'}',
+          '${notification.displayTitle}. ${notification.message}. $age. ${notification.isRead ? 'Read' : 'Unread'}',
       child: Material(
         color: background,
         child: InkWell(
@@ -306,7 +306,7 @@ class NotificationTile extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        notification.title,
+                        notification.displayTitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: textTheme.titleSmall?.copyWith(

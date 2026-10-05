@@ -5,6 +5,7 @@ import 'package:food_expiry_and_pantry_management/features/notifications/domain/
 import 'package:food_expiry_and_pantry_management/features/notifications/domain/notification_sync.dart';
 import 'package:food_expiry_and_pantry_management/features/notifications/domain/notification_time.dart';
 import 'package:food_expiry_and_pantry_management/features/pantry/domain/models/pantry_item.dart';
+import 'package:food_expiry_and_pantry_management/features/pantry/domain/pantry_scope.dart';
 
 import 'memory_notification_repository.dart';
 
@@ -415,4 +416,107 @@ void main() {
       );
     },
   );
+
+  test('personal and shared scopes prefix new alerts without changing the calculation', () {
+    final milk = item(
+      id: 'milk',
+      name: 'Milk',
+      expiry: DateTime(2026, 10, 3),
+      quantity: 1,
+    );
+    final personal = plan(
+      [milk],
+    );
+    // The helper above does not pass a scope, so existing wording stays.
+    final plain = personal.create.firstWhere(
+      (alert) => alert.type == AppNotificationType.expiringSoon,
+    );
+    expect(plain.title, 'Milk expires tomorrow');
+    expect(
+      plain.toNotification(userId: 'alice', createdAt: now).displayTitle,
+      'Milk expires tomorrow',
+    );
+
+    final sharedPlan = planPantryNotifications(
+      items: [milk],
+      existingKeys: const {},
+      memory: const StockMemory(),
+      now: now,
+      expiryService: service,
+      pantryScope: const PantryScope.shared('Smith Home'),
+    );
+    final sharedExpiry = sharedPlan.create.firstWhere(
+      (alert) => alert.type == AppNotificationType.expiringSoon,
+    );
+    final sharedLow = sharedPlan.create.firstWhere(
+      (alert) => alert.type == AppNotificationType.lowStock,
+    );
+    expect(sharedExpiry.title, 'Milk expires tomorrow');
+    expect(sharedExpiry.pantryScope, 'shared');
+    expect(sharedExpiry.pantryName, 'Smith Home');
+    expect(
+      sharedExpiry.toNotification(userId: 'alice', createdAt: now).displayTitle,
+      'Smith Home • Milk expires tomorrow',
+    );
+    expect(
+      sharedLow.toNotification(userId: 'alice', createdAt: now).displayTitle,
+      'Smith Home • Milk is running low',
+    );
+
+    final personalPlan = planPantryNotifications(
+      items: [milk],
+      existingKeys: const {},
+      memory: const StockMemory(),
+      now: now,
+      expiryService: service,
+      pantryScope: const PantryScope.personal(),
+    );
+    final personalExpiry = personalPlan.create.firstWhere(
+      (alert) => alert.type == AppNotificationType.expiringSoon,
+    );
+    expect(
+      personalExpiry
+          .toNotification(userId: 'alice', createdAt: now)
+          .displayTitle,
+      'My Pantry • Milk expires tomorrow',
+    );
+    expect(
+      personalPlan.create
+          .firstWhere((alert) => alert.type == AppNotificationType.lowStock)
+          .toNotification(userId: 'alice', createdAt: now)
+          .displayTitle,
+      'My Pantry • Milk is running low',
+    );
+  });
+
+  test('a missing or unknown pantry scope keeps the stored wording', () {
+    final legacy = AppNotification.tryParse('old', {
+      'userId': 'alice',
+      'type': 'lowStock',
+      'title': 'Milk is running low',
+      'message': 'Only 1 bottle remains.',
+    });
+    expect(legacy?.pantryScope, isNull);
+    expect(legacy?.displayTitle, 'Milk is running low');
+
+    final unknown = AppNotification.tryParse('odd', {
+      'userId': 'alice',
+      'type': 'expiringSoon',
+      'title': 'Milk expires tomorrow',
+      'message': 'Use it soon.',
+      'pantryScope': 'office',
+    });
+    expect(unknown?.pantryScope, isNull);
+    expect(unknown?.displayTitle, 'Milk expires tomorrow');
+
+    final stored = AppNotification.tryParse('new', {
+      'userId': 'alice',
+      'type': 'expired',
+      'title': 'Milk has expired',
+      'message': 'Review the item and record it appropriately.',
+      'pantryScope': 'shared',
+      'pantryName': 'Family Home',
+    });
+    expect(stored?.displayTitle, 'Family Home • Milk has expired');
+  });
 }

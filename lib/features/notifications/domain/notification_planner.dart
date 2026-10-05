@@ -1,5 +1,6 @@
 import '../../expiry/domain/services/expiry_service.dart';
 import '../../pantry/domain/models/pantry_item.dart';
+import '../../pantry/domain/pantry_scope.dart';
 import '../../pantry/domain/utils/expiry_status.dart';
 import 'models/app_notification.dart';
 
@@ -39,6 +40,8 @@ class PlannedNotification {
     required this.pantryItemId,
     required this.pantryItemName,
     this.expiryDate,
+    this.pantryScope,
+    this.pantryName,
   });
 
   final String alertKey;
@@ -48,6 +51,8 @@ class PlannedNotification {
   final String pantryItemId;
   final String pantryItemName;
   final DateTime? expiryDate;
+  final String? pantryScope;
+  final String? pantryName;
 
   AppNotification toNotification({
     required String userId,
@@ -62,6 +67,8 @@ class PlannedNotification {
       pantryItemId: pantryItemId,
       pantryItemName: pantryItemName,
       expiryDate: expiryDate,
+      pantryScope: pantryScope,
+      pantryName: pantryName,
       alertKey: alertKey,
       isRead: false,
       createdAt: createdAt,
@@ -109,6 +116,7 @@ NotificationPlan planPantryNotifications({
   required DateTime now,
   required ExpiryService expiryService,
   int expiringSoonDays = kExpiryExpiringSoonDays,
+  PantryScope? pantryScope,
 }) {
   final create = <PlannedNotification>[];
   final reserved = <String>{...existingKeys};
@@ -139,6 +147,7 @@ NotificationPlan planPantryNotifications({
           message: days <= 1
               ? 'Use it soon to avoid food waste.'
               : 'Plan to use it soon.',
+          pantryScope: pantryScope,
         );
       } else if (status == ExpiryStatus.expired) {
         final overdue = expiryService.daysOverdue(item, referenceDate: now);
@@ -153,6 +162,7 @@ NotificationPlan planPantryNotifications({
           message: overdue == 1
               ? 'Check whether it should be recorded as waste.'
               : 'Review the item and record it appropriately.',
+          pantryScope: pantryScope,
         );
       }
     }
@@ -179,6 +189,8 @@ NotificationPlan planPantryNotifications({
         message: 'Only ${item.quantityLabel} remains.',
         pantryItemId: itemId,
         pantryItemName: name,
+        pantryScope: pantryScope?.kind,
+        pantryName: pantryScope?.householdName,
       ),
     );
   }
@@ -201,6 +213,7 @@ void _addExpiry({
   required DateTime expiry,
   required String title,
   required String message,
+  PantryScope? pantryScope,
 }) {
   final timeStamp = expiry.hour == 0 &&
           expiry.minute == 0 &&
@@ -220,6 +233,8 @@ void _addExpiry({
       pantryItemId: itemId,
       pantryItemName: name,
       expiryDate: expiry,
+      pantryScope: pantryScope?.kind,
+      pantryName: pantryScope?.householdName,
     ),
   );
 }

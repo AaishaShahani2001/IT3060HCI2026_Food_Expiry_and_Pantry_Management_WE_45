@@ -302,11 +302,11 @@ class _NotificationPopupHostState extends ConsumerState<NotificationPopupHost>
       _dismissTimer?.cancel();
       _dismissTimer = Timer(const Duration(seconds: 8), _dismiss);
       final title = alerts.length == 1
-          ? alerts.single.title
+          ? alerts.single.displayTitle
           : '${alerts.length} pantry expiry alerts';
       final body = alerts.length == 1
           ? alerts.single.message
-          : alerts.map((alert) => alert.title).join('\n');
+          : alerts.map((alert) => alert.displayTitle).join('\n');
       unawaited(
         ref
             .read(expiryNotificationServiceProvider)
@@ -407,7 +407,7 @@ class _NotificationPopupHostState extends ConsumerState<NotificationPopupHost>
                                     children: [
                                       Text(
                                         visible.length == 1
-                                            ? visible.single.title
+                                            ? visible.single.displayTitle
                                             : '${visible.length} pantry expiry alerts',
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
@@ -420,7 +420,7 @@ class _NotificationPopupHostState extends ConsumerState<NotificationPopupHost>
                                         visible.length == 1
                                             ? visible.single.message
                                             : visible
-                                                  .map((alert) => alert.title)
+                                                  .map((alert) => alert.displayTitle)
                                                   .join('\n'),
                                         maxLines: 3,
                                         overflow: TextOverflow.ellipsis,

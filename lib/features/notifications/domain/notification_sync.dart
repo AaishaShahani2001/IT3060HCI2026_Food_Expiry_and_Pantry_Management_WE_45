@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import '../../expiry/domain/services/expiry_service.dart';
 import '../../pantry/domain/models/pantry_item.dart';
+import '../../pantry/domain/pantry_scope.dart';
 import 'notification_planner.dart';
 import 'notification_repository.dart';
 
@@ -31,13 +32,16 @@ class NotificationSynchronizer {
   bool _again = false;
   String? _queuedUser;
   List<PantryItem>? _queuedItems;
+  PantryScope? _queuedScope;
 
   Future<void> synchronize({
     required String userId,
     required List<PantryItem> items,
+    PantryScope? pantryScope,
   }) async {
     _queuedUser = userId;
     _queuedItems = List<PantryItem>.unmodifiable(items);
+    _queuedScope = pantryScope;
     if (_running) {
       _again = true;
       return;
@@ -48,15 +52,20 @@ class NotificationSynchronizer {
         _again = false;
         final user = _queuedUser;
         final snapshot = _queuedItems;
+        final scope = _queuedScope;
         if (user == null || snapshot == null) return;
-        await _syncOnce(user, snapshot);
+        await _syncOnce(user, snapshot, scope);
       } while (_again);
     } finally {
       _running = false;
     }
   }
 
-  Future<void> _syncOnce(String userId, List<PantryItem> items) async {
+  Future<void> _syncOnce(
+    String userId,
+    List<PantryItem> items,
+    PantryScope? pantryScope,
+  ) async {
     if (_userId != userId) {
       _userId = userId;
       _signature = null;
@@ -66,8 +75,11 @@ class NotificationSynchronizer {
 
     final now = (clock ?? DateTime.now)();
     final daysBefore = expiringSoonDays?.call() ?? 3;
+    final scopeKey = pantryScope == null
+        ? ''
+        : '${pantryScope.kind}|${pantryScope.householdName ?? ''}|';
     final signature =
-        '${now.year}-${now.month}-${now.day}|$daysBefore\n${_itemSignature(items)}';
+        '$scopeKey${now.year}-${now.month}-${now.day}|$daysBefore\n${_itemSignature(items)}';
     if (signature == _signature && _keys != null && _memory != null) return;
 
     final keys = _keys ?? await repository.fetchAlertKeys(userId);
@@ -82,6 +94,7 @@ class NotificationSynchronizer {
       now: now,
       expiryService: expiryService,
       expiringSoonDays: daysBefore,
+      pantryScope: pantryScope,
     );
 
     for (final planned in plan.create) {
