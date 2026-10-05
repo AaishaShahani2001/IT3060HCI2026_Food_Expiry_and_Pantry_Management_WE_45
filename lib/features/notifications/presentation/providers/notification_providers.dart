@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../expiry/presentation/providers/expiry_provider.dart';
+import '../../../expiry/presentation/providers/expiry_notification_settings_provider.dart';
 import '../../data/notification_repository.dart';
 import '../../domain/models/app_notification.dart';
 import '../../domain/notification_repository.dart';
@@ -35,6 +36,8 @@ final notificationSyncProvider = Provider<NotificationSynchronizer>((ref) {
     repository: ref.watch(notificationRepositoryProvider),
     expiryService: ref.watch(expiryServiceProvider),
     clock: ref.watch(notificationClockProvider),
+    expiringSoonDays: () =>
+        ref.read(expiryNotificationSettingsProvider).daysBefore,
   );
 });
 

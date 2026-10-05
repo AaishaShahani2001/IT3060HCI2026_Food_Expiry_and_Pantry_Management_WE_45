@@ -15,11 +15,13 @@ class NotificationSynchronizer {
     required this.repository,
     required this.expiryService,
     this.clock,
+    this.expiringSoonDays,
   });
 
   final NotificationRepository repository;
   final ExpiryService expiryService;
   final DateTime Function()? clock;
+  final int Function()? expiringSoonDays;
 
   String? _userId;
   String? _signature;
@@ -62,7 +64,10 @@ class NotificationSynchronizer {
       _memory = null;
     }
 
-    final signature = _itemSignature(items);
+    final now = (clock ?? DateTime.now)();
+    final daysBefore = expiringSoonDays?.call() ?? 3;
+    final signature =
+        '${now.year}-${now.month}-${now.day}|$daysBefore\n${_itemSignature(items)}';
     if (signature == _signature && _keys != null && _memory != null) return;
 
     final keys = _keys ?? await repository.fetchAlertKeys(userId);
@@ -70,13 +75,13 @@ class NotificationSynchronizer {
     _keys = keys;
     _memory = memory;
 
-    final now = (clock ?? DateTime.now)();
     final plan = planPantryNotifications(
       items: items,
       existingKeys: keys,
       memory: memory,
       now: now,
       expiryService: expiryService,
+      expiringSoonDays: daysBefore,
     );
 
     for (final planned in plan.create) {

@@ -38,6 +38,7 @@ class PlannedNotification {
     required this.message,
     required this.pantryItemId,
     required this.pantryItemName,
+    this.expiryDate,
   });
 
   final String alertKey;
@@ -46,6 +47,7 @@ class PlannedNotification {
   final String message;
   final String pantryItemId;
   final String pantryItemName;
+  final DateTime? expiryDate;
 
   AppNotification toNotification({
     required String userId,
@@ -59,6 +61,7 @@ class PlannedNotification {
       message: message,
       pantryItemId: pantryItemId,
       pantryItemName: pantryItemName,
+      expiryDate: expiryDate,
       alertKey: alertKey,
       isRead: false,
       createdAt: createdAt,
@@ -105,6 +108,7 @@ NotificationPlan planPantryNotifications({
   required StockMemory memory,
   required DateTime now,
   required ExpiryService expiryService,
+  int expiringSoonDays = kExpiryExpiringSoonDays,
 }) {
   final create = <PlannedNotification>[];
   final reserved = <String>{...existingKeys};
@@ -119,6 +123,7 @@ NotificationPlan planPantryNotifications({
     final status = ExpiryStatusHelper.fromDate(
       item.expiryDate,
       referenceDate: now,
+      expiringSoonDays: expiringSoonDays,
     );
     final days = expiryService.daysUntilExpiry(item, referenceDate: now);
     if (item.expiryDate != null && days != null) {
@@ -207,6 +212,7 @@ void _addExpiry({
       message: message,
       pantryItemId: itemId,
       pantryItemName: name,
+      expiryDate: expiry,
     ),
   );
 }
