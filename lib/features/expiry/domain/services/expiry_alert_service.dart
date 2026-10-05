@@ -2,7 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../pantry/domain/models/pantry_item.dart';
 import '../../data/repositories/firestore_expiry_repository.dart';
-import '../../domain/repositories/expiry_repository.dart';
+import '../expiry_alert_id.dart';
+import '../repositories/expiry_repository.dart';
 import 'expiry_notification_service.dart';
 import 'expiry_service.dart';
 
@@ -53,7 +54,7 @@ class ExpiryAlertService {
       final status = _statusFromDays(daysUntilExpiry);
 
       final alert = ExpiryAlert(
-        id: _alertId(uid, item.id),
+        id: buildExpiryAlertId(uid, item.id),
         userId: uid,
         itemId: item.id,
         itemName: item.name,
@@ -85,9 +86,5 @@ class ExpiryAlertService {
     }
 
     return 'fresh';
-  }
-
-  String _alertId(String userId, String itemId) {
-    return '${userId}_$itemId';
   }
 }
