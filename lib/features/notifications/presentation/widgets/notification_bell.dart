@@ -8,12 +8,13 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../pantry/domain/models/pantry_item.dart';
 import '../../../pantry/presentation/providers/pantry_providers.dart';
+import '../../../expiry/presentation/providers/expiry_notification_settings_provider.dart';
 import '../providers/notification_providers.dart';
 import 'notification_panel.dart';
 
 /// Starts alert generation from the existing pantry stream.
 ///
-/// Mounted beside the bell. It does nothing until a signed-in user is known,
+/// Mounted at the app root. It does nothing until a signed-in user is known,
 /// so Home tests that never initialize Firebase do not open a pantry listener.
 class NotificationSyncHost extends ConsumerStatefulWidget {
   const NotificationSyncHost({super.key});
@@ -23,8 +24,45 @@ class NotificationSyncHost extends ConsumerStatefulWidget {
       _NotificationSyncHostState();
 }
 
-class _NotificationSyncHostState extends ConsumerState<NotificationSyncHost> {
+class _NotificationSyncHostState extends ConsumerState<NotificationSyncHost>
+    with WidgetsBindingObserver {
   String? _scheduledFor;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _refresh(),
+    );
+  }
+
+  void _refresh() {
+    final uid = ref.read(notificationUserIdProvider).asData?.value;
+    if (uid == null) return;
+    final items = ref.read(pantryItemsProvider).asData?.value;
+    if (items != null) _queue(uid, items);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  String _signature(String uid, List<PantryItem> items) {
+    final now = ref.read(notificationClockProvider)();
+    final days = ref.read(expiryNotificationSettingsProvider).daysBefore;
+    return '${now.year}-${now.month}-${now.day}|$days\n${_pantrySignature(uid, items)}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +71,8 @@ class _NotificationSyncHostState extends ConsumerState<NotificationSyncHost> {
       _scheduledFor = null;
       return const SizedBox.shrink();
     }
+
+    ref.listen(expiryNotificationSettingsProvider, (_, next) => _refresh());
 
     ref.listen<AsyncValue<List<PantryItem>>>(pantryItemsProvider, (
       previous,
@@ -45,11 +85,15 @@ class _NotificationSyncHostState extends ConsumerState<NotificationSyncHost> {
 
     final current = ref.watch(pantryItemsProvider).asData?.value;
     if (current != null) {
-      final signature = _pantrySignature(uid, current);
+      final signature = _signature(uid, current);
       if (_scheduledFor != signature) {
         final snapshot = current;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || _scheduledFor == signature) return;
+          if (!mounted ||
+              _scheduledFor == signature ||
+              ref.read(notificationUserIdProvider).asData?.value != uid) {
+            return;
+          }
           _scheduledFor = signature;
           unawaited(_synchronize(ref, uid, snapshot));
         });
@@ -59,11 +103,14 @@ class _NotificationSyncHostState extends ConsumerState<NotificationSyncHost> {
   }
 
   void _queue(String userId, List<PantryItem> items) {
-    final signature = _pantrySignature(userId, items);
+    final signature = _signature(userId, items);
     if (_scheduledFor == signature) return;
     _scheduledFor = signature;
     Future<void>.microtask(() {
-      if (!mounted) return;
+      if (!mounted ||
+          ref.read(notificationUserIdProvider).asData?.value != userId) {
+        return;
+      }
       unawaited(_synchronize(ref, userId, items));
     });
   }

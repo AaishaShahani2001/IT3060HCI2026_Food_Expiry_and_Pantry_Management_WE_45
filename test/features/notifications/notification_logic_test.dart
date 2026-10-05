@@ -84,6 +84,7 @@ void main() {
     expect(parsed, isNotNull);
     expect(parsed!.isRead, isFalse);
     expect(parsed.type, AppNotificationType.expiringSoon);
+    expect(parsed.expiryDate, DateTime(2026, 10, 3));
     expect(parsed.createdAt, DateTime.fromMillisecondsSinceEpoch(0));
     expect(AppNotification.tryParse('bad', {'type': 'Expiring soon'}), isNull);
   });
@@ -204,6 +205,52 @@ void main() {
     expect(redated.create.single.alertKey, 'expiringSoon_milk_2026-10-05');
   });
 
+  test(
+    'planner follows a one-day-before setting instead of the default three days',
+    () {
+      final result = planPantryNotifications(
+        items: [
+          item(id: 'grains', name: 'grains', expiry: DateTime(2026, 10, 3)),
+          item(id: 'rice', name: 'Rice', expiry: DateTime(2026, 10, 4)),
+        ],
+        existingKeys: {},
+        memory: const StockMemory(),
+        now: now,
+        expiryService: service,
+        expiringSoonDays: 1,
+      );
+      expect(result.create.single.title, 'grains expires tomorrow');
+      expect(result.create.single.expiryDate, DateTime(2026, 10, 3));
+    },
+  );
+
+  test(
+    'changing days-before settings rechecks unchanged pantry items',
+    () async {
+      var daysBefore = 1;
+      final repository = MemoryNotificationRepository();
+      final sync = NotificationSynchronizer(
+        repository: repository,
+        expiryService: service,
+        clock: () => now,
+        expiringSoonDays: () => daysBefore,
+      );
+      final grains = item(
+        id: 'grains',
+        name: 'grains',
+        expiry: DateTime(2026, 10, 7),
+      );
+      await sync.synchronize(userId: 'alice', items: [grains]);
+      expect(repository.activeOf('alice'), isEmpty);
+      daysBefore = 5;
+      await sync.synchronize(userId: 'alice', items: [grains]);
+      expect(
+        repository.activeOf('alice').single.title,
+        'grains expires in 5 days',
+      );
+    },
+  );
+
   test('latest five keeps the original list order', () {
     final notifications = [
       for (var index = 0; index < 8; index++)
@@ -300,4 +347,36 @@ void main() {
       isEmpty,
     );
   });
+
+  test(
+    'synchronizer detects expiry on a new day with unchanged pantry items',
+    () async {
+      var currentTime = now;
+      final repository = MemoryNotificationRepository();
+      final sync = NotificationSynchronizer(
+        repository: repository,
+        expiryService: service,
+        clock: () => currentTime,
+      );
+      final milk = item(
+        id: 'milk',
+        name: 'Milk',
+        expiry: DateTime(2026, 10, 2),
+      );
+      await sync.synchronize(userId: 'alice', items: [milk]);
+      expect(
+        repository.activeOf('alice').single.type,
+        AppNotificationType.expiringSoon,
+      );
+      currentTime = DateTime(2026, 10, 3, 9);
+      await sync.synchronize(userId: 'alice', items: [milk]);
+      expect(
+        repository.activeOf('alice').map((alert) => alert.type),
+        containsAll([
+          AppNotificationType.expiringSoon,
+          AppNotificationType.expired,
+        ]),
+      );
+    },
+  );
 }

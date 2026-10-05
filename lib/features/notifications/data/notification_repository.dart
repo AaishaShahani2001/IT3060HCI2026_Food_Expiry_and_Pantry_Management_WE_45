@@ -104,6 +104,9 @@ class FirestoreNotificationRepository implements NotificationRepository {
           'message': notification.message,
           'pantryItemId': notification.pantryItemId,
           'pantryItemName': notification.pantryItemName,
+          'expiryDate': notification.expiryDate == null
+              ? null
+              : Timestamp.fromDate(notification.expiryDate!),
           'alertKey': notification.alertKey,
           'isRead': false,
           'createdAt': FieldValue.serverTimestamp(),
