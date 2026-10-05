@@ -118,8 +118,14 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Shared pantry created successfully.'),
+          content: Text(
+            'Joined Shared Pantry. Your personal Shopping List and Waste data '
+                'have not been deleted. While you are in this shared pantry, the '
+                'household\'s shared Shopping List and Waste data are shown. Your '
+                'personal data will become active again when you leave the pantry.',
+          ),
           behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 6),
         ),
       );
 
@@ -240,8 +246,10 @@ class _SharedPantryScreenState extends State<SharedPantryScreen> {
         return AlertDialog(
           title: const Text('Leave Shared Pantry?'),
           content: const Text(
-            'You will no longer have access to this shared pantry. '
-            'You can join another pantry later using an invite code.',
+            'Shopping items and waste records added to this shared pantry '
+                'will remain with the household after you leave. You will no '
+                'longer have access to those shared records. Your personal '
+                'Shopping List and Waste data will become active again after leaving.',
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
