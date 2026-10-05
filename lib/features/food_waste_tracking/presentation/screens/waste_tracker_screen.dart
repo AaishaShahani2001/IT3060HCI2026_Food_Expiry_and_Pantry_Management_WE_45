@@ -140,22 +140,29 @@ class _WasteTrackerScreenState extends ConsumerState<WasteTrackerScreen> {
     Future<void>.microtask(() async {
       _reconcileScheduled = false;
       if (!mounted || _reconciling) return;
-      final records = ref.read(foodWasteProvider).asData?.value;
-      final sources = ref.read(expiredWastePantryProvider).asData?.value;
       final scope = _scope;
-      if (records == null || sources == null || scope == null) return;
-      final existingIds = {for (final record in records) record.id};
-      final candidates = sources
-          .where((source) => source.scope == scope)
-          .map((source) => source.automaticCandidate())
-          .where((candidate) => !existingIds.contains(candidate.eventId))
-          .toList();
-      if (candidates.isEmpty) return;
+      if (scope == null) return;
+      final session = _session;
       _reconciling = true;
       try {
+        final notifier = ref.read(foodWasteProvider.notifier);
+        await notifier.waitUntilIdleFor(scope);
+        if (!_current(scope, session)) return;
+        final records = ref.read(foodWasteProvider).asData?.value;
+        final sources = ref.read(expiredWastePantryProvider).asData?.value;
+        if (records == null || sources == null) return;
+        final existingIds = {for (final record in records) record.id};
+        final candidates = sources
+            .where((source) => source.scope == scope)
+            .map((source) => source.automaticCandidate())
+            .where((candidate) => !existingIds.contains(candidate.eventId))
+            .toList();
+        if (candidates.isEmpty || !_current(scope, session)) return;
         await ref
             .read(foodWasteProvider.notifier)
             .reconcileAutomatic(candidates);
+      } on WasteScopeChangedException {
+        // Account and Pantry scope changes deliberately discard deferred work.
       } catch (error) {
         // The Pantry stream or a later refresh will retry. Existing Waste data
         // remains usable while the transient reconciliation failure is logged.
