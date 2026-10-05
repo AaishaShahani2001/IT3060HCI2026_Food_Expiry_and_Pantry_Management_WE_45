@@ -7,8 +7,10 @@ final authStateProvider = StreamProvider<User?>((ref) {
 });
 
 final currentUserNameProvider = FutureProvider<String>((ref) async {
-  final user = await ref.watch(authStateProvider.future);
+  final authState = ref.watch(authStateProvider);
+  final user = authState.value;
 
+  // No authenticated user yet.
   if (user == null) {
     return '';
   }
