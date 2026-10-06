@@ -40,7 +40,10 @@ final activePantryScopeProvider = StreamProvider<PantryScope>((ref) {
               .snapshots()
               .map((pantry) {
                 final name = pantry.data()?['name'];
-                return PantryScope.shared(name is String ? name : null);
+                return PantryScope.shared(
+                  name is String ? name : null,
+                  pantryId,
+                );
               });
         });
   });

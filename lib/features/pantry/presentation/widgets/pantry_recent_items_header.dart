@@ -8,9 +8,14 @@ import '../../../../core/router/app_routes.dart';
 /// Uses [GoRouter.push] so the Pantry dashboard stays on the stack and
 /// search, location, filters, and sort are still held in Riverpod on pop.
 class PantryRecentItemsHeader extends StatelessWidget {
-  const PantryRecentItemsHeader({required this.matchingCount, super.key});
+  const PantryRecentItemsHeader({
+    required this.matchingCount,
+    this.viewAllHelpKey,
+    super.key,
+  });
 
   final int matchingCount;
+  final GlobalKey? viewAllHelpKey;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +39,7 @@ class PantryRecentItemsHeader extends StatelessWidget {
           if (matchingCount > 0) ...[
             const SizedBox(width: 8),
             Semantics(
+              key: viewAllHelpKey,
               button: true,
               label: 'View all $matchingCount pantry items',
               child: FilledButton.tonal(

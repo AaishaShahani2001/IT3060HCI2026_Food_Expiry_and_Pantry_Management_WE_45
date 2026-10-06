@@ -14,6 +14,18 @@ import 'pantry_item_list_tile.dart';
 /// overflow; at 700dp two cards fit without using a fixed pixel card width.
 const double kPantryWideLayoutBreakpoint = 700;
 
+class PantryItemHelpTargets {
+  const PantryItemHelpTargets({
+    required this.cardKey,
+    required this.quantityKey,
+    required this.actionsKey,
+  });
+
+  final GlobalKey cardKey;
+  final GlobalKey quantityKey;
+  final GlobalKey actionsKey;
+}
+
 /// Lazy card or list rendering for dashboard preview and All Pantry Items.
 ///
 /// Uses slivers so large lists are not inflated at once. Item actions go
@@ -23,12 +35,14 @@ class PantryItemsSliver extends ConsumerWidget {
     required this.items,
     required this.viewMode,
     this.bottomPadding = 96,
+    this.firstItemHelpTargets,
     super.key,
   });
 
   final List<PantryItem> items;
   final PantryViewMode viewMode;
   final double bottomPadding;
+  final PantryItemHelpTargets? firstItemHelpTargets;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -77,6 +91,7 @@ class PantryItemsSliver extends ConsumerWidget {
             item: item,
             index: index,
             viewMode: PantryViewMode.cards,
+            helpTargets: index == 0 ? firstItemHelpTargets : null,
           );
         }, childCount: items.length),
       ),
@@ -89,11 +104,13 @@ class _BoundPantryItem extends ConsumerWidget {
     required this.item,
     required this.index,
     required this.viewMode,
+    this.helpTargets,
   });
 
   final PantryItem item;
   final int index;
   final PantryViewMode viewMode;
+  final PantryItemHelpTargets? helpTargets;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -131,10 +148,12 @@ class _BoundPantryItem extends ConsumerWidget {
       );
     }
 
-    return PantryItemCard(
+    final card = PantryItemCard(
       key: ValueKey(item.id),
       item: item,
       isUpdating: isUpdating,
+      quantityHelpKey: helpTargets?.quantityKey,
+      actionsHelpKey: helpTargets?.actionsKey,
       onTap: () => _openDetails(context, item),
       onEdit: () => openPantryItemEditor(context, item),
       onUsedUp: () => handlePantryUsedUp(
@@ -158,6 +177,8 @@ class _BoundPantryItem extends ConsumerWidget {
         delta: -item.quantityStep,
       ),
     );
+    final cardKey = helpTargets?.cardKey;
+    return cardKey == null ? card : KeyedSubtree(key: cardKey, child: card);
   }
 }
 
