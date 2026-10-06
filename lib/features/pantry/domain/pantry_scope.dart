@@ -3,15 +3,25 @@
 /// `family` and `shared` are both shown as a shared household pantry. An
 /// unknown or missing value is not treated as either one.
 class PantryScope {
-  const PantryScope.personal() : kind = 'personal', householdName = null;
+  const PantryScope.personal()
+    : kind = 'personal',
+      householdName = null,
+      pantryId = null;
 
-  const PantryScope.shared([this.householdName]) : kind = 'shared';
+  const PantryScope.shared([this.householdName, this.pantryId])
+    : kind = 'shared';
 
   /// `personal` or `shared`.
   final String kind;
 
   /// Household name from `pantries/{id}.name`, when the pantry has one.
   final String? householdName;
+
+  /// Firestore pantry id for a shared household, when it is resolved.
+  ///
+  /// Presentation-only consumers can use this stable identity without
+  /// deriving scope from the display name. Personal pantries do not have one.
+  final String? pantryId;
 
   bool get isShared => kind == 'shared';
 
@@ -65,10 +75,11 @@ class PantryScope {
   static PantryScope fromProfile({
     required String pantryType,
     String? pantryName,
+    String? pantryId,
   }) {
     final type = pantryType.trim().toLowerCase();
     if (type == 'family' || type == 'shared') {
-      return PantryScope.shared(pantryName);
+      return PantryScope.shared(pantryName, pantryId);
     }
     return const PantryScope.personal();
   }

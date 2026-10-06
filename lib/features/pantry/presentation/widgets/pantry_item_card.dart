@@ -26,6 +26,8 @@ class PantryItemCard extends StatelessWidget {
     required this.onDecrement,
     this.onTap,
     this.isUpdating = false,
+    this.quantityHelpKey,
+    this.actionsHelpKey,
     super.key,
   });
 
@@ -37,6 +39,8 @@ class PantryItemCard extends StatelessWidget {
   final VoidCallback onDecrement;
   final VoidCallback? onTap;
   final bool isUpdating;
+  final GlobalKey? quantityHelpKey;
+  final GlobalKey? actionsHelpKey;
 
   @override
   Widget build(BuildContext context) {
@@ -194,6 +198,7 @@ class PantryItemCard extends StatelessWidget {
                           )
                         else
                           SizedBox(
+                            key: actionsHelpKey,
                             width: 28,
                             height: 28,
                             child: IconButton(
@@ -254,6 +259,7 @@ class PantryItemCard extends StatelessWidget {
                     const Spacer(),
                     // Bottom Quantity Stepper
                     PantryQuantityStepper(
+                      key: quantityHelpKey,
                       quantityLabel: item.quantityLabel,
                       canDecrement: canDecrement,
                       isUpdating: isUpdating,
