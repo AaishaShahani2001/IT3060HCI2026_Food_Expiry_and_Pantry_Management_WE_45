@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../features/recipes/presentation/providers/recipe_providers.dart';
 import '../../../../features/pantry/presentation/providers/pantry_providers.dart';
+import '../../../../core/providers/current_user_provider.dart';
 
 import '../../../../core/router/app_routes.dart';
 
@@ -213,6 +214,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
       ref.invalidate(userDietaryProfileProvider);
       ref.invalidate(pantryItemsProvider);
+      ref.invalidate(currentUserNameProvider);
 
       if (!mounted) return;
 
