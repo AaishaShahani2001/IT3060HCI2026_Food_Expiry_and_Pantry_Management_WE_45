@@ -7,9 +7,17 @@ class CloudinaryConfig {
   const CloudinaryConfig({required this.cloudName, required this.uploadPreset});
 
   factory CloudinaryConfig.fromEnvironment() {
+    const definedCloudName = String.fromEnvironment('CLOUDINARY_CLOUD_NAME');
+    const definedUploadPreset = String.fromEnvironment(
+      'CLOUDINARY_UPLOAD_PRESET',
+    );
     return CloudinaryConfig(
-      cloudName: dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '',
-      uploadPreset: dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '',
+      cloudName: definedCloudName.isNotEmpty
+          ? definedCloudName
+          : dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '',
+      uploadPreset: definedUploadPreset.isNotEmpty
+          ? definedUploadPreset
+          : dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '',
     );
   }
 
