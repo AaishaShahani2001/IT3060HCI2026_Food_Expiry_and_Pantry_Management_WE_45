@@ -76,7 +76,9 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Firebase.apps.isNotEmpty
+        ? FirebaseAuth.instance.currentUser
+        : null;
 
     if (user != null) {
       // Existing logged-in user.
