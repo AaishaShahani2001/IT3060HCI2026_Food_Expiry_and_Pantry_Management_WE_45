@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -454,7 +455,9 @@ String _emptyMessage(ExpiryStatusFilter filter, int trackedCount) {
 
 ExpiryAlert _alertFor(PantryItem item, ExpiryService service) {
   final expiryDate = item.expiryDate ?? DateTime.now();
-  final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+  final userId = Firebase.apps.isNotEmpty
+      ? FirebaseAuth.instance.currentUser?.uid ?? ''
+      : '';
   return ExpiryAlert(
     id: userId.isEmpty ? item.id : buildExpiryAlertId(userId, item.id),
     userId: userId,
