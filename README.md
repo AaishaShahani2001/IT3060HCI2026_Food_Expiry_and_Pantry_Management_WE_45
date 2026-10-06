@@ -239,6 +239,21 @@ flutter pub get
 flutter run
 ```
 
+### Build the release APK
+
+Pantry photo upload reads its Cloudinary configuration from compile-time
+defines in release builds. Build the Milestone 3 APK with both values:
+
+```bash
+flutter build apk --release \
+  --dart-define=CLOUDINARY_CLOUD_NAME=dyeuonham \
+  --dart-define=CLOUDINARY_UPLOAD_PRESET=hci_pantrypal
+```
+
+The APK is written to `build/app/outputs/flutter-apk/app-release.apk`. Do not
+omit these defines; a release without them cannot configure Pantry photo
+uploads unless a valid development `.env` asset is also present.
+
 Create an account on the sign-up screen, then use the same email and password on the login screen. Pantry, shopping, and waste data are stored for that Firebase user.
 
 Widget and unit tests live under `test/`:
