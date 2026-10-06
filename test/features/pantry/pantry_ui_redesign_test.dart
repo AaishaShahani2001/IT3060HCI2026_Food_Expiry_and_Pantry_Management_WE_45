@@ -142,6 +142,8 @@ void main() {
 
       expect(find.byType(SliverGrid), findsOneWidget);
       expect(find.byType(PantryItemCard), findsNWidgets(2));
+      expect(find.byKey(const ValueKey('1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('2')), findsOneWidget);
 
       await tester.pumpWidget(
         ProviderScope(

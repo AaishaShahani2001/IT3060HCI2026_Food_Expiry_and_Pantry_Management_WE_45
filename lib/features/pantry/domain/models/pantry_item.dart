@@ -266,6 +266,7 @@ class PantryItem {
     this.photoStoragePath,
     this.imagePublicId,
     this.imageProvider,
+    this.barcode,
   }) : originalQuantity = originalQuantity ?? quantity,
        priceAmount = priceAmount ?? price,
        priceType = priceType ?? PantryPriceType.totalPrice;
@@ -312,6 +313,10 @@ class PantryItem {
 
   /// `cloudinary` when [photoUrl] came from Cloudinary. Null for legacy photos.
   final String? imageProvider;
+
+  /// Product barcode, when a scan or import provided one. Null for manual
+  /// items. It identifies the product, not a stock batch.
+  final String? barcode;
 
   /// True when this item can be updated or deleted in Cloud Firestore.
   bool get isConnectedToFirestore =>
@@ -429,6 +434,7 @@ class PantryItem {
     String? photoStoragePath,
     String? imagePublicId,
     String? imageProvider,
+    String? barcode,
     bool clearPhoto = false,
     bool clearPhotoStoragePath = false,
   }) {
@@ -455,6 +461,7 @@ class PantryItem {
           : (photoStoragePath ?? this.photoStoragePath),
       imagePublicId: clearPhoto ? null : (imagePublicId ?? this.imagePublicId),
       imageProvider: clearPhoto ? null : (imageProvider ?? this.imageProvider),
+      barcode: barcode ?? this.barcode,
     );
   }
 
@@ -477,6 +484,7 @@ class PantryItem {
       'photoStoragePath': photoStoragePath,
       'imagePublicId': imagePublicId,
       'imageProvider': imageProvider,
+      'barcode': barcode,
     };
   }
 
@@ -516,6 +524,8 @@ class PantryItem {
       if (imagePublicId != null) data['imagePublicId'] = imagePublicId;
       if (imageProvider != null) data['imageProvider'] = imageProvider;
     }
+    final code = barcode?.trim();
+    if (code != null && code.isNotEmpty) data['barcode'] = code;
     return data;
   }
 
@@ -543,6 +553,7 @@ class PantryItem {
       photoStoragePath: _optionalString(data['photoStoragePath']),
       imagePublicId: _optionalString(data['imagePublicId']),
       imageProvider: _optionalString(data['imageProvider']),
+      barcode: _optionalString(data['barcode']),
     );
   }
 

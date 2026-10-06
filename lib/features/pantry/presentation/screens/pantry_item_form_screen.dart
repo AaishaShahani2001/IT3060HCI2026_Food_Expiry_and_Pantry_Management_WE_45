@@ -6,7 +6,9 @@ import 'package:image_picker/image_picker.dart';
 import '../../data/services/cloudinary_image_service.dart';
 import '../../data/services/pantry_firestore_service.dart';
 import '../../domain/models/pantry_item.dart';
+import '../../domain/utils/pantry_expiry_batch.dart';
 import '../providers/pantry_providers.dart';
+import 'pantry_item_details_screen.dart';
 import '../utils/pantry_snackbar.dart';
 import '../widgets/duplicate_item_dialog.dart';
 import '../widgets/pantry_item_form.dart';
@@ -26,47 +28,121 @@ class PantryItemFormScreen extends ConsumerStatefulWidget {
 class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
   bool _isSaving = false;
   String? _savingMessage;
+  final PantrySubmitLock _submitLock = PantrySubmitLock();
 
   Future<void> _handleSubmit(PantryItemFormData data) async {
-    if (_isSaving) return;
+    if (_isSaving || !_submitLock.tryAcquire()) return;
 
     FocusScope.of(context).unfocus();
-    setState(() {
-      _isSaving = true;
-      _savingMessage = data.selectedPhoto != null
-          ? 'Uploading photo…'
-          : 'Saving item…';
-    });
 
     try {
-      final duplicate = ref
+      final candidate = _candidateFrom(data);
+      final lookup = ref
           .read(pantryItemsProvider.notifier)
-          .findDuplicateByName(data.name, excludeItemId: widget.item?.id);
+          .findSameProductCandidates(
+            name: candidate.name,
+            location: candidate.location,
+            unit: candidate.unit,
+            expiryDate: candidate.expiryDate,
+            barcode: candidate.barcode,
+            excludeItemId: widget.item?.id,
+          );
 
-      if (duplicate != null) {
-        if (!mounted) return;
+      if (lookup.isEmpty) {
+        await _saveSubmission(data);
+        return;
+      }
 
-        final action = await showDuplicateItemDialog(
-          context: context,
-          existingItem: duplicate,
-        );
+      if (!mounted) return;
+      final choice = await _chooseMatch(lookup);
+      if (!mounted || choice == null) return;
 
-        if (!mounted) return;
+      final action = await showPantryDuplicateDialog(
+        context: context,
+        existing: choice.item,
+        candidate: candidate,
+        exactBatch: choice.exactBatch,
+      );
+      if (!mounted) return;
 
-        if (action == DuplicateItemAction.updateExisting) {
-          Navigator.of(context).pushReplacement(
+      switch (followUpFor(action)) {
+        case PantryDuplicateFollowUp.stay:
+          return;
+        case PantryDuplicateFollowUp.saveOnce:
+          await _saveSubmission(data);
+          return;
+        case PantryDuplicateFollowUp.openDetails:
+          await Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => PantryItemFormScreen(item: duplicate),
+              builder: (_) => PantryItemDetailsScreen(item: choice.item),
             ),
           );
           return;
-        }
-
-        if (action != DuplicateItemAction.addAnyway) {
+        case PantryDuplicateFollowUp.openEditor:
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => PantryItemFormScreen(item: choice.item),
+            ),
+          );
           return;
-        }
       }
+    } on _PhotoSaveCancelled {
+      return;
+    } catch (error, stackTrace) {
+      debugPrint('Pantry item save failed: $error');
+      debugPrint('$stackTrace');
+      if (mounted) {
+        PantrySnackBar.error(context, mapPantryFirestoreError(error));
+      }
+    } finally {
+      _submitLock.release();
+    }
+  }
 
+  PantryItem _candidateFrom(PantryItemFormData data) {
+    final current = widget.item;
+    return PantryItem(
+      id: current?.id ?? '',
+      name: data.name,
+      category: data.category,
+      location: data.location,
+      quantity: data.quantity,
+      originalQuantity: data.originalQuantity,
+      unit: data.unit,
+      price: data.price,
+      priceType: data.priceType,
+      expiryDate: data.expiryDate,
+      barcode: current?.barcode,
+    );
+  }
+
+  Future<PantryMatchChoice?> _chooseMatch(PantryProductLookup lookup) async {
+    final preferred = lookup.preferred;
+    if (preferred != null) return preferred;
+    final picked = await showPantryBatchPicker(
+      context: context,
+      matches: lookup.matches.map((match) => match.item).toList(),
+    );
+    if (picked == null) return null;
+    for (final match in lookup.matches) {
+      if (match.item.id == picked.id) return match;
+    }
+    return null;
+  }
+
+  /// Writes this submission. A new item always receives a new document id.
+  /// An edit writes only the document that was opened.
+  Future<void> _saveSubmission(PantryItemFormData data) async {
+    if (mounted) {
+      setState(() {
+        _isSaving = true;
+        _savingMessage = data.selectedPhoto != null
+            ? 'Uploading photo…'
+            : 'Saving item…';
+      });
+    }
+
+    try {
       final saved = await _persistItem(data);
       if (!saved || !mounted) return;
 
@@ -78,14 +154,6 @@ class _PantryItemFormScreenState extends ConsumerState<PantryItemFormScreen> {
             ? '${data.name} added to your pantry'
             : 'Item updated successfully.',
       );
-    } on _PhotoSaveCancelled {
-      return;
-    } catch (error, stackTrace) {
-      debugPrint('Pantry item save failed: $error');
-      debugPrint('$stackTrace');
-      if (mounted) {
-        PantrySnackBar.error(context, mapPantryFirestoreError(error));
-      }
     } finally {
       if (mounted) {
         setState(() {
