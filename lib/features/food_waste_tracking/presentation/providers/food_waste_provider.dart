@@ -107,6 +107,7 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
   WasteScope? _scope;
   int _generation = 0;
   bool _busy = false;
+  Completer<void>? _idleCompleter;
 
   FoodWasteRepository get _repository => ref.read(foodWasteRepositoryProvider);
 
@@ -116,7 +117,8 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
   Future<List<FoodWasteRecord>> build() async {
     final generation = ++_generation;
     _scope = null;
-    _busy = false;
+    _releaseBusyWaiter();
+    ref.onDispose(_releaseBusyWaiter);
     final repository = ref.watch(foodWasteRepositoryProvider);
     final scope = await ref.watch(wasteScopeProvider.future);
     if (!ref.mounted || generation != _generation) return [];
@@ -155,6 +157,41 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
       _scope == scope &&
       _repository.isCurrentScope(scope);
 
+  void _releaseBusyWaiter() {
+    _busy = false;
+    final completer = _idleCompleter;
+    _idleCompleter = null;
+    if (completer != null && !completer.isCompleted) completer.complete();
+  }
+
+  void _beginOperation() {
+    if (_busy) throw StateError('Waste Tracker operation pending.');
+    _busy = true;
+    _idleCompleter = Completer<void>();
+  }
+
+  void _finishOperation(int generation) {
+    if (generation != _generation) return;
+    _releaseBusyWaiter();
+  }
+
+  /// Waits for the current Waste operation without carrying stale work across
+  /// an account or Pantry scope change.
+  Future<void> waitUntilIdleFor(WasteScope expectedScope) async {
+    final generation = _generation;
+    while (true) {
+      if (!_isCurrent(expectedScope, generation)) {
+        throw const WasteScopeChangedException();
+      }
+      if (!_busy) return;
+      final idle = _idleCompleter;
+      if (idle == null) {
+        throw StateError('Waste Tracker operation pending.');
+      }
+      await idle.future;
+    }
+  }
+
   WasteScope _requireScope([WasteScope? expectedScope]) {
     final scope = _scope;
     if (scope == null ||
@@ -185,12 +222,12 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
     }
     final scope = _requireScope();
     final generation = _generation;
-    _busy = true;
+    _beginOperation();
     try {
       final records = await _repository.load(scope);
       if (_isCurrent(scope, generation)) state = AsyncData(records);
     } finally {
-      if (ref.mounted && generation == _generation) _busy = false;
+      _finishOperation(generation);
     }
   }
 
@@ -224,7 +261,7 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
       throw WasteDuplicateWarning._(scope, generation, record, matches);
     }
 
-    _busy = true;
+    _beginOperation();
     try {
       final saved = record.id == null
           ? await _repository.create(scope, record)
@@ -234,7 +271,7 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
       }
       return saved;
     } finally {
-      if (ref.mounted && generation == _generation) _busy = false;
+      _finishOperation(generation);
     }
   }
 
@@ -244,7 +281,7 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
       throw StateError('Record changed.');
     }
     final generation = _generation;
-    _busy = true;
+    _beginOperation();
     try {
       await _repository.delete(scope, id);
       if (_isCurrent(scope, generation)) {
@@ -253,7 +290,7 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
         );
       }
     } finally {
-      if (ref.mounted && generation == _generation) _busy = false;
+      _finishOperation(generation);
     }
   }
 
@@ -271,7 +308,7 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
       throw StateError('Selected Waste records changed.');
     }
     final generation = _generation;
-    _busy = true;
+    _beginOperation();
     try {
       await _repository.deleteMany(scope, ids);
       if (_isCurrent(scope, generation)) {
@@ -282,7 +319,7 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
         );
       }
     } finally {
-      if (ref.mounted && generation == _generation) _busy = false;
+      _finishOperation(generation);
     }
   }
 
@@ -307,7 +344,7 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
       throw const WasteScopeChangedException();
     }
     final generation = _generation;
-    _busy = true;
+    _beginOperation();
     try {
       final changed = await _repository.reconcileAutomatic(scope, candidates);
       if (!_isCurrent(scope, generation)) {
@@ -315,7 +352,7 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
       }
       return changed;
     } finally {
-      if (ref.mounted && generation == _generation) _busy = false;
+      _finishOperation(generation);
     }
   }
 
@@ -330,7 +367,7 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
       throw StateError('Automatic waste record changed.');
     }
     final generation = _generation;
-    _busy = true;
+    _beginOperation();
     try {
       await _repository.markNotWasted(scope, record);
       if (_isCurrent(scope, generation)) {
@@ -339,7 +376,7 @@ class FoodWasteNotifier extends AsyncNotifier<List<FoodWasteRecord>> {
         );
       }
     } finally {
-      if (ref.mounted && generation == _generation) _busy = false;
+      _finishOperation(generation);
     }
   }
 }

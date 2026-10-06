@@ -302,6 +302,40 @@ void main() {
     expect(session.store.addCalls, 1);
     expect(records().length, 1);
   });
+  test('idle wait completes after the current Waste operation', () async {
+    await load();
+    final gate = Completer<void>();
+    session.store.addGate = gate.future;
+    final pending = notifier().save(draft());
+    var becameIdle = false;
+    final idle = notifier()
+        .waitUntilIdleFor(session.scopeFor('alice'))
+        .then((_) => becameIdle = true);
+
+    await pumpEventQueue();
+    expect(becameIdle, isFalse);
+    gate.complete();
+    await pending;
+    await idle;
+    expect(becameIdle, isTrue);
+  });
+  test('idle wait rejects an account change while work is pending', () async {
+    await load();
+    final gate = Completer<void>();
+    session.store.addGate = gate.future;
+    final pending = notifier().save(draft(name: 'Alice'));
+    final idle = expectLater(
+      notifier().waitUntilIdleFor(session.scopeFor('alice')),
+      throwsA(isA<WasteScopeChangedException>()),
+    );
+
+    session.changeUser('bob');
+    await pumpEventQueue(times: 3);
+    gate.complete();
+    await pending;
+    await idle;
+    expect((await load()), isEmpty);
+  });
   test(
     'account switch and logout never expose previous user records',
     () async {

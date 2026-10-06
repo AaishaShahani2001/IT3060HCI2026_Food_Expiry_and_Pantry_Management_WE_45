@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -138,6 +140,96 @@ void main() {
     expect(
       session.store.documents.keys.where((path) => path.contains(eventId!)),
       hasLength(1),
+    );
+  });
+
+  testWidgets('automatic reconciliation waits for a busy Waste save', (
+    tester,
+  ) async {
+    await open(tester);
+    final gate = Completer<void>();
+    session.store.addGate = gate.future;
+    final pendingSave = container(
+      tester,
+    ).read(foodWasteProvider.notifier).save(draft(name: 'Manual record'));
+
+    session.pantry.seed('alice', stock());
+    await tester.pump();
+    expect(session.store.transactionCalls, 0);
+
+    gate.complete();
+    await pendingSave;
+    await tester.pumpAndSettle();
+
+    expect(records(tester).map((record) => record.itemName), {
+      'Manual record',
+      'Milk',
+    });
+    expect(session.store.transactionSetCalls, 1);
+  });
+
+  testWidgets('multiple busy updates coalesce to one automatic Waste record', (
+    tester,
+  ) async {
+    await open(tester);
+    final gate = Completer<void>();
+    session.store.addGate = gate.future;
+    final pendingSave = container(
+      tester,
+    ).read(foodWasteProvider.notifier).save(draft(name: 'Manual record'));
+
+    session.pantry.seed('alice', stock());
+    await tester.pump();
+    session.pantry.seed('alice', stock(quantity: 2));
+    await tester.pump();
+    session.pantry.seed('alice', stock(quantity: 3));
+    await tester.pump();
+    expect(session.store.transactionCalls, 0);
+
+    gate.complete();
+    await pendingSave;
+    await tester.pumpAndSettle();
+
+    final automatic = records(
+      tester,
+    ).where((record) => record.isAutomaticExpiry).toList();
+    expect(automatic, hasLength(1));
+    expect(automatic.single.quantity, 3);
+    expect(session.store.transactionSetCalls, 1);
+    expect(
+      session.store.documents.keys.where(
+        (path) => path.endsWith('/${automatic.single.id}'),
+      ),
+      hasLength(1),
+    );
+  });
+
+  testWidgets('account change discards reconciliation waiting for idle', (
+    tester,
+  ) async {
+    await open(tester);
+    final gate = Completer<void>();
+    session.store.addGate = gate.future;
+    final pendingSave = container(
+      tester,
+    ).read(foodWasteProvider.notifier).save(draft(name: 'Alice manual'));
+
+    session.pantry.seed('alice', stock());
+    await tester.pump();
+    session.changeUser('bob');
+    await tester.pump();
+    gate.complete();
+    await pendingSave;
+    await tester.pumpAndSettle();
+
+    expect(records(tester), isEmpty);
+    expect(session.store.transactionSetCalls, 0);
+    expect(
+      session.store.documents.keys.where(
+        (path) =>
+            path.contains(automaticWasteEventId('milk', DateTime(2026, 9, 15))),
+      ),
+      isEmpty,
     );
   });
 
