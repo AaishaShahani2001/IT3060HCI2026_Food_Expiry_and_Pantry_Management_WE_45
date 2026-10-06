@@ -12,6 +12,7 @@ import '../../data/services/pantry_item_photo_save.dart';
 import '../../domain/models/pantry_item.dart';
 import '../../domain/models/removed_pantry_item.dart';
 import '../../domain/utils/pantry_duplicate_lookup.dart';
+import '../../domain/utils/pantry_expiry_batch.dart';
 import '../../domain/utils/pantry_list_query.dart';
 
 const Duration _quantityDebounce = Duration(milliseconds: 550);
@@ -238,6 +239,29 @@ class PantryItemsNotifier extends StreamNotifier<List<PantryItem>> {
     return lookupDuplicatePantryItemByName(
       state.asData?.value ?? const <PantryItem>[],
       name,
+      excludeItemId: excludeItemId,
+    );
+  }
+
+  /// Same products in the active pantry. Expiry date is not used to find them.
+  ///
+  /// The list is already the signed-in user's current pantry, so a personal
+  /// item is not compared with a shared item.
+  PantryProductLookup findSameProductCandidates({
+    required String name,
+    required PantryLocation location,
+    required PantryUnit unit,
+    DateTime? expiryDate,
+    String? barcode,
+    String? excludeItemId,
+  }) {
+    return lookupPantryProducts(
+      state.asData?.value ?? const <PantryItem>[],
+      name: name,
+      location: location,
+      unit: unit,
+      expiryDate: expiryDate,
+      barcode: barcode,
       excludeItemId: excludeItemId,
     );
   }

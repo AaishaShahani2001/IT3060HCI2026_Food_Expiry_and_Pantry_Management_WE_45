@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/pantry_item.dart';
+import '../../domain/utils/pantry_expiry_batch.dart';
 import 'expiry_status_indicator.dart';
 import 'pantry_item_actions_sheet.dart';
 import 'pantry_item_image.dart';
@@ -193,7 +194,7 @@ class PantryItemListTile extends StatelessWidget {
                           const SizedBox(width: 3),
                           Expanded(
                             child: Text(
-                              status.label,
+                              pantryBatchStatusLabel(item),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
