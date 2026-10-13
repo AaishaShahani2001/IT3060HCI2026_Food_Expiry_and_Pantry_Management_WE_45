@@ -1,0 +1,175 @@
+import 'package:flutter/material.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/data/shopping_item_metadata.dart';
+import 'package:food_expiry_and_pantry_management/features/shopping_list/models/shopping_item.dart';
+
+class ShoppingItemTile extends StatelessWidget {
+  final ShoppingItem item;
+  final ValueChanged<bool> onPurchasedChanged;
+  final ValueChanged<int> onQuantityChanged;
+  final VoidCallback onEdit;
+  final VoidCallback onLongPress;
+  final VoidCallback onSelectionTap;
+  final bool selectionMode;
+  final bool isSelected;
+  final bool enabled;
+
+  const ShoppingItemTile({
+    super.key,
+    required this.item,
+    required this.onPurchasedChanged,
+    required this.onQuantityChanged,
+    required this.onEdit,
+    required this.onLongPress,
+    required this.onSelectionTap,
+    this.selectionMode = false,
+    this.isSelected = false,
+    this.enabled = true,
+  });
+
+  Widget _quantityControl(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border.all(color: colors.outline.withValues(alpha: 0.55)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: 'Decrease quantity of ${item.name}',
+            onPressed: enabled && item.quantity > 1
+                ? () => onQuantityChanged(item.quantity - 1)
+                : null,
+            icon: const Icon(Icons.remove, size: 20),
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          ),
+          Semantics(
+            label:
+                'Quantity: ${shoppingQuantityLabel(item.quantity, item.unit)}',
+            excludeSemantics: true,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 30),
+              child: Text(
+                shoppingQuantityLabel(item.quantity, item.unit),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colors.onSurface,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Increase quantity of ${item.name}',
+            onPressed: enabled && item.quantity < 100
+                ? () => onQuantityChanged(item.quantity + 1)
+                : null,
+            icon: const Icon(Icons.add, size: 20),
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final leading = selectionMode
+        ? IconButton(
+            onPressed: enabled ? onSelectionTap : null,
+            tooltip:
+                '${isSelected ? 'Deselect' : 'Select'} ${item.name} for deletion',
+            icon: Icon(
+              isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
+            ),
+            color: colors.primary,
+          )
+        : Checkbox(
+            value: item.isPurchased,
+            onChanged: enabled
+                ? (value) => onPurchasedChanged(value ?? false)
+                : null,
+            activeColor: colors.primary,
+            semanticLabel: 'Purchased ${item.name}',
+          );
+    final editButton = IconButton(
+      tooltip: 'Edit ${item.name}',
+      onPressed: enabled ? onEdit : null,
+      icon: const Icon(Icons.edit_outlined, size: 21),
+      color: colors.primary,
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+    );
+    final name = Text(
+      item.name,
+      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+        color: item.isPurchased ? colors.onSurfaceVariant : colors.onSurface,
+        fontWeight: FontWeight.w500,
+        decoration: item.isPurchased ? TextDecoration.lineThrough : null,
+      ),
+    );
+
+    return Semantics(
+      container: true,
+      selected: selectionMode ? isSelected : null,
+      label: selectionMode
+          ? '${isSelected ? 'Selected' : 'Not selected'} ${item.name} for deletion'
+          : null,
+      child: Material(
+        color: isSelected
+            ? colors.secondaryContainer
+            : colors.surfaceContainerHighest,
+        child: InkWell(
+          onLongPress: enabled ? onLongPress : null,
+          onTap: !enabled
+              ? null
+              : selectionMode
+              ? onSelectionTap
+              : () => onPurchasedChanged(!item.isPurchased),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Keep 48px controls and readable names on narrow/large-text screens.
+                final stacked =
+                    constraints.maxWidth < 340 ||
+                    MediaQuery.textScalerOf(context).scale(16) > 20;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        SizedBox(width: 48, height: 48, child: leading),
+                        Expanded(child: name),
+                        if (!selectionMode && !stacked) ...[
+                          const SizedBox(width: 8),
+                          _quantityControl(context),
+                        ],
+                        if (!selectionMode)
+                          SizedBox(width: 48, height: 48, child: editButton),
+                      ],
+                    ),
+                    if (!selectionMode && stacked)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          right: 8,
+                          top: 4,
+                          bottom: 4,
+                        ),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: _quantityControl(context),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

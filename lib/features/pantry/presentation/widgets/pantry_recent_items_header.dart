@@ -1,0 +1,81 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/router/app_routes.dart';
+
+/// Dashboard section title with a matching-count View All action.
+///
+/// Uses [GoRouter.push] so the Pantry dashboard stays on the stack and
+/// search, location, filters, and sort are still held in Riverpod on pop.
+class PantryRecentItemsHeader extends StatelessWidget {
+  const PantryRecentItemsHeader({
+    required this.matchingCount,
+    this.viewAllHelpKey,
+    super.key,
+  });
+
+  final int matchingCount;
+  final GlobalKey? viewAllHelpKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Pantry Recent Items',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
+            ),
+          ),
+          if (matchingCount > 0) ...[
+            const SizedBox(width: 8),
+            Semantics(
+              key: viewAllHelpKey,
+              button: true,
+              label: 'View all $matchingCount pantry items',
+              child: FilledButton.tonal(
+                onPressed: () => context.push(AppRoutes.pantryItems),
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.primaryContainer,
+                  foregroundColor: colorScheme.onPrimaryContainer,
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
+                  shape: const StadiumBorder(),
+                  tapTargetSize: MaterialTapTargetSize.padded,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'View All ($matchingCount)',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 18,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

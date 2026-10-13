@@ -1,0 +1,76 @@
+abstract final class AppStrings {
+  static const String appName = 'FreshTrack';
+  static const String tagline = 'Track Freshness. Reduce Waste.';
+
+  static const String onboardingTitle1 = 'Never Miss an Expiry Date';
+  static const String onboardingDescription1 =
+      'Keep track of your food items and know when they are about to expire.';
+
+  static const String onboardingTitle2 = 'Organize Your Pantry';
+  static const String onboardingDescription2 =
+      'View and manage all your pantry items in one convenient place.';
+
+  static const String onboardingTitle3 = 'Save Food and Reduce Waste';
+  static const String onboardingDescription3 =
+      'Receive useful reminders and use your food before it expires.';
+
+  static const String skip = 'Skip';
+  static const String next = 'Next';
+  static const String getStarted = 'Get Started';
+
+  static const String homeWelcome = 'Welcome to PantryPal';
+  static const String homePlaceholder =
+      'Home screen development will continue later';
+  static const String homeWelcomeMessage =
+      'Manage your pantry, track expiry dates and reduce food waste.';
+
+  static const String goodMorning = 'Good Morning';
+  static const String goodAfternoon = 'Good Afternoon';
+  static const String goodEvening = 'Good Evening';
+  static const String goodNight = 'Good Night';
+  static const String userFallback = 'User';
+  static const String searchTooltip = 'Search';
+  static const String notificationsTooltip = 'Notifications';
+
+  static const String navHome = 'Home';
+  static const String navPantry = 'Pantry';
+  static const String navExpiry = 'Expiry';
+  static const String navShopping = 'Shop';
+  static const String navRecipes = 'Recipes';
+  static const String navSettings = 'Settings';
+
+  static const String profileTitle = 'Profile';
+  static const String expiryNotificationsTitle = 'Expiry Notifications';
+  static const String expiryNotificationsSubtitle =
+      'Alerts for items that are expiring soon';
+  static const String themePreferences = 'Theme Preferences';
+  static const String themeSystem = 'System';
+  static const String themeLight = 'Light';
+  static const String themeDark = 'Dark';
+  static const String noEmailAvailable = 'No email available';
+
+  static const String pantryItems = 'Pantry items';
+  static const String expiringSoon = 'Expiring soon';
+  static const String shoppingList = 'Shopping list';
+  static const String recipeSuggestions = 'Recipe suggestions';
+  static const String foodWasteSaved = 'Food waste saved';
+
+  static const String shoppingListTitle = 'Shopping List';
+  static const String shoppingListEmpty = 'Your shopping list is empty';
+  static const String shoppingListEmptyDescription =
+      'Add items you need to buy.';
+  static const String addItem = 'Add Item';
+  static const String addShoppingItemTitle = 'Add Shopping Item';
+  static const String editShoppingItemTitle = 'Edit Shopping Item';
+  static const String itemName = 'Item Name';
+  static const String itemNameHint = 'Milk';
+  static const String itemNameRequired = 'Please enter an item name.';
+  static const String quantity = 'Quantity';
+  static const String quantityHint = '1';
+  static const String quantityRequired = 'Please enter a quantity.';
+  static const String quantityInvalid = 'Enter a whole number from 1 to 100.';
+  static const String saveItem = 'Save Item';
+  static const String updateItem = 'Update Item';
+
+  static const String sectionComingSoon = 'This section will be updated later.';
+}
